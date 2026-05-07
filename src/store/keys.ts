@@ -4,6 +4,12 @@ export const KEYS = {
   MARKET_CTX: (coin: string) => `market:ctx:${coin}`,
   MARKET_L2: (coin: string) => `market:l2:${coin}`,
   MARKET_META: 'market:meta',
+  // Sub-DEX universe metadata. Main DEX uses MARKET_META; each
+  // builder-deployed perp DEX (xyz, flx, vntl, …) gets its own meta
+  // cache. PERPDEXS holds the JSON list returned by /info perpDexs —
+  // used to decode HL's asset id encoding back to a coin name.
+  MARKET_PERPDEXS: 'market:perpdexs',
+  MARKET_META_DEX: (dex: string) => `market:meta:${dex}`,
 
   // User account
   USER_ACCOUNT: (userId: string) => `user:${userId}:account`,

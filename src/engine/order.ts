@@ -12,20 +12,45 @@ import type { PaperOrder } from '../types/order.js';
 
 const matcher = new OrderMatcher(eventBus);
 
+// HL encodes sub-DEX asset ids as `100_000 + perpDexIdx*10_000 + universeIdx`.
+// Anything < 100_000 is a main-DEX universe index. perpDexIdx aligns with
+// the index in the array returned by /info perpDexs (where index 0 is null,
+// index 1 is the first sub-DEX, etc.).
+const SUB_DEX_OFFSET = 100_000;
+const SUB_DEX_STRIDE = 10_000;
+
+async function loadUniverseEntry(asset: number): Promise<{ universe: HlMeta['universe']; localIdx: number } | null> {
+  if (asset < SUB_DEX_OFFSET) {
+    const metaRaw = await redis.get(KEYS.MARKET_META);
+    if (!metaRaw) return null;
+    const meta: HlMeta = JSON.parse(metaRaw);
+    if (asset < 0 || asset >= meta.universe.length) return null;
+    return { universe: meta.universe, localIdx: asset };
+  }
+  // Sub-DEX
+  const offset = asset - SUB_DEX_OFFSET;
+  const dexIdx = Math.floor(offset / SUB_DEX_STRIDE);
+  const localIdx = offset % SUB_DEX_STRIDE;
+  const perpDexsRaw = await redis.get(KEYS.MARKET_PERPDEXS);
+  if (!perpDexsRaw) return null;
+  const perpDexs: Array<{ name: string } | null> = JSON.parse(perpDexsRaw);
+  const dex = perpDexs[dexIdx];
+  if (!dex || !dex.name) return null;
+  const subMetaRaw = await redis.get(KEYS.MARKET_META_DEX(dex.name));
+  if (!subMetaRaw) return null;
+  const subMeta: HlMeta = JSON.parse(subMetaRaw);
+  if (localIdx < 0 || localIdx >= subMeta.universe.length) return null;
+  return { universe: subMeta.universe, localIdx };
+}
+
 export async function resolveAssetCoin(asset: number): Promise<string | null> {
-  const metaRaw = await redis.get(KEYS.MARKET_META);
-  if (!metaRaw) return null;
-  const meta: HlMeta = JSON.parse(metaRaw);
-  if (asset < 0 || asset >= meta.universe.length) return null;
-  return meta.universe[asset].name;
+  const found = await loadUniverseEntry(asset);
+  return found ? found.universe[found.localIdx].name : null;
 }
 
 export async function getAssetDecimals(asset: number): Promise<number> {
-  const metaRaw = await redis.get(KEYS.MARKET_META);
-  if (!metaRaw) return 0;
-  const meta: HlMeta = JSON.parse(metaRaw);
-  if (asset < 0 || asset >= meta.universe.length) return 0;
-  return meta.universe[asset].szDecimals;
+  const found = await loadUniverseEntry(asset);
+  return found ? found.universe[found.localIdx].szDecimals : 0;
 }
 
 export async function placeOrders(
