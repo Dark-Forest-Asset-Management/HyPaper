@@ -2,12 +2,12 @@ import { redis } from '../store/redis.js';
 import { KEYS } from '../store/keys.js';
 import { logger } from '../utils/logger.js';
 import { lte, gte, isZero, gt, lt } from '../utils/math.js';
-import { nextOid } from '../utils/id.js';
+import { nextOid, nextTwapId } from '../utils/id.js';
 import { checkMarginForOrder } from './margin.js';
 import { OrderMatcher } from '../worker/order-matcher.js';
 import { computeFillPrice } from '../utils/slippage.js';
 import { eventBus } from '../worker/index.js';
-import type { HlOrderWire, HlCancelRequest, HlCancelByCloidRequest, HlOrderResponseStatus, HlMeta } from '../types/hl.js';
+import type { HlOrderWire, HlCancelRequest, HlCancelByCloidRequest, HlOrderResponseStatus, HlMeta, HlTwapWire } from '../types/hl.js';
 import type { PaperOrder } from '../types/order.js';
 
 const matcher = new OrderMatcher(eventBus);
@@ -57,17 +57,39 @@ export async function placeOrders(
   userId: string,
   orders: HlOrderWire[],
   grouping: string,
+  opts?: { expiresAfter?: number },
 ): Promise<HlOrderResponseStatus[]> {
   const results: HlOrderResponseStatus[] = [];
+  const placedOids: number[] = [];
 
   for (const wire of orders) {
     try {
-      const result = await placeSingleOrder(userId, wire, grouping);
+      const result = await placeSingleOrder(userId, wire, grouping, opts);
       results.push(result);
+      // Collect oids of orders that successfully made it onto the book or
+      // fully filled — we'll wire OCO bracket links across them below.
+      if (typeof result === 'object' && result !== null) {
+        if ('resting' in result && result.resting?.oid) placedOids.push(result.resting.oid);
+        else if ('filled' in result && result.filled?.oid) placedOids.push(result.filled.oid);
+      }
     } catch (err) {
       logger.error({ err, wire }, 'Error placing order');
       results.push({ error: String(err) });
     }
+  }
+
+  // OCO bracket linkage: for `normalTpsl` and `positionTpsl` groupings, HL
+  // links every order in the batch as siblings. When one fills (or is
+  // cancelled), the matcher walks the bracket set and cancels the rest.
+  // For `na` (default) no linkage is applied.
+  if ((grouping === 'normalTpsl' || grouping === 'positionTpsl') && placedOids.length > 1) {
+    const pipeline = redis.pipeline();
+    for (const oid of placedOids) {
+      // Each oid's bracket set holds every OTHER oid in the batch.
+      const siblings = placedOids.filter((o) => o !== oid).map(String);
+      if (siblings.length > 0) pipeline.sadd(KEYS.ORDER_BRACKET(oid), ...siblings);
+    }
+    await pipeline.exec();
   }
 
   return results;
@@ -77,6 +99,7 @@ async function placeSingleOrder(
   userId: string,
   wire: HlOrderWire,
   grouping: string,
+  opts?: { expiresAfter?: number },
 ): Promise<HlOrderResponseStatus> {
   const coin = await resolveAssetCoin(wire.a);
   if (!coin) return { error: `Unknown asset ${wire.a}` };
@@ -85,13 +108,19 @@ async function placeSingleOrder(
   const sz = wire.s;
   const limitPx = wire.p;
   const reduceOnly = wire.r;
-  const tif = wire.t.limit.tif;
   const trigger = wire.t.trigger;
 
-  // For trigger orders
+  // For trigger orders. Real HL wires include both `t.limit.tif` (as the
+  // fallback for the trigger order's limit leg) AND `t.trigger`, but
+  // some clients send trigger-only — guard the limit access so we don't
+  // crash before reaching the branch.
   if (trigger) {
     return placeTriggeredOrder(userId, wire.a, coin, isBuy, sz, limitPx, reduceOnly, trigger, wire.c, grouping);
   }
+  if (!wire.t.limit?.tif) {
+    return { error: 'Order missing both t.limit.tif and t.trigger' };
+  }
+  const tif = wire.t.limit.tif;
 
   // Get current mid price for immediate fill check
   const midPx = await redis.hget(KEYS.MARKET_MIDS, coin);
@@ -321,6 +350,24 @@ export async function cancelOrders(
     pipeline.srem(KEYS.ORDERS_TRIGGERS, cancel.o.toString());
     await pipeline.exec();
 
+    // Bracket OCO: cancelling one leg of a `normalTpsl`/`positionTpsl`
+    // group should cancel the siblings too. Drain the bracket set so we
+    // don't loop forever.
+    const siblings = await redis.smembers(KEYS.ORDER_BRACKET(cancel.o));
+    if (siblings.length > 0) {
+      await redis.del(KEYS.ORDER_BRACKET(cancel.o));
+      const sibCancels: HlCancelRequest[] = [];
+      for (const sibStr of siblings) {
+        const sibOid = parseInt(sibStr, 10);
+        if (!Number.isFinite(sibOid)) continue;
+        const sibData = await redis.hgetall(KEYS.ORDER(sibOid));
+        if (sibData.oid && sibData.status === 'open' && sibData.userId === userId) {
+          sibCancels.push({ a: parseInt(sibData.asset, 10), o: sibOid });
+        }
+      }
+      if (sibCancels.length > 0) await cancelOrders(userId, sibCancels);
+    }
+
     eventBus.emit('orderUpdate', {
       userId,
       order: {
@@ -382,4 +429,139 @@ export async function updateLeverage(
     'leverage', leverage.toString(),
     'isCross', isCross.toString(),
   );
+}
+
+/** Atomic cancel-and-replace. HL's `modify` is one operation server-side;
+ *  HyPaper does it as `cancelOrders` + `placeOrders` back-to-back. There's
+ *  a tiny window between the two where the order is missing from the book —
+ *  acceptable for a paper-trading sim, but worth noting if the user uses
+ *  modify for time-critical strategies. */
+export async function modifyOrder(
+  userId: string,
+  target: number | string,
+  newWire: HlOrderWire,
+): Promise<HlOrderResponseStatus> {
+  // Resolve oid: numbers are direct order ids; strings are cloids.
+  let oid: number;
+  if (typeof target === 'number') {
+    oid = target;
+  } else {
+    const oidStr = await redis.hget(KEYS.USER_CLOIDS(userId), target);
+    if (!oidStr) return { error: `cloid ${target} not found` };
+    oid = parseInt(oidStr, 10);
+  }
+
+  // Verify the order exists and belongs to this user before cancelling.
+  const orderData = await redis.hgetall(KEYS.ORDER(oid));
+  if (!orderData.oid || orderData.userId !== userId) {
+    return { error: `Order ${oid} not found` };
+  }
+  if (orderData.status !== 'open') {
+    return { error: `Order ${oid} is not open (status: ${orderData.status})` };
+  }
+
+  // Cancel the original. We don't surface its result on the wire — modify's
+  // canonical HL response is `{ type: 'default' }` regardless.
+  await cancelOrders(userId, [{ a: parseInt(orderData.asset, 10), o: oid }]);
+
+  // Place the replacement. Use `na` grouping by default — modify shouldn't
+  // re-link an order to an unrelated bracket on its own.
+  const [result] = await placeOrders(userId, [newWire], 'na');
+  return result;
+}
+
+/** Loop apply of `modify`. HL atomicizes the whole batch server-side; we
+ *  don't, but the API surface matches. */
+export async function batchModifyOrders(
+  userId: string,
+  modifies: Array<{ oid: number | string; order: HlOrderWire }>,
+): Promise<HlOrderResponseStatus[]> {
+  const results: HlOrderResponseStatus[] = [];
+  for (const m of modifies) {
+    results.push(await modifyOrder(userId, m.oid, m.order));
+  }
+  return results;
+}
+
+/** Active TWAP record persisted in Redis. The matcher reads these on each
+ *  tick and submits suborders as time elapses. */
+export interface PaperTwap {
+  twapId: number;
+  userId: string;
+  asset: number;
+  coin: string;
+  isBuy: boolean;
+  totalSize: string;
+  reduceOnly: boolean;
+  durationMin: number;
+  randomize: boolean;
+  startTime: number;          // ms
+  endTime: number;            // ms
+  filledSize: string;
+  status: 'running' | 'finished' | 'cancelled' | 'error';
+  lastSubmittedAt: number;    // ms — tracks last suborder time
+  createdAt: number;
+}
+
+/** Register a TWAP order. The matcher then drives the actual suborder
+ *  schedule (see `worker/order-matcher.ts:matchTwaps`). HL spec is ~30s
+ *  suborders with a 3% slippage cap and up-to-3× catchup; HyPaper's v1
+ *  ticks slices proportionally to elapsed time without the catchup math.
+ *  Documented as a known approximation. */
+export async function placeTwap(
+  userId: string,
+  twap: HlTwapWire,
+): Promise<{ status: 'ok' | 'err'; twapId?: number; error?: string }> {
+  const coin = await resolveAssetCoin(twap.a);
+  if (!coin) return { status: 'err', error: `Unknown asset ${twap.a}` };
+  if (twap.m <= 0 || twap.m > 24 * 60) return { status: 'err', error: 'Duration must be 1..1440 minutes' };
+  const totalSize = Number(twap.s);
+  if (!Number.isFinite(totalSize) || totalSize <= 0) return { status: 'err', error: 'Size must be a positive number' };
+
+  const twapId = await nextTwapId();
+  const now = Date.now();
+  const record: PaperTwap = {
+    twapId,
+    userId,
+    asset: twap.a,
+    coin,
+    isBuy: twap.b,
+    totalSize: twap.s,
+    reduceOnly: twap.r,
+    durationMin: twap.m,
+    randomize: twap.t,
+    startTime: now,
+    endTime: now + twap.m * 60_000,
+    filledSize: '0',
+    status: 'running',
+    lastSubmittedAt: 0,
+    createdAt: now,
+  };
+
+  const pipeline = redis.pipeline();
+  pipeline.hset(KEYS.TWAP(twapId), record as unknown as Record<string, string | number>);
+  pipeline.sadd(KEYS.TWAPS_ACTIVE, twapId.toString());
+  pipeline.zadd(KEYS.USER_TWAPS(userId), now, twapId.toString());
+  await pipeline.exec();
+
+  eventBus.emit('twapUpdate', { userId, twap: record, status: 'running' });
+  return { status: 'ok', twapId };
+}
+
+/** Mark a TWAP cancelled. Any in-flight suborder loop will skip it on the
+ *  next matcher tick. HL accepts a `twapCancel` action (asset + twapId). */
+export async function cancelTwap(
+  userId: string,
+  twapId: number,
+): Promise<{ status: 'ok' | 'err'; error?: string }> {
+  const data = await redis.hgetall(KEYS.TWAP(twapId));
+  if (!data.twapId || data.userId !== userId) return { status: 'err', error: `TWAP ${twapId} not found` };
+  if (data.status !== 'running') return { status: 'err', error: `TWAP ${twapId} not running` };
+
+  const pipeline = redis.pipeline();
+  pipeline.hset(KEYS.TWAP(twapId), 'status', 'cancelled', 'lastSubmittedAt', Date.now().toString());
+  pipeline.srem(KEYS.TWAPS_ACTIVE, twapId.toString());
+  await pipeline.exec();
+  eventBus.emit('twapUpdate', { userId, twapId, status: 'cancelled' });
+  return { status: 'ok' };
 }
