@@ -441,14 +441,45 @@ export class OrderMatcher {
     await this.cancelOrderSiblings(order.oid, userId);
   }
 
-  /** Walks the bracket set for `oid` and cancels every sibling that's
-   *  still open. Called after a fill or after a manual cancel. The
-   *  bracket set is a Redis Set; we drain it once and then forget so
-   *  follow-up cancels don't loop forever. */
+  /** Bracket cascade on fill. Two cases:
+   *    1. THIS oid is a PARENT (has CHILDREN registered) → fill it and
+   *       LEAVE children alive. Children now bracket the new position.
+   *    2. THIS oid is a CHILD (has BRACKET siblings registered) → cancel
+   *       sibling children (OCO: only one exit fires) and clean parent's
+   *       children-set so a later parent-cancel doesn't try to re-cancel
+   *       already-filled / already-cancelled legs.
+   *    3. Unlinked order → no-op.
+   */
   private async cancelOrderSiblings(oid: number, userId: string): Promise<void> {
+    // Case 1: parent fill — children stay alive. Just clean the children
+    // set and the children's reverse pointers since the parent is gone.
+    const childrenOids = await redis.smembers(KEYS.ORDER_CHILDREN(oid));
+    if (childrenOids.length > 0) {
+      const pipeline = redis.pipeline();
+      pipeline.del(KEYS.ORDER_CHILDREN(oid));
+      for (const childStr of childrenOids) {
+        const childOid = parseInt(childStr, 10);
+        if (Number.isFinite(childOid)) pipeline.del(KEYS.ORDER_PARENT(childOid));
+      }
+      await pipeline.exec();
+      return;
+    }
+
+    // Case 2/3: this oid is a child (or unlinked). Walk its sibling set.
     const siblings = await redis.smembers(KEYS.ORDER_BRACKET(oid));
-    if (siblings.length === 0) return;
+    if (siblings.length === 0) {
+      // Unlinked or already drained — nothing to do.
+      await redis.del(KEYS.ORDER_PARENT(oid));
+      return;
+    }
+    // Pull the parent so we can clean its children-set too.
+    const parentStr = await redis.get(KEYS.ORDER_PARENT(oid));
+    const parentOid = parentStr ? parseInt(parentStr, 10) : null;
     await redis.del(KEYS.ORDER_BRACKET(oid));
+    await redis.del(KEYS.ORDER_PARENT(oid));
+    if (parentOid && Number.isFinite(parentOid)) {
+      await redis.srem(KEYS.ORDER_CHILDREN(parentOid), oid.toString());
+    }
     for (const sibStr of siblings) {
       const sibOid = parseInt(sibStr, 10);
       if (!Number.isFinite(sibOid)) continue;
@@ -460,6 +491,8 @@ export class OrderMatcher {
       pipeline.srem(KEYS.ORDERS_OPEN, sibStr);
       pipeline.srem(KEYS.ORDERS_TRIGGERS, sibStr);
       pipeline.del(KEYS.ORDER_BRACKET(sibOid));
+      pipeline.del(KEYS.ORDER_PARENT(sibOid));
+      if (parentOid && Number.isFinite(parentOid)) pipeline.srem(KEYS.ORDER_CHILDREN(parentOid), sibStr);
       await pipeline.exec();
       this.eventBus.emit('orderUpdate', {
         userId,

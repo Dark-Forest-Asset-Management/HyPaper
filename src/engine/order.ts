@@ -78,16 +78,30 @@ export async function placeOrders(
     }
   }
 
-  // OCO bracket linkage: for `normalTpsl` and `positionTpsl` groupings, HL
-  // links every order in the batch as siblings. When one fills (or is
-  // cancelled), the matcher walks the bracket set and cancels the rest.
-  // For `na` (default) no linkage is applied.
+  // Bracket linkage for `normalTpsl` / `positionTpsl`. HL convention:
+  // first order in the batch is the PARENT (entry), the rest are CHILDREN
+  // (TP / SL exits). The link structure is asymmetric so each fill type
+  // cascades correctly:
+  //
+  //   parent.children = [child1, child2, ...]   ← used on parent cancel
+  //   child.parent    = parent                  ← reverse pointer
+  //   child.bracket   = [other children]        ← used on child fill (OCO)
+  //
+  // Behavior:
+  //   parent fills    → children stay alive (they bracket the new position)
+  //   parent cancels  → cascade-cancel children (no entry = no bracket)
+  //   child fills     → cancel sibling children (OCO; only one exit fires)
+  //   child cancels   → no cascade (user-explicit one-leg cancel)
   if ((grouping === 'normalTpsl' || grouping === 'positionTpsl') && placedOids.length > 1) {
+    const [parentOid, ...childOids] = placedOids;
     const pipeline = redis.pipeline();
-    for (const oid of placedOids) {
-      // Each oid's bracket set holds every OTHER oid in the batch.
-      const siblings = placedOids.filter((o) => o !== oid).map(String);
-      if (siblings.length > 0) pipeline.sadd(KEYS.ORDER_BRACKET(oid), ...siblings);
+    if (childOids.length > 0) {
+      pipeline.sadd(KEYS.ORDER_CHILDREN(parentOid), ...childOids.map(String));
+      for (const childOid of childOids) {
+        pipeline.set(KEYS.ORDER_PARENT(childOid), String(parentOid));
+        const sibs = childOids.filter((o) => o !== childOid).map(String);
+        if (sibs.length > 0) pipeline.sadd(KEYS.ORDER_BRACKET(childOid), ...sibs);
+      }
     }
     await pipeline.exec();
   }
@@ -350,22 +364,33 @@ export async function cancelOrders(
     pipeline.srem(KEYS.ORDERS_TRIGGERS, cancel.o.toString());
     await pipeline.exec();
 
-    // Bracket OCO: cancelling one leg of a `normalTpsl`/`positionTpsl`
-    // group should cancel the siblings too. Drain the bracket set so we
-    // don't loop forever.
-    const siblings = await redis.smembers(KEYS.ORDER_BRACKET(cancel.o));
-    if (siblings.length > 0) {
-      await redis.del(KEYS.ORDER_BRACKET(cancel.o));
-      const sibCancels: HlCancelRequest[] = [];
-      for (const sibStr of siblings) {
-        const sibOid = parseInt(sibStr, 10);
-        if (!Number.isFinite(sibOid)) continue;
-        const sibData = await redis.hgetall(KEYS.ORDER(sibOid));
-        if (sibData.oid && sibData.status === 'open' && sibData.userId === userId) {
-          sibCancels.push({ a: parseInt(sibData.asset, 10), o: sibOid });
+    // Bracket cascade on cancel:
+    //   - If THIS oid is a PARENT (has children registered), cascade-cancel
+    //     all open children. A bracket without an entry is meaningless.
+    //   - If THIS oid is a CHILD, do NOT cascade. The user explicitly
+    //     cancelled one bracket leg; the surviving leg + parent remain.
+    //   - Always clean up any reverse-pointers we own so the next
+    //     event finds a clean state.
+    const childrenOids = await redis.smembers(KEYS.ORDER_CHILDREN(cancel.o));
+    if (childrenOids.length > 0) {
+      await redis.del(KEYS.ORDER_CHILDREN(cancel.o));
+      const childCancels: HlCancelRequest[] = [];
+      for (const childStr of childrenOids) {
+        const childOid = parseInt(childStr, 10);
+        if (!Number.isFinite(childOid)) continue;
+        const childData = await redis.hgetall(KEYS.ORDER(childOid));
+        if (childData.oid && childData.status === 'open' && childData.userId === userId) {
+          childCancels.push({ a: parseInt(childData.asset, 10), o: childOid });
         }
+        // Drop the child's reverse pointers regardless of status.
+        await redis.del(KEYS.ORDER_PARENT(childOid));
+        await redis.del(KEYS.ORDER_BRACKET(childOid));
       }
-      if (sibCancels.length > 0) await cancelOrders(userId, sibCancels);
+      if (childCancels.length > 0) await cancelOrders(userId, childCancels);
+    } else {
+      // Child or unlinked: clean any sibling/parent links we own.
+      await redis.del(KEYS.ORDER_BRACKET(cancel.o));
+      await redis.del(KEYS.ORDER_PARENT(cancel.o));
     }
 
     eventBus.emit('orderUpdate', {

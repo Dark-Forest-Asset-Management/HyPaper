@@ -25,11 +25,19 @@ export const KEYS = {
   ORDER: (oid: number) => `order:${oid}`,
   ORDERS_OPEN: 'orders:open',
   ORDERS_TRIGGERS: 'orders:triggers',
-  /** Bracket OCO links: a Set keyed by parent oid containing its sibling
-   *  oids (TP/SL group). When one fills or cancels, the matcher walks
-   *  this set and cancels the others, mirroring HL's `normalTpsl` /
-   *  `positionTpsl` grouping. */
+  /** OCO sibling links — populated ONLY on child orders (TP/SL legs). Set
+   *  contains the other child oids in the bracket. Used when a child
+   *  fills: walk this set and cancel the siblings so they don't fire on
+   *  the same position twice. NOT populated on parent orders, because a
+   *  parent fill must leave its children alive (they're the bracketed
+   *  exits on the new position). */
   ORDER_BRACKET: (oid: number) => `order:${oid}:bracket`,
+  /** Parent → children link — populated ONLY on the parent (entry) order.
+   *  Used when the parent is CANCELLED (not filled): walk the children
+   *  and cancel them too, since a bracket without an entry is meaningless. */
+  ORDER_CHILDREN: (oid: number) => `order:${oid}:children`,
+  /** Reverse pointer from child → parent. Stored as a single oid string. */
+  ORDER_PARENT: (oid: number) => `order:${oid}:parent`,
   /** Sorted set of `expiresAfter` deadlines: score = expiry-ms,
    *  member = oid. The matcher sweeps low-scored entries to cancel. */
   ORDERS_EXPIRY: 'orders:expiry',
