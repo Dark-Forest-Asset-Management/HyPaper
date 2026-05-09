@@ -135,6 +135,7 @@ export async function getFrontendOpenOrders(userId: string) {
     const data = await redis.hgetall(KEYS.ORDER(oid));
     if (!data.oid || data.status !== 'open') continue;
 
+    const isTrigger = data.orderType === 'trigger';
     orders.push({
       coin: data.coin,
       side: data.isBuy === 'true' ? 'B' : 'A',
@@ -145,7 +146,15 @@ export async function getFrontendOpenOrders(userId: string) {
       origSz: data.sz,
       cloid: data.cloid || undefined,
       tif: data.tif,
-      orderType: data.orderType === 'trigger' ? 'Stop' : 'Limit',
+      // Match HL-prod's FrontendOrderInfo shape exactly so consumers
+      // (e.g. slushy's auto-position-overlay classifier) can use the
+      // same detection rules against either backend. Reference:
+      // hyperliquid-rust-sdk/src/info/sub_structs.rs `BasicOrderInfo`.
+      // Previously HyPaper omitted `isTrigger` and collapsed every
+      // trigger order's orderType to "Stop" — both diverged from HL,
+      // which broke the bracket detector silently in paper mode.
+      isTrigger,
+      orderType: hlOrderTypeString(isTrigger, data.tpsl, data.isMarket === 'true'),
       triggerPx: data.triggerPx || undefined,
       triggerCondition: data.tpsl || undefined,
       isPositionTpsl: data.grouping === 'positionTpsl',
@@ -154,6 +163,18 @@ export async function getFrontendOpenOrders(userId: string) {
   }
 
   return orders;
+}
+
+/** HL FrontendOrderInfo orderType strings. `Limit` for non-trigger, four
+ *  trigger variants by (tp|sl) × (market|limit). Cross-checked against
+ *  the gitbook example responses + python-sdk basic_tpsl example. */
+function hlOrderTypeString(isTrigger: boolean, tpsl: string | undefined, isMarket: boolean): string {
+  if (!isTrigger) return 'Limit';
+  if (tpsl === 'tp') return isMarket ? 'Take Profit Market' : 'Take Profit Limit';
+  if (tpsl === 'sl') return isMarket ? 'Stop Market' : 'Stop Limit';
+  // Trigger order without an explicit tpsl tag — fall back to the
+  // generic name HL uses pre-classification.
+  return isMarket ? 'Stop Market' : 'Stop Limit';
 }
 
 export async function getOrderStatus(oid: number) {
