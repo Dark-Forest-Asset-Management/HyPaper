@@ -353,6 +353,9 @@ export class OrderMatcher {
       tid,
       cloid: order.cloid,
       feeToken: 'USDC',
+      // HL prod always emits twapId on userFills entries; null for non-TWAP
+      // fills (every fill HyPaper produces, since HyPaper has no TWAP path).
+      twapId: null,
     };
 
     // Pre-read funding fields before pipeline

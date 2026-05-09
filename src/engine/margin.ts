@@ -1,6 +1,6 @@
 import { redis } from '../store/redis.js';
 import { KEYS } from '../store/keys.js';
-import { D, add, sub, mul, div, abs, gt, lt, isZero, neg } from '../utils/math.js';
+import { D, add, sub, mul, div, abs, gt, gte, lt, lte, isZero, neg } from '../utils/math.js';
 
 export async function calculateAccountValue(userId: string): Promise<string> {
   const balance = await getBalance(userId);
@@ -120,28 +120,56 @@ export async function checkMarginForOrder(
   return !lt(available, marginNeeded);
 }
 
+/** Compute the price at which this position would be liquidated, mirroring
+ *  HL prod's behaviour. `isCross` controls the formula:
+ *
+ *  - **Cross**: position survives until total account value falls below
+ *    the sum of maintenance margins. Liquidation price is
+ *    `entryPx ∓ (accountValue − maintMargin) / size`. If the cushion is
+ *    bigger than the position's notional (i.e. liqPx ≤ 0 for longs, or
+ *    ≥ 2× entry for shorts), HL returns `null` — verified 2026-05-09
+ *    against an 8 XRP long @ 1.4161 with $144 account value and ~$0.28
+ *    maintenance margin: cushion ≈ $143.82, offset ≈ $17.98, liqPx_long
+ *    ≈ −16.56 → HL prod emits `liquidationPx: null`.
+ *
+ *  - **Isolated**: dedicated margin per position; never null. Same formula
+ *    HyPaper used historically: `entryPx × (1 − 1/leverage + maintRate)`
+ *    for longs, mirrored for shorts. The `accountValue` arg is ignored
+ *    in this branch, matching how isolated positions don't share equity.
+ *
+ *  Maintenance margin rate is approximated as `1 / (2 × leverage)` — same
+ *  approximation HyPaper has always used. The real HL rate is per-asset
+ *  tier-based; this is close enough for paper trading. */
 export function calculateLiquidationPrice(
   szi: string,
   entryPx: string,
   accountValue: string,
   leverage: number,
+  isCross: boolean,
 ): string | null {
   if (isZero(szi)) return null;
 
   const isLong = gt(szi, '0');
   const size = abs(szi);
-  const margin = div(mul(size, entryPx), leverage.toString());
-
-  // Maintenance margin is ~half of initial margin
   const maintMarginRate = div('1', (leverage * 2).toString());
 
+  if (isCross) {
+    const positionNotional = mul(size, entryPx);
+    const maintMargin = mul(positionNotional, maintMarginRate);
+    const cushion = sub(accountValue, maintMargin);
+    // If cushion ≥ positionNotional, the account can absorb the position
+    // going to zero (long) or doubling (short) without liquidating.
+    // HL returns null in those cases — match that.
+    if (gte(cushion, positionNotional)) return null;
+    if (lte(cushion, '0')) return isLong ? '0' : entryPx;
+    const offset = div(cushion, size);
+    return isLong ? sub(entryPx, offset) : add(entryPx, offset);
+  }
+
+  // Isolated.
   if (isLong) {
-    // liqPx = entryPx * (1 - 1/leverage + maintMarginRate)
-    // Simplified: price drops enough to eat through margin
     const liqPx = mul(entryPx, sub('1', sub(div('1', leverage.toString()), maintMarginRate)));
     return gt(liqPx, '0') ? liqPx : '0';
-  } else {
-    const liqPx = mul(entryPx, add('1', sub(div('1', leverage.toString()), maintMarginRate)));
-    return liqPx;
   }
+  return mul(entryPx, add('1', sub(div('1', leverage.toString()), maintMarginRate)));
 }

@@ -45,4 +45,8 @@ export interface PaperFill {
   tid: number;
   cloid?: string;
   feeToken: string;
+  // HL prod always emits `twapId` on userFills entries (null when the
+  // fill wasn't part of a TWAP). Captured 2026-05-09 from open-hl-bracket
+  // userFills snapshot — every entry has the field.
+  twapId: string | null;
 }

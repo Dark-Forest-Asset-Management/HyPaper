@@ -42,7 +42,7 @@ export async function getClearinghouseState(userId: string): Promise<HlClearingh
     const marginUsed = await calculatePositionMarginUsed(userId, asset, pos.szi, midPx);
 
     const accountValue = await calculateAccountValue(userId);
-    const liqPx = calculateLiquidationPrice(pos.szi, pos.entryPx, accountValue, leverage);
+    const liqPx = calculateLiquidationPrice(pos.szi, pos.entryPx, accountValue, leverage, isCross);
 
     const roe = isZero(marginUsed)
       ? '0'
@@ -54,27 +54,31 @@ export async function getClearinghouseState(userId: string): Promise<HlClearingh
     totalMarginUsed = D(totalMarginUsed).plus(D(marginUsed)).toString();
     totalUnrealizedPnl = D(totalUnrealizedPnl).plus(D(unrealizedPnl)).toString();
 
+    // Field order mirrors HL prod /info clearinghouseState response,
+    // captured 2026-05-09T16-51-39 from open-hl-bracket.ts on XRP perp.
+    // HL emits: coin, szi, leverage, entryPx, positionValue, unrealizedPnl,
+    // returnOnEquity, liquidationPx, marginUsed, maxLeverage, cumFunding.
     assetPositions.push({
       type: 'oneWay',
       position: {
         coin,
         szi: pos.szi,
+        leverage: {
+          type: isCross ? 'cross' : 'isolated',
+          value: leverage,
+        },
         entryPx: pos.entryPx,
         positionValue: posValue,
         unrealizedPnl,
         returnOnEquity: roe,
         liquidationPx: liqPx,
-        leverage: {
-          type: isCross ? 'cross' : 'isolated',
-          value: leverage,
-        },
+        marginUsed,
+        maxLeverage,
         cumFunding: {
           allTime: pos.cumFunding ?? '0',
           sinceOpen: pos.cumFundingSinceOpen ?? '0',
           sinceChange: pos.cumFundingSinceChange ?? '0',
         },
-        maxLeverage,
-        marginUsed,
       },
     });
   }
@@ -111,7 +115,16 @@ export async function getOpenOrders(userId: string) {
     const data = await redis.hgetall(KEYS.ORDER(oid));
     if (!data.oid || data.status !== 'open') continue;
 
-    orders.push({
+    // HL prod /info openOrders shape, captured 2026-05-09: each entry has
+    // exactly these 8 fields — coin, side, limitPx, sz, oid, timestamp,
+    // origSz, reduceOnly. `cloid` is omitted entirely when not set (HL
+    // does NOT emit cloid: null on basic openOrders, only on the richer
+    // frontendOpenOrders response). Field order matches HL.
+    const entry: {
+      coin: string; side: 'A' | 'B'; limitPx: string; sz: string;
+      oid: number; timestamp: number; origSz: string; reduceOnly: boolean;
+      cloid?: string;
+    } = {
       coin: data.coin,
       side: data.isBuy === 'true' ? 'B' : 'A',
       limitPx: data.limitPx,
@@ -119,8 +132,10 @@ export async function getOpenOrders(userId: string) {
       oid,
       timestamp: parseInt(data.createdAt, 10),
       origSz: data.sz,
-      cloid: data.cloid || undefined,
-    });
+      reduceOnly: data.reduceOnly === 'true',
+    };
+    if (data.cloid) entry.cloid = data.cloid;
+    orders.push(entry);
   }
 
   return orders;
@@ -135,35 +150,64 @@ export async function getFrontendOpenOrders(userId: string) {
     const data = await redis.hgetall(KEYS.ORDER(oid));
     if (!data.oid || data.status !== 'open') continue;
 
+    // Field order, types, and explicit-null vs omit semantics mirror
+    // HL prod /info frontendOpenOrders. Ground truth captured by
+    // black-owl-app/test-scripts/open-hl-bracket.ts on 2026-05-09 against
+    // a normalTpsl bracket on XRP — both TP (oid 418261286181) and SL
+    // (oid 418261286182) entries show this exact field layout, with
+    // `tif: null`, `cloid: null`, `children: []`, and a prose
+    // `triggerCondition` string ("Price above 1.4379" / "Price below 1.3991").
     const isTrigger = data.orderType === 'trigger';
+    const isBuy = data.isBuy === 'true';
+    const triggerPx = data.triggerPx || '0.0';
     orders.push({
       coin: data.coin,
-      side: data.isBuy === 'true' ? 'B' : 'A',
+      side: isBuy ? 'B' : 'A',
       limitPx: data.limitPx,
       sz: data.sz,
       oid,
       timestamp: parseInt(data.createdAt, 10),
-      origSz: data.sz,
-      cloid: data.cloid || undefined,
-      tif: data.tif,
-      // Match HL-prod's FrontendOrderInfo shape exactly so consumers
-      // (e.g. slushy's auto-position-overlay classifier) can use the
-      // same detection rules against either backend. Reference:
-      // hyperliquid-rust-sdk/src/info/sub_structs.rs `BasicOrderInfo`.
-      // Previously HyPaper omitted `isTrigger` and collapsed every
-      // trigger order's orderType to "Stop" — both diverged from HL,
-      // which broke the bracket detector silently in paper mode.
+      triggerCondition: isTrigger
+        ? hlTriggerConditionString(data.tpsl, isBuy, triggerPx)
+        : 'N/A',
       isTrigger,
-      orderType: hlOrderTypeString(isTrigger, data.tpsl, data.isMarket === 'true'),
-      triggerPx: data.triggerPx || undefined,
-      triggerCondition: data.tpsl || undefined,
+      triggerPx,
+      children: [] as Array<{ oid: number; triggerPx: string; tpsl: 'tp' | 'sl' }>,
       isPositionTpsl: data.grouping === 'positionTpsl',
       reduceOnly: data.reduceOnly === 'true',
+      orderType: hlOrderTypeString(isTrigger, data.tpsl, data.isMarket === 'true'),
+      origSz: data.sz,
+      tif: data.tif ?? null,
+      cloid: data.cloid || null,
     });
   }
 
   return orders;
 }
+
+/** Build the human-readable trigger-condition prose HL emits in
+ *  frontendOpenOrders. Verified against HL prod for a normalTpsl bracket
+ *  on a long XRP position:
+ *    side='A' + tpsl='tp' + triggerPx=1.4379 → "Price above 1.4379"
+ *    side='A' + tpsl='sl' + triggerPx=1.3991 → "Price below 1.3991"
+ *  Direction rule: trigger fires "above" when the trigger order is a sell
+ *  (closing long) on TP, or a buy (closing short) on SL — i.e., when
+ *  `(tpsl === 'tp') !== isBuy`. Exported so pg-queries.ts can build the
+ *  same prose for historicalOrders responses. */
+export function hlTriggerConditionString(
+  tpsl: string | undefined | null,
+  isBuy: boolean,
+  triggerPx: string,
+): string {
+  if (tpsl !== 'tp' && tpsl !== 'sl') return 'N/A';
+  const direction = ((tpsl === 'tp') !== isBuy) ? 'above' : 'below';
+  return `Price ${direction} ${triggerPx}`;
+}
+
+/** Same hlOrderTypeString from this file but exported for pg-queries to
+ *  reuse — historicalOrders needs the same "Stop Market" / "Take Profit
+ *  Market" / "Limit" strings HL prod emits. */
+export { hlOrderTypeString };
 
 /** HL FrontendOrderInfo orderType strings. `Limit` for non-trigger, four
  *  trigger variants by (tp|sl) × (market|limit). Cross-checked against
@@ -183,24 +227,48 @@ export async function getOrderStatus(oid: number) {
     return { status: 'unknownOid' };
   }
 
+  // HL prod /info orderStatus uses a NESTED structure, captured 2026-05-09
+  // against oid 418261286180 (filled XRP entry):
+  //   { status: 'order',
+  //     order: {
+  //       order: { ...same fields as historicalOrders },
+  //       status: 'filled',
+  //       statusTimestamp: <ms>
+  //     }
+  //   }
+  // Note the double `order` — outer wraps the historicalOrder-shaped
+  // entry. Previously HyPaper FLATTENED status/statusTimestamp into the
+  // inner order object, which broke any client that round-tripped the
+  // shape between HL prod and HyPaper. Also normalize `cancelled` (UK)
+  // to `canceled` (US) the same way getHistoricalOrdersPg does so the
+  // status string matches HL.
+  const isTrigger = data.orderType === 'trigger';
+  const isBuy = data.isBuy === 'true';
+  const triggerPx = data.triggerPx || '0.0';
   return {
     status: 'order',
     order: {
-      coin: data.coin,
-      side: data.isBuy === 'true' ? 'B' : 'A',
-      limitPx: data.limitPx,
-      sz: data.sz,
-      oid: parseInt(data.oid, 10),
-      timestamp: parseInt(data.createdAt, 10),
-      origSz: data.sz,
-      cloid: data.cloid || undefined,
-      tif: data.tif,
-      orderType: data.orderType === 'trigger' ? 'Stop' : 'Limit',
-      triggerPx: data.triggerPx || undefined,
-      triggerCondition: data.tpsl || undefined,
-      isPositionTpsl: data.grouping === 'positionTpsl',
-      reduceOnly: data.reduceOnly === 'true',
-      status: data.status,
+      order: {
+        coin: data.coin,
+        side: isBuy ? 'B' : 'A',
+        limitPx: data.limitPx,
+        sz: data.sz,
+        oid: parseInt(data.oid, 10),
+        timestamp: parseInt(data.createdAt, 10),
+        triggerCondition: isTrigger
+          ? hlTriggerConditionString(data.tpsl, isBuy, triggerPx)
+          : 'N/A',
+        isTrigger,
+        triggerPx,
+        children: [] as Array<{ oid: number; triggerPx: string; tpsl: 'tp' | 'sl' }>,
+        isPositionTpsl: data.grouping === 'positionTpsl',
+        reduceOnly: data.reduceOnly === 'true',
+        orderType: hlOrderTypeString(isTrigger, data.tpsl, data.isMarket === 'true'),
+        origSz: data.sz,
+        tif: isTrigger ? null : data.tif,
+        cloid: data.cloid || null,
+      },
+      status: data.status === 'cancelled' ? 'canceled' : data.status,
       statusTimestamp: parseInt(data.updatedAt, 10),
     },
   };
