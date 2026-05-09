@@ -19,9 +19,9 @@ const envSchema = z.object({
   WS_RECONNECT_MAX_MS: z.coerce.number().default(30000),
   // Match HL prod's documented IP rate limit: 1200 requests per minute
   // per IP (https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/rate-limits).
-  // The previous default of 120/min was 10× stricter than HL and tripped
-  // 429s on slushy's 4-parallel /info polls every 2 s (~120 req/min just
-  // from polling, before any user-action requests).
+  // The previous default of 120/min was 10× stricter than HL and
+  // tripped 429s on typical SPA polling (4 parallel /info requests
+  // every 2 s ≈ 120/min, before any user-action /exchange requests).
   RATE_LIMIT_MAX: z.coerce.number().default(1200),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(60_000),
   FEES_ENABLED: z.coerce.boolean().default(true),
