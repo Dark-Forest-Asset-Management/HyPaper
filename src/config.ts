@@ -29,6 +29,22 @@ const envSchema = z.object({
   FEE_RATE_MAKER: z.string().default('0.0001'),
   FUNDING_ENABLED: z.coerce.boolean().default(true),
   FUNDING_INTERVAL_MS: z.coerce.number().default(28_800_000),
+  // ── Chart-drawing snapshot indexer (HyperEVM) ────────────────
+  // Reads SnapshotPublished / SnapshotBurned events from the chart-
+  // snapshots ERC-721 contract on HyperEVM and mirrors the latest
+  // (wallet, market) → uri mapping into Postgres for fast hydration
+  // by the slushy frontend. Disabled by default so installs without
+  // a deployed contract address don't fail at startup.
+  CHART_DRAWINGS_INDEXER_ENABLED: z.coerce.boolean().default(false),
+  HYPEREVM_RPC: z.string().default('https://rpc.hyperliquid.xyz/evm'),
+  CHART_NFT_CONTRACT: z.string().optional(),
+  CHART_NFT_DEPLOY_BLOCK: z.coerce.number().optional(),
+  CHART_INDEXER_POLL_MS: z.coerce.number().default(5_000),
+  // Hard cap on getLogs window per query. HyperEVM's RPC rejects
+  // requests where toBlock - fromBlock + 1 > 1000 with `query exceeds
+  // max block range 1000`. Use 999 (one under) so the inclusive-span
+  // computation in the worker stays safely under the cap.
+  CHART_INDEXER_MAX_BLOCK_RANGE: z.coerce.number().default(999),
 });
 
 export const config = envSchema.parse(process.env);

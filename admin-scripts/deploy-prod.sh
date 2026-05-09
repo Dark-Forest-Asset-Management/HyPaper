@@ -81,6 +81,14 @@ ssh "$DEPLOY_SSH" "
   echo 'Rebuild…'
   npm run build 2>&1 | tail -3
   echo
+  echo 'DB migrations…'
+  # Apply any pending drizzle migrations BEFORE restarting the service
+  # so the running process never sees a schema older than its code.
+  # `db:migrate` is idempotent — drizzle tracks applied migrations in
+  # __drizzle_migrations and skips ones already on file. No-op when
+  # there are no pending changes.
+  npm run db:migrate 2>&1 | tail -10
+  echo
   echo 'Restart…'
   sudo systemctl restart ${DEPLOY_SERVICE}
   sleep 3

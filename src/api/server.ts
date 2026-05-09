@@ -4,6 +4,7 @@ import { rateLimitMiddleware } from './middleware/rate-limit.js';
 import { exchangeRouter } from './routes/exchange.js';
 import { infoRouter } from './routes/info.js';
 import { hypaperRouter } from './routes/hypaper.js';
+import { drawingsRouter } from './routes/drawings.js';
 import { logger } from '../utils/logger.js';
 
 export const app = new Hono();
@@ -40,8 +41,10 @@ app.get('/hypaper', (c) => c.json(postOnlyMsg, 405));
 app.use('/exchange', rateLimitMiddleware);
 app.use('/info', rateLimitMiddleware);
 app.use('/hypaper', rateLimitMiddleware);
+app.use('/drawings', rateLimitMiddleware);
 
 // Routes
 app.route('/exchange', exchangeRouter);
 app.route('/info', infoRouter);
 app.route('/hypaper', hypaperRouter);
+app.route('/drawings', drawingsRouter);

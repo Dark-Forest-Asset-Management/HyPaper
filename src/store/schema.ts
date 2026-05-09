@@ -1,4 +1,4 @@
-import { pgTable, text, integer, bigint, boolean, index } from 'drizzle-orm/pg-core';
+import { pgTable, text, integer, bigint, boolean, index, primaryKey } from 'drizzle-orm/pg-core';
 
 // ---------- Enums as text (matching TS union types) ----------
 
@@ -34,6 +34,37 @@ export const orders = pgTable('orders', {
   index('orders_user_id_status_idx').on(table.userId, table.status),
   index('orders_coin_idx').on(table.coin),
 ]);
+
+// ── Chart-drawing snapshot NFT indexer ─────────────────────────────
+// Mirrors the on-chain SlushyChartSnapshots ERC-721's per-(wallet,
+// market) snapshot mapping into Postgres so the slushy frontend can
+// hydrate a user's drawings without doing a chain RPC round-trip on
+// every chart load. Source of truth is on-chain; this table is a
+// cache fed by the indexer worker (see worker/chart-drawings-indexer).
+export const chartDrawings = pgTable('chart_drawings', {
+  walletAddress: text('wallet_address').notNull(),  // 0x… lowercased
+  market: text('market').notNull(),
+  tokenId: text('token_id').notNull(),              // bigint as string
+  uri: text('uri').notNull(),                        // encrypted envelope or IPFS pointer
+  blockNumber: bigint('block_number', { mode: 'number' }).notNull(),
+  txHash: text('tx_hash').notNull(),
+  updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
+}, (t) => [
+  // Composite primary key: one snapshot per (wallet, market) — exactly
+  // what the contract enforces on-chain via currentSnapshotOf.
+  primaryKey({ columns: [t.walletAddress, t.market] }),
+  index('chart_drawings_wallet_idx').on(t.walletAddress),
+  index('chart_drawings_token_idx').on(t.tokenId),
+]);
+
+// Indexer cursor — last block successfully scanned by a given indexer.
+// Used by the chart-drawings indexer to resume from where it left off
+// across HyPaper restarts.
+export const indexerCheckpoints = pgTable('indexer_checkpoints', {
+  name: text('name').primaryKey(),
+  blockNumber: bigint('block_number', { mode: 'number' }).notNull(),
+  updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
+});
 
 export const fills = pgTable('fills', {
   tid: integer('tid').primaryKey(),
