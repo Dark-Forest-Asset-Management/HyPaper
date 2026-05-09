@@ -269,6 +269,15 @@ export interface HlUserFill {
   cloid?: string;
   feeToken: string;
   twapId: string | null;
+  // Present only when this fill was the counterparty to a liquidation
+  // (3 of 2000 fills in the captured HL prod sample). HyPaper has no
+  // paper-liquidation simulation so it never emits this field, but
+  // consumers should still know it can appear.
+  liquidation?: {
+    liquidatedUser: string;
+    markPx: string;
+    method: string;
+  };
 }
 
 // === Order status response ===

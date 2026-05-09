@@ -86,15 +86,18 @@ export async function getClearinghouseState(userId: string): Promise<HlClearingh
   const accountValue = D(balance).plus(D(totalUnrealizedPnl)).toString();
   const withdrawable = sub(accountValue, totalMarginUsed);
 
+  // Top-level field order mirrors HL prod /info clearinghouseState:
+  //   marginSummary, crossMarginSummary, crossMaintenanceMarginUsed,
+  //   withdrawable, assetPositions, time
+  // Verified 2026-05-09 by diffing against the HL prod capture.
   return {
-    assetPositions,
-    crossMarginSummary: {
+    marginSummary: {
       accountValue,
       totalNtlPos,
       totalRawUsd: balance,
       totalMarginUsed,
     },
-    marginSummary: {
+    crossMarginSummary: {
       accountValue,
       totalNtlPos,
       totalRawUsd: balance,
@@ -102,6 +105,7 @@ export async function getClearinghouseState(userId: string): Promise<HlClearingh
     },
     crossMaintenanceMarginUsed: div(totalMarginUsed, '2'),
     withdrawable: gt(withdrawable, '0') ? withdrawable : '0',
+    assetPositions,
     time: Date.now(),
   };
 }
@@ -177,7 +181,12 @@ export async function getFrontendOpenOrders(userId: string) {
       reduceOnly: data.reduceOnly === 'true',
       orderType: hlOrderTypeString(isTrigger, data.tpsl, data.isMarket === 'true'),
       origSz: data.sz,
-      tif: data.tif ?? null,
+      // HL prod emits `tif: null` for trigger orders (verified 2026-05-09);
+      // HyPaper's DB column is notNull, so the stored string ('Gtc' /
+      // 'Ioc' / 'Alo') would leak through `data.tif ?? null`. Gate
+      // explicitly on isTrigger to match HL exactly. Same fix already
+      // applied in getOrderStatus and getHistoricalOrdersPg.
+      tif: isTrigger ? null : (data.tif ?? null),
       cloid: data.cloid || null,
     });
   }
