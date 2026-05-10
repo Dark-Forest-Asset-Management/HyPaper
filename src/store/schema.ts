@@ -35,39 +35,58 @@ export const orders = pgTable('orders', {
   index('orders_coin_idx').on(table.coin),
 ]);
 
-// ── Chart-drawing snapshot NFT indexer ─────────────────────────────
-// Mirrors the on-chain SlushyChartSnapshots ERC-721's per-(wallet,
-// market) snapshot mapping into Postgres so the slushy frontend can
-// hydrate a user's drawings without doing a chain RPC round-trip on
-// every chart load. Source of truth is on-chain; this table is a
-// cache fed by the indexer worker (see worker/chart-drawings-indexer).
+// ── Chart-drawing snapshot NFT (paper-mode chain emulation) ────────
+// HyPaper exposes a HyperEVM-shaped JSON-RPC at /evm so slushy can use
+// a single viem client in both paper + live modes. The state below
+// mirrors the on-chain SlushyChartSnapshots contract's storage —
+// `chartDrawings` IS the contract's `currentSnapshotOf` + `tokenURI`
+// + `marketOf` mappings; `chainEvents` is the event log for
+// `eth_getLogs`; `chainCounters` holds incrementing token id + block
+// number to match real-chain behaviour.
 export const chartDrawings = pgTable('chart_drawings', {
   walletAddress: text('wallet_address').notNull(),  // 0x… lowercased
   market: text('market').notNull(),
-  // Distinguishes indexer-mirrored chain rows from paper-mode writes.
-  // Chain rows always have tokenId/blockNumber/txHash; paper rows
-  // leave those NULL since there's no on-chain mint to reference.
-  source: text('source').notNull().default('chain'), // 'chain' | 'paper'
-  tokenId: text('token_id'),                          // bigint as string, NULL for paper
-  uri: text('uri').notNull(),                         // encrypted envelope or IPFS pointer
-  blockNumber: bigint('block_number', { mode: 'number' }), // NULL for paper
-  txHash: text('tx_hash'),                            // NULL for paper
+  tokenId: text('token_id').notNull(),               // bigint as string — actual NFT id
+  uri: text('uri').notNull(),                         // encrypted envelope (slushy:1:…)
+  blockNumber: bigint('block_number', { mode: 'number' }).notNull(),
+  txHash: text('tx_hash').notNull(),
   updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
 }, (t) => [
-  // Composite primary key: one snapshot per (wallet, market) — exactly
-  // what the contract enforces on-chain via currentSnapshotOf.
+  // Composite primary key: one snapshot per (wallet, market) —
+  // exactly what the contract enforces via currentSnapshotOf.
   primaryKey({ columns: [t.walletAddress, t.market] }),
   index('chart_drawings_wallet_idx').on(t.walletAddress),
   index('chart_drawings_token_idx').on(t.tokenId),
 ]);
 
-// Indexer cursor — last block successfully scanned by a given indexer.
-// Used by the chart-drawings indexer to resume from where it left off
-// across HyPaper restarts.
-export const indexerCheckpoints = pgTable('indexer_checkpoints', {
-  name: text('name').primaryKey(),
+// Event log rows for eth_getLogs. Topic 0 = event signature hash;
+// topic 1..3 = indexed args. `data` carries non-indexed args, ABI-
+// encoded. Mirrors what HyperEVM would return for the same query.
+export const chainEvents = pgTable('chain_events', {
+  id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
   blockNumber: bigint('block_number', { mode: 'number' }).notNull(),
-  updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
+  txHash: text('tx_hash').notNull(),
+  logIndex: integer('log_index').notNull(),
+  address: text('address').notNull(),                 // contract address (lowercase 0x…)
+  topic0: text('topic0').notNull(),                   // event sig hash
+  topic1: text('topic1'),                             // indexed arg 1 (or null)
+  topic2: text('topic2'),                             // indexed arg 2
+  topic3: text('topic3'),                             // indexed arg 3
+  data: text('data').notNull(),                       // ABI-encoded non-indexed args (0x…)
+}, (t) => [
+  index('chain_events_block_idx').on(t.blockNumber),
+  index('chain_events_topic0_idx').on(t.topic0),
+]);
+
+// Single-row counter table holding the next NFT token id + the
+// current chain head block number. Both increment monotonically.
+// The contract's `_nextTokenId` lives here.
+export const chainCounters = pgTable('chain_counters', {
+  // Locking row — always 1. Use uniqueness so we can't accidentally
+  // create a second counters row.
+  id: integer('id').primaryKey(),
+  nextTokenId: bigint('next_token_id', { mode: 'number' }).notNull().default(1),
+  currentBlock: bigint('current_block', { mode: 'number' }).notNull().default(0),
 });
 
 export const fills = pgTable('fills', {

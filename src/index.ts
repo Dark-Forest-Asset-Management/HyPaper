@@ -5,14 +5,12 @@ import { connectRedis, disconnectRedis } from './store/redis.js';
 import { connectDb, disconnectDb } from './store/db.js';
 import { startPgSink } from './store/pg-sink.js';
 import { Worker, eventBus } from './worker/index.js';
-import { ChartDrawingsIndexer } from './worker/chart-drawings-indexer.js';
 import { app } from './api/server.js';
 import { logger } from './utils/logger.js';
 import { HyPaperWsServer } from './ws/server.js';
 
 let worker: Worker;
 let wsServer: HyPaperWsServer;
-let chartIndexer: ChartDrawingsIndexer;
 
 async function main() {
   logger.info('Starting HyPaper backend...');
@@ -31,12 +29,6 @@ async function main() {
   // Attach Postgres sink (async event listeners)
   startPgSink(eventBus);
 
-  // Start chart-drawings NFT indexer (no-op if disabled in config).
-  // Independent of the orderbook/market-data worker so an HyperEVM
-  // RPC outage doesn't impact paper trading.
-  chartIndexer = new ChartDrawingsIndexer();
-  await chartIndexer.start();
-
   // Start HTTP server
   const httpServer = serve({
     fetch: app.fetch,
@@ -53,7 +45,6 @@ async function shutdown() {
   logger.info('Shutting down...');
   wsServer?.close();
   worker?.stop();
-  chartIndexer?.stop();
   await disconnectDb();
   await disconnectRedis();
   process.exit(0);

@@ -15,6 +15,13 @@
       "when": 1778376485467,
       "tag": "0001_solid_gravity",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1778389200000,
+      "tag": "0002_chain_emulation",
+      "breakpoints": true
     }
   ]
 }

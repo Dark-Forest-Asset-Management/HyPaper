@@ -29,22 +29,16 @@ const envSchema = z.object({
   FEE_RATE_MAKER: z.string().default('0.0001'),
   FUNDING_ENABLED: z.coerce.boolean().default(true),
   FUNDING_INTERVAL_MS: z.coerce.number().default(28_800_000),
-  // ── Chart-drawing snapshot indexer (HyperEVM) ────────────────
-  // Reads SnapshotPublished / SnapshotBurned events from the chart-
-  // snapshots ERC-721 contract on HyperEVM and mirrors the latest
-  // (wallet, market) → uri mapping into Postgres for fast hydration
-  // by the slushy frontend. Disabled by default so installs without
-  // a deployed contract address don't fail at startup.
-  CHART_DRAWINGS_INDEXER_ENABLED: z.coerce.boolean().default(false),
-  HYPEREVM_RPC: z.string().default('https://rpc.hyperliquid.xyz/evm'),
-  CHART_NFT_CONTRACT: z.string().optional(),
-  CHART_NFT_DEPLOY_BLOCK: z.coerce.number().optional(),
-  CHART_INDEXER_POLL_MS: z.coerce.number().default(5_000),
-  // Hard cap on getLogs window per query. HyperEVM's RPC rejects
-  // requests where toBlock - fromBlock + 1 > 1000 with `query exceeds
-  // max block range 1000`. Use 999 (one under) so the inclusive-span
-  // computation in the worker stays safely under the cap.
-  CHART_INDEXER_MAX_BLOCK_RANGE: z.coerce.number().default(999),
+  // ── Chart-drawing snapshot chain emulation ──────────────────
+  // HyPaper exposes a HyperEVM-shaped JSON-RPC at /evm so slushy can
+  // use a single viem client in both paper and live modes. The
+  // contract address below is the deployed contract on real HyperEVM
+  // (chain 999); the emulator pretends it lives at the same address
+  // so client code is identical across modes.
+  CHART_NFT_CONTRACT: z.string().default('0x790Dd8d58a203Bb61768F68332bb7d897f452Ae3'),
+  // Chain id reported by eth_chainId. 999 matches HyperEVM mainnet
+  // so wallet typed-data signatures are interchangeable across modes.
+  EVM_CHAIN_ID: z.coerce.number().default(999),
 });
 
 export const config = envSchema.parse(process.env);
