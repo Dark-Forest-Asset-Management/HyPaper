@@ -145,6 +145,24 @@ async function handle(req: JsonRpcRequest): Promise<unknown> {
     case 'eth_syncing':
       return false;
 
+    case 'eth_fillTransaction': {
+      // Geth/parity-style helper some wallets call to populate
+      // missing fields before signing. Return the input merged with
+      // emulator defaults so the wallet has gasPrice/nonce/etc to
+      // work with. Not a write — no state changes here.
+      const [tx] = (params as [Record<string, unknown> | undefined]) ?? [];
+      return {
+        raw: '0x',
+        tx: {
+          ...(tx ?? {}),
+          chainId: CHAIN_ID_HEX,
+          gas: FAKE_GAS_LIMIT_HEX,
+          gasPrice: ZERO_HEX,
+          nonce: ZERO_HEX,
+        },
+      };
+    }
+
     default:
       throw rpcError(-32601, `method not supported: ${req.method}`);
   }
