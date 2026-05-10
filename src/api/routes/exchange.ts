@@ -43,11 +43,25 @@ function validateOrderWire(o: HlOrderWire): string | null {
 exchangeRouter.post('/', async (c) => {
   const body = await c.req.json();
 
-  const rawWallet: string | undefined = body.wallet;
-  if (!rawWallet || typeof rawWallet !== 'string') {
-    return c.json({ status: 'err', response: 'Missing wallet address' }, 400);
+  // Derive the wallet from the signature (HL-prod shape: no `wallet`
+  // field in the body — slushy uses this for both paper and live so the
+  // exchange POST is identical across modes). Fall back to `body.wallet`
+  // only when no signature is present (unsigned local tests, scripts).
+  let wallet: string;
+  if (body.signature && body.action && typeof body.nonce === 'number') {
+    try {
+      wallet = recoverHlSigner(body.action, body.nonce, body.signature, body.vaultAddress);
+    } catch (err) {
+      return c.json({
+        status: 'err',
+        response: `Signature recovery failed: ${(err as Error).message}`,
+      }, 400);
+    }
+  } else if (typeof body.wallet === 'string') {
+    wallet = body.wallet.toLowerCase();
+  } else {
+    return c.json({ status: 'err', response: 'Missing signature (or wallet for unsigned tests)' }, 400);
   }
-  const wallet = rawWallet.toLowerCase();
 
   await ensureAccount(wallet);
 
