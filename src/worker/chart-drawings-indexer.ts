@@ -211,7 +211,10 @@ export class ChartDrawingsIndexer {
   private async scanOnce(): Promise<void> {
     if (!this.provider || !this.contract) return;
 
-    const latestBlock = await this.withRateLimitRetry('getBlockNumber', () => this.provider!.getBlockNumber());
+    const latestBlock: number = await this.withRateLimitRetry<number>(
+      'getBlockNumber',
+      () => this.provider!.getBlockNumber(),
+    );
     const cpRows = await db.select().from(indexerCheckpoints).where(eq(indexerCheckpoints.name, INDEXER_NAME)).limit(1);
     const lastScanned = cpRows[0]?.blockNumber ?? (config.CHART_NFT_DEPLOY_BLOCK! - 1);
     if (lastScanned >= latestBlock) return; // already caught up
@@ -254,7 +257,7 @@ export class ChartDrawingsIndexer {
       toBlock,
       topics: [[TOPIC_PUBLISHED, TOPIC_BURNED]],   // OR-filter on topic[0]
     };
-    const logs = await this.withRateLimitRetry(
+    const logs: ethers.Log[] = await this.withRateLimitRetry<ethers.Log[]>(
       `getLogs[${fromBlock}-${toBlock}]`,
       () => this.provider!.getLogs(filter),
     );
