@@ -97,9 +97,12 @@ ssh "$DEPLOY_SSH" "
   echo 'DB migrations…'
   # Apply any pending drizzle migrations BEFORE restarting the service
   # so the running process never sees a schema older than its code.
-  # `db:migrate` is idempotent — drizzle tracks applied migrations in
+  # db:migrate is idempotent — drizzle tracks applied migrations in
   # __drizzle_migrations and skips ones already on file. No-op when
   # there are no pending changes.
+  # NB: avoid backticks inside this double-quoted ssh string — bash
+  # treats them as local command substitution even on lines that
+  # start with #, since # is not a comment marker inside a string.
   npm run db:migrate 2>&1 | tail -10
   echo
   echo 'Restart…'
