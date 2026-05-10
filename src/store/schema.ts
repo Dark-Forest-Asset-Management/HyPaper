@@ -44,10 +44,14 @@ export const orders = pgTable('orders', {
 export const chartDrawings = pgTable('chart_drawings', {
   walletAddress: text('wallet_address').notNull(),  // 0x… lowercased
   market: text('market').notNull(),
-  tokenId: text('token_id').notNull(),              // bigint as string
-  uri: text('uri').notNull(),                        // encrypted envelope or IPFS pointer
-  blockNumber: bigint('block_number', { mode: 'number' }).notNull(),
-  txHash: text('tx_hash').notNull(),
+  // Distinguishes indexer-mirrored chain rows from paper-mode writes.
+  // Chain rows always have tokenId/blockNumber/txHash; paper rows
+  // leave those NULL since there's no on-chain mint to reference.
+  source: text('source').notNull().default('chain'), // 'chain' | 'paper'
+  tokenId: text('token_id'),                          // bigint as string, NULL for paper
+  uri: text('uri').notNull(),                         // encrypted envelope or IPFS pointer
+  blockNumber: bigint('block_number', { mode: 'number' }), // NULL for paper
+  txHash: text('tx_hash'),                            // NULL for paper
   updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
 }, (t) => [
   // Composite primary key: one snapshot per (wallet, market) — exactly
