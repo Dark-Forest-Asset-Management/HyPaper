@@ -78,8 +78,21 @@ ssh "$DEPLOY_SSH" "
   git pull --ff-only 2>&1 | tail -3
   echo \"HEAD: \$(git rev-parse --short HEAD) (\$(git log -1 --format=%s | head -c 60))\"
   echo
+  echo 'Install dependencies…'
+  # --include=dev so devDeps (typescript, tsx, drizzle-kit) are
+  # present for the build + migrate steps below. ci is preferred
+  # over install to honour package-lock exactly.
+  npm ci --include=dev 2>&1 | tail -5
+  echo
   echo 'Rebuild…'
-  npm run build 2>&1 | tail -3
+  # PIPESTATUS to surface tsc's exit code despite the tail filter.
+  # Without this, build failures get masked by tail's exit 0 and
+  # the script happily restarts the service on stale dist.
+  npm run build 2>&1 | tail -10
+  if [ \"\${PIPESTATUS[0]}\" -ne 0 ]; then
+    echo 'BUILD FAILED — aborting before migrate/restart' >&2
+    exit 1
+  fi
   echo
   echo 'DB migrations…'
   # Apply any pending drizzle migrations BEFORE restarting the service
