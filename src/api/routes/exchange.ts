@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { placeOrders, cancelOrders, cancelByCloid, updateLeverage, modifyOrder, batchModifyOrders, placeTwap, cancelTwap } from '../../engine/order.js';
 import { ensureAccount } from '../middleware/auth.js';
+import { recoverHlSigner } from '../middleware/recoverHlSigner.js';
 import { logger } from '../../utils/logger.js';
 import { redis } from '../../store/redis.js';
 import { KEYS } from '../../store/keys.js';

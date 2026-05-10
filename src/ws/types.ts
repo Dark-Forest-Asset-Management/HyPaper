@@ -18,7 +18,11 @@ export type WsSubscription =
   | { type: 'allMids' }
   | { type: 'l2Book'; coin: string }
   | { type: 'orderUpdates'; user: string }
-  | { type: 'userFills'; user: string };
+  | { type: 'userFills'; user: string }
+  // Combined user-state push. Mirrors HL prod's webData2 channel —
+  // emits clearinghouseState + openOrders on every change. Replaces
+  // slushy's 2s REST poll for those.
+  | { type: 'webData2'; user: string };
 
 // === Outbound (server → client) ===
 
