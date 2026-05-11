@@ -5,6 +5,7 @@ import { exchangeRouter } from './routes/exchange.js';
 import { infoRouter } from './routes/info.js';
 import { hypaperRouter } from './routes/hypaper.js';
 import { evmRouter } from './routes/evm.js';
+import { consentRouter } from './routes/consent.js';
 import { logger } from '../utils/logger.js';
 
 export const app = new Hono();
@@ -51,3 +52,7 @@ app.route('/exchange', exchangeRouter);
 app.route('/info', infoRouter);
 app.route('/hypaper', hypaperRouter);
 app.route('/evm', evmRouter);
+// GDPR consent audit log — no rate limit (each visitor fires once per
+// policy version, ~once a year). Endpoint records hashed-IP + policy
+// version + per-category decision via the pg sink.
+app.route('/consent', consentRouter);

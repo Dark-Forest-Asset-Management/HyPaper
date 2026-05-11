@@ -89,6 +89,29 @@ export const chainCounters = pgTable('chain_counters', {
   currentBlock: bigint('current_block', { mode: 'number' }).notNull().default(0),
 });
 
+// GDPR consent audit trail. Each row is one accept/decline decision
+// made by a slushy user. The IP is SHA-256-hashed before insert (raw
+// IP is PII) — combined with the user-agent it provides reasonable
+// proof of consent under Article 7(1) without retaining raw PII.
+// Policy version is stored explicitly so we can re-prompt on policy
+// changes and tie the decision to a specific document version.
+export const consentRecords = pgTable('consent_records', {
+  // Monotonic insert order — `now() * 1000` from the route handler. Acts
+  // as both PK and rough timestamp. Conflicting inserts (same ms) get
+  // bumped on insert.
+  id: bigint('id', { mode: 'number' }).primaryKey(),
+  ts: bigint('ts', { mode: 'number' }).notNull(),
+  ipHash: text('ip_hash'),
+  userAgent: text('user_agent'),
+  policyVersion: integer('policy_version').notNull(),
+  analytics: boolean('analytics').notNull(),
+  advertising: boolean('advertising').notNull(),
+  adPersonalization: boolean('ad_personalization').notNull(),
+}, (table) => [
+  index('consent_records_ts_idx').on(table.ts),
+  index('consent_records_ip_hash_idx').on(table.ipHash),
+]);
+
 export const fills = pgTable('fills', {
   tid: integer('tid').primaryKey(),
   userId: text('user_id').notNull().references(() => users.userId),
