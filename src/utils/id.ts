@@ -8,3 +8,7 @@ export async function nextOid(): Promise<number> {
 export async function nextTid(): Promise<number> {
   return redis.incr(KEYS.SEQ_TID);
 }
+
+export async function nextTwapId(): Promise<number> {
+  return redis.incr(KEYS.SEQ_TWAP_ID);
+}
