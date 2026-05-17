@@ -1,0 +1,32 @@
+{
+  "request": {
+    "action": {
+      "type": "modify",
+      "oid": 53244215259,
+      "order": {
+        "a": 3,
+        "b": true,
+        "p": "70806",
+        "s": "0.00039",
+        "r": false,
+        "t": {
+          "limit": {
+            "tif": "Gtc"
+          }
+        }
+      }
+    },
+    "nonce": 1778996626127,
+    "signature": {
+      "r": "0x5dbdea140c6d97c87af0f16b2abfe79ee975ad0975a7236c521294505ac3ece0",
+      "s": "0x3e82dc63ff2b80219abb7f4bfdeaa39c40e7311b08da4a931d937c5a87e342e2",
+      "v": 27
+    }
+  },
+  "response": {
+    "status": "ok",
+    "response": {
+      "type": "default"
+    }
+  }
+}

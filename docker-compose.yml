@@ -7,14 +7,26 @@ services:
       - redis-data:/data
     command: redis-server --appendonly yes
 
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=hypaper
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
   app:
     build: .
     ports:
       - "3000:3000"
     depends_on:
       - redis
+      - postgres
     environment:
-      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/hypaper
       - REDIS_URL=redis://redis:6379
       - PORT=3000
       - DEFAULT_BALANCE=100000
@@ -25,3 +37,4 @@ services:
 
 volumes:
   redis-data:
+  postgres-data:

@@ -1,0 +1,39 @@
+{
+  "request": {
+    "action": {
+      "type": "cancel",
+      "cancels": [
+        {
+          "a": 3,
+          "o": 53244215259
+        },
+        {
+          "a": 3,
+          "o": 53244215260
+        }
+      ]
+    },
+    "nonce": 1778996631526,
+    "signature": {
+      "r": "0xef2f8d0e9eb08e6285754e427aa634c4072e839f414aab023b076c92b7401b4b",
+      "s": "0x71e0c98693505c5cca3bb564c0d01ca69b8e640dba0af3faa216f99612cda50f",
+      "v": 27
+    }
+  },
+  "response": {
+    "status": "ok",
+    "response": {
+      "type": "cancel",
+      "data": {
+        "statuses": [
+          {
+            "error": "Order was never placed, already canceled, or filled. asset=3"
+          },
+          {
+            "error": "Order was never placed, already canceled, or filled. asset=3"
+          }
+        ]
+      }
+    }
+  }
+}
