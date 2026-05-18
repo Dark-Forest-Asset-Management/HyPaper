@@ -268,7 +268,7 @@ async function main() {
   //
   // Place buy limit orders 10% below oracle.
   // HL allows orders up to 20% away from oracle for resting orders.
-  // 10% below = safely within band, won't fill (oracle >> testnet mark).
+  // 10% below = safely within band, won't fill (oracle >> testnet mark)...
 
   const p1    = fmtPx(oraclePx * 0.90, tickSize);
   const p2    = fmtPx(oraclePx * 0.89, tickSize);

@@ -78,14 +78,33 @@ export interface HlUpdateLeverageAction {
   leverage: number;
 }
 
+export interface HlTwapOrderAction {
+  type: 'twapOrder';
+  twap: {
+    a: number;   // asset
+    b: boolean;  // isBuy
+    s: string;   // size
+    r: boolean;  // reduceOnly
+    m: number;   // minutes
+    t: boolean;  // randomize
+  };
+}
+
+export interface HlTwapCancelAction {
+  type: 'twapCancel';
+  a: number;   // asset
+  t: number;   // twapId
+}
+
 export type HlExchangeAction =
   | HlOrderAction
   | HlCancelAction
   | HlCancelByCloidAction
   | HlModifyAction
   | HlBatchModifyAction
-  | HlUpdateLeverageAction;
-
+  | HlUpdateLeverageAction
+  | HlTwapOrderAction
+  | HlTwapCancelAction;
 // === Info request types ===
 
 export interface HlInfoRequest {

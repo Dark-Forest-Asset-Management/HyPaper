@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { placeOrders, cancelOrders, cancelByCloid, updateLeverage } from '../../engine/order.js';
+import { placeOrders, cancelOrders, cancelByCloid, updateLeverage, modifyOrder, batchModifyOrders, createTwapOrder, cancelTwapOrder } from '../../engine/order.js';
 import { ensureAccount } from '../middleware/auth.js';
 import { logger } from '../../utils/logger.js';
 import type { HlExchangeAction } from '../../types/hl.js';
@@ -93,7 +93,68 @@ exchangeRouter.post('/', async (c) => {
           },
         });
       }
+case 'modify': {
+        if (typeof action.oid !== 'number' || !action.order) {
+          return c.json({ status: 'err', response: 'modify requires oid (number) and order' }, 400);
+        }
+        const result = await modifyOrder(wallet, action.oid, action.order);
+        if ('error' in result) {
+          return c.json({ status: 'err', response: result.error }, 400);
+        }
+        return c.json({ status: 'ok', response: { type: 'default' } });
+      }
 
+      case 'batchModify': {
+        if (!Array.isArray(action.modifies) || action.modifies.length === 0) {
+          return c.json({ status: 'err', response: 'batchModify requires modifies array' }, 400);
+        }
+        for (const m of action.modifies) {
+          if (typeof m.oid !== 'number' || !m.order) {
+            return c.json({ status: 'err', response: 'Each modify needs oid and order' }, 400);
+          }
+        }
+        const statuses = await batchModifyOrders(wallet, action.modifies);
+        return c.json({
+          status: 'ok',
+          response: { type: 'order', data: { statuses } },
+        });
+      }
+
+      case 'twapOrder': {
+        const tw = action.twap;
+        if (
+          typeof tw?.a !== 'number' || typeof tw?.b !== 'boolean' ||
+          typeof tw?.s !== 'string' || typeof tw?.r !== 'boolean' ||
+          typeof tw?.m !== 'number' || typeof tw?.t !== 'boolean'
+        ) {
+          return c.json({ status: 'err', response: 'twapOrder requires twap.{a,b,s,r,m,t}' }, 400);
+        }
+        if (tw.m < 5) {
+          return c.json({ status: 'err', response: 'TWAP duration minimum is 5 minutes' }, 400);
+        }
+        const twapResult = await createTwapOrder(wallet, tw.a, tw.b, tw.s, tw.r, tw.m);
+        if ('error' in twapResult) {
+          return c.json({ status: 'ok', response: { type: 'twapOrder', data: { status: { error: twapResult.error } } } });
+        }
+        return c.json({
+          status: 'ok',
+          response: { type: 'twapOrder', data: { status: { running: { twapId: twapResult.twapId } } } },
+        });
+      }
+
+      case 'twapCancel': {
+        if (typeof action.a !== 'number' || typeof action.t !== 'number') {
+          return c.json({ status: 'err', response: 'twapCancel requires a (asset) and t (twapId)' }, 400);
+        }
+        const cancelResult = await cancelTwapOrder(wallet, action.t);
+        if ('error' in cancelResult) {
+          return c.json({ status: 'err', response: cancelResult.error }, 400);
+        }
+        return c.json({
+          status: 'ok',
+          response: { type: 'twapCancel', data: { status: 'success' } },
+        });
+      }
       case 'updateLeverage': {
         if (typeof action.asset !== 'number' || typeof action.leverage !== 'number' || typeof action.isCross !== 'boolean') {
           return c.json({ status: 'err', response: 'updateLeverage requires asset (number), leverage (number), isCross (boolean)' }, 400);
