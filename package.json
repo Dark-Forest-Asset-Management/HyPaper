@@ -27,6 +27,7 @@
     "decimal.js": "^10.4.3",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.1",
+    "ethers": "^6.16.0",
     "hono": "^4.7.4",
     "ioredis": "^5.4.2",
     "pino": "^9.6.0",

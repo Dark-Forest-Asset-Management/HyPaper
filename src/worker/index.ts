@@ -36,10 +36,24 @@ export class Worker {
     // Fetch initial meta + prices from HL HTTP API
     await this.seedMarketData();
 
-    // Connect WebSocket and subscribe
+    // Connect WebSocket and subscribe to main + sub-DEX mids.
+    // Sub-DEX mids live in their own keyspace (allMids without a `dex`
+    // param returns main DEX only). We add one allMids subscription per
+    // perp DEX so sub-DEX assets like `xyz:AAPL` get live mark prices.
     this.wsClient!.connect();
     this.wsClient!.subscribe({ type: 'allMids' });
     this.wsClient!.subscribe({ type: 'activeAssetCtx' });
+    try {
+      const perpDexsRaw = await redis.get(KEYS.MARKET_PERPDEXS);
+      if (perpDexsRaw) {
+        const dexList: Array<{ name: string } | null> = JSON.parse(perpDexsRaw);
+        for (const d of dexList) {
+          if (d && d.name) this.wsClient!.subscribe({ type: 'allMids', dex: d.name });
+        }
+      }
+    } catch (e) {
+      logger.warn({ err: e }, 'Failed to subscribe sub-DEX mids');
+    }
 
     this.fundingWorker.start();
 
@@ -99,6 +113,59 @@ export class Worker {
       });
       const allMids = await midsRes.json() as Record<string, string>;
       await this.priceUpdater.seedMids(allMids);
+
+      // ── Sub-DEX seeding ──
+      // Cache the perpDexs list so resolveAssetCoin can decode HL's
+      // `100_000 + perpDexIdx*10_000 + uIdx` encoding. For each non-null
+      // sub-DEX, fetch its meta + ctxs + mids and cache under MARKET_META_DEX.
+      try {
+        const perpDexsRes = await fetch(`${config.HL_API_URL}/info`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'perpDexs' }),
+        });
+        const perpDexs = await perpDexsRes.json() as Array<{ name: string; fullName: string } | null>;
+        await redis.set(KEYS.MARKET_PERPDEXS, JSON.stringify(perpDexs));
+        logger.info({ count: perpDexs.filter((d) => d != null).length }, 'Seeded perpDexs');
+
+        for (const dex of perpDexs) {
+          if (!dex || !dex.name) continue;
+          try {
+            const subRes = await fetch(`${config.HL_API_URL}/info`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ type: 'metaAndAssetCtxs', dex: dex.name }),
+            });
+            const subData = await subRes.json() as [HlMeta, HlAssetCtx[]];
+            const [subMeta, subCtxs] = subData;
+            await redis.set(KEYS.MARKET_META_DEX(dex.name), JSON.stringify(subMeta));
+
+            const subMids: Record<string, string> = {};
+            for (let i = 0; i < subMeta.universe.length && i < subCtxs.length; i++) {
+              const coin = subMeta.universe[i].name;  // already prefixed (e.g. "xyz:AAPL")
+              const ctx = subCtxs[i];
+              const livePx = ctx.midPx ?? ctx.markPx;
+              if (livePx) subMids[coin] = livePx;
+              await redis.hset(KEYS.MARKET_CTX(coin),
+                'markPx', ctx.markPx ?? '',
+                'midPx', ctx.midPx ?? '',
+                'oraclePx', ctx.oraclePx ?? '',
+                'funding', ctx.funding ?? '',
+                'openInterest', ctx.openInterest ?? '',
+                'prevDayPx', ctx.prevDayPx ?? '',
+                'dayNtlVlm', ctx.dayNtlVlm ?? '',
+                'premium', ctx.premium ?? '',
+              );
+            }
+            await this.priceUpdater.seedMids(subMids);
+            logger.info({ dex: dex.name, assets: subMeta.universe.length }, 'Seeded sub-DEX meta');
+          } catch (e) {
+            logger.warn({ err: e, dex: dex.name }, 'Failed to seed sub-DEX');
+          }
+        }
+      } catch (e) {
+        logger.warn({ err: e }, 'Failed to seed perpDexs — sub-DEX trading disabled');
+      }
     } catch (err) {
       logger.error({ err }, 'Failed to seed market data');
       throw err;

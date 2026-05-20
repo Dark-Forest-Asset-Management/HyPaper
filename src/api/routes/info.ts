@@ -4,6 +4,7 @@ import { KEYS } from '../../store/keys.js';
 import { config } from '../../config.js';
 import { getClearinghouseState, getOpenOrders, getFrontendOpenOrders, getOrderStatus } from '../../engine/position.js';
 import { getUserFills, getUserFillsByTime } from '../../engine/fill.js';
+import { getHistoricalOrdersPg } from '../../store/pg-queries.js';
 import { logger } from '../../utils/logger.js';
 import { ensureAccount } from '../middleware/auth.js';
 
@@ -101,6 +102,12 @@ infoRouter.post('/', async (c) => {
       case 'orderStatus': {
         const status = await getOrderStatus(body.oid);
         return c.json(status);
+      }
+
+      case 'historicalOrders': {
+        if (!user) return c.json({ error: 'Missing user' }, 400);
+        const rows = await getHistoricalOrdersPg(user, body.limit ?? 200);
+        return c.json(rows);
       }
 
       case 'activeAssetCtx': {

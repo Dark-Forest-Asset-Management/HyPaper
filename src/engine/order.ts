@@ -2,47 +2,108 @@ import { redis } from '../store/redis.js';
 import { KEYS } from '../store/keys.js';
 import { logger } from '../utils/logger.js';
 import { lte, gte, isZero, gt, lt } from '../utils/math.js';
-import { nextOid } from '../utils/id.js';
+import { nextOid, nextTwapId } from '../utils/id.js';
 import { checkMarginForOrder } from './margin.js';
 import { OrderMatcher } from '../worker/order-matcher.js';
 import { computeFillPrice } from '../utils/slippage.js';
 import { eventBus } from '../worker/index.js';
-import type { HlOrderWire, HlCancelRequest, HlCancelByCloidRequest, HlOrderResponseStatus, HlMeta } from '../types/hl.js';
+import type { HlOrderWire, HlCancelRequest, HlCancelByCloidRequest, HlOrderResponseStatus, HlMeta, HlTwapWire } from '../types/hl.js';
 import type { PaperOrder } from '../types/order.js';
 
 const matcher = new OrderMatcher(eventBus);
 
+// HL encodes sub-DEX asset ids as `100_000 + perpDexIdx*10_000 + universeIdx`.
+// Anything < 100_000 is a main-DEX universe index. perpDexIdx aligns with
+// the index in the array returned by /info perpDexs (where index 0 is null,
+// index 1 is the first sub-DEX, etc.).
+const SUB_DEX_OFFSET = 100_000;
+const SUB_DEX_STRIDE = 10_000;
+
+async function loadUniverseEntry(asset: number): Promise<{ universe: HlMeta['universe']; localIdx: number } | null> {
+  if (asset < SUB_DEX_OFFSET) {
+    const metaRaw = await redis.get(KEYS.MARKET_META);
+    if (!metaRaw) return null;
+    const meta: HlMeta = JSON.parse(metaRaw);
+    if (asset < 0 || asset >= meta.universe.length) return null;
+    return { universe: meta.universe, localIdx: asset };
+  }
+  // Sub-DEX
+  const offset = asset - SUB_DEX_OFFSET;
+  const dexIdx = Math.floor(offset / SUB_DEX_STRIDE);
+  const localIdx = offset % SUB_DEX_STRIDE;
+  const perpDexsRaw = await redis.get(KEYS.MARKET_PERPDEXS);
+  if (!perpDexsRaw) return null;
+  const perpDexs: Array<{ name: string } | null> = JSON.parse(perpDexsRaw);
+  const dex = perpDexs[dexIdx];
+  if (!dex || !dex.name) return null;
+  const subMetaRaw = await redis.get(KEYS.MARKET_META_DEX(dex.name));
+  if (!subMetaRaw) return null;
+  const subMeta: HlMeta = JSON.parse(subMetaRaw);
+  if (localIdx < 0 || localIdx >= subMeta.universe.length) return null;
+  return { universe: subMeta.universe, localIdx };
+}
+
 export async function resolveAssetCoin(asset: number): Promise<string | null> {
-  const metaRaw = await redis.get(KEYS.MARKET_META);
-  if (!metaRaw) return null;
-  const meta: HlMeta = JSON.parse(metaRaw);
-  if (asset < 0 || asset >= meta.universe.length) return null;
-  return meta.universe[asset].name;
+  const found = await loadUniverseEntry(asset);
+  return found ? found.universe[found.localIdx].name : null;
 }
 
 export async function getAssetDecimals(asset: number): Promise<number> {
-  const metaRaw = await redis.get(KEYS.MARKET_META);
-  if (!metaRaw) return 0;
-  const meta: HlMeta = JSON.parse(metaRaw);
-  if (asset < 0 || asset >= meta.universe.length) return 0;
-  return meta.universe[asset].szDecimals;
+  const found = await loadUniverseEntry(asset);
+  return found ? found.universe[found.localIdx].szDecimals : 0;
 }
 
 export async function placeOrders(
   userId: string,
   orders: HlOrderWire[],
   grouping: string,
+  opts?: { expiresAfter?: number },
 ): Promise<HlOrderResponseStatus[]> {
   const results: HlOrderResponseStatus[] = [];
+  const placedOids: number[] = [];
 
   for (const wire of orders) {
     try {
-      const result = await placeSingleOrder(userId, wire, grouping);
+      const result = await placeSingleOrder(userId, wire, grouping, opts);
       results.push(result);
+      // Collect oids of orders that successfully made it onto the book or
+      // fully filled — we'll wire OCO bracket links across them below.
+      if (typeof result === 'object' && result !== null) {
+        if ('resting' in result && result.resting?.oid) placedOids.push(result.resting.oid);
+        else if ('filled' in result && result.filled?.oid) placedOids.push(result.filled.oid);
+      }
     } catch (err) {
       logger.error({ err, wire }, 'Error placing order');
       results.push({ error: String(err) });
     }
+  }
+
+  // Bracket linkage for `normalTpsl` / `positionTpsl`. HL convention:
+  // first order in the batch is the PARENT (entry), the rest are CHILDREN
+  // (TP / SL exits). The link structure is asymmetric so each fill type
+  // cascades correctly:
+  //
+  //   parent.children = [child1, child2, ...]   ← used on parent cancel
+  //   child.parent    = parent                  ← reverse pointer
+  //   child.bracket   = [other children]        ← used on child fill (OCO)
+  //
+  // Behavior:
+  //   parent fills    → children stay alive (they bracket the new position)
+  //   parent cancels  → cascade-cancel children (no entry = no bracket)
+  //   child fills     → cancel sibling children (OCO; only one exit fires)
+  //   child cancels   → no cascade (user-explicit one-leg cancel)
+  if ((grouping === 'normalTpsl' || grouping === 'positionTpsl') && placedOids.length > 1) {
+    const [parentOid, ...childOids] = placedOids;
+    const pipeline = redis.pipeline();
+    if (childOids.length > 0) {
+      pipeline.sadd(KEYS.ORDER_CHILDREN(parentOid), ...childOids.map(String));
+      for (const childOid of childOids) {
+        pipeline.set(KEYS.ORDER_PARENT(childOid), String(parentOid));
+        const sibs = childOids.filter((o) => o !== childOid).map(String);
+        if (sibs.length > 0) pipeline.sadd(KEYS.ORDER_BRACKET(childOid), ...sibs);
+      }
+    }
+    await pipeline.exec();
   }
 
   return results;
@@ -52,6 +113,7 @@ export async function placeSingleOrder(
   userId: string,
   wire: HlOrderWire,
   grouping: string,
+  opts?: { expiresAfter?: number },
 ): Promise<HlOrderResponseStatus> {
   const coin = await resolveAssetCoin(wire.a);
   if (!coin) return { error: `Unknown asset ${wire.a}` };
@@ -60,13 +122,19 @@ export async function placeSingleOrder(
   const sz = wire.s;
   const limitPx = wire.p;
   const reduceOnly = wire.r;
-  const tif = wire.t.limit.tif;
   const trigger = wire.t.trigger;
 
-  // For trigger orders
+  // For trigger orders. Real HL wires include both `t.limit.tif` (as the
+  // fallback for the trigger order's limit leg) AND `t.trigger`, but
+  // some clients send trigger-only — guard the limit access so we don't
+  // crash before reaching the branch.
   if (trigger) {
     return placeTriggeredOrder(userId, wire.a, coin, isBuy, sz, limitPx, reduceOnly, trigger, wire.c, grouping);
   }
+  if (!wire.t.limit?.tif) {
+    return { error: 'Order missing both t.limit.tif and t.trigger' };
+  }
+  const tif = wire.t.limit.tif;
 
   // Get current mid price for immediate fill check
   const midPx = await redis.hget(KEYS.MARKET_MIDS, coin);
@@ -295,6 +363,35 @@ export async function cancelOrders(
     pipeline.srem(KEYS.ORDERS_OPEN, cancel.o.toString());
     pipeline.srem(KEYS.ORDERS_TRIGGERS, cancel.o.toString());
     await pipeline.exec();
+
+    // Bracket cascade on cancel:
+    //   - If THIS oid is a PARENT (has children registered), cascade-cancel
+    //     all open children. A bracket without an entry is meaningless.
+    //   - If THIS oid is a CHILD, do NOT cascade. The user explicitly
+    //     cancelled one bracket leg; the surviving leg + parent remain.
+    //   - Always clean up any reverse-pointers we own so the next
+    //     event finds a clean state.
+    const childrenOids = await redis.smembers(KEYS.ORDER_CHILDREN(cancel.o));
+    if (childrenOids.length > 0) {
+      await redis.del(KEYS.ORDER_CHILDREN(cancel.o));
+      const childCancels: HlCancelRequest[] = [];
+      for (const childStr of childrenOids) {
+        const childOid = parseInt(childStr, 10);
+        if (!Number.isFinite(childOid)) continue;
+        const childData = await redis.hgetall(KEYS.ORDER(childOid));
+        if (childData.oid && childData.status === 'open' && childData.userId === userId) {
+          childCancels.push({ a: parseInt(childData.asset, 10), o: childOid });
+        }
+        // Drop the child's reverse pointers regardless of status.
+        await redis.del(KEYS.ORDER_PARENT(childOid));
+        await redis.del(KEYS.ORDER_BRACKET(childOid));
+      }
+      if (childCancels.length > 0) await cancelOrders(userId, childCancels);
+    } else {
+      // Child or unlinked: clean any sibling/parent links we own.
+      await redis.del(KEYS.ORDER_BRACKET(cancel.o));
+      await redis.del(KEYS.ORDER_PARENT(cancel.o));
+    }
 
     eventBus.emit('orderUpdate', {
       userId,

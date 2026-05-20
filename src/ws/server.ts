@@ -3,6 +3,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { redis } from '../store/redis.js';
 import { KEYS } from '../store/keys.js';
 import { logger } from '../utils/logger.js';
+import { getClearinghouseState, getFrontendOpenOrders } from '../engine/position.js';
 import type { IncomingMessage } from 'node:http';
 import type { Server } from 'node:http';
 import type {
@@ -135,6 +136,52 @@ export class HyPaperWsServer {
         this.send(state.ws, { channel: 'l2Book', data: { coin: l2.coin, levels: l2.levels, time: l2.time } });
       }
     }
+
+    // Send snapshot for webData2 (combined user state).
+    if (sub.type === 'webData2' && sub.user) {
+      await this.sendWebData2(state.ws, sub.user.toLowerCase());
+    }
+  }
+
+  /** Build + send a webData2 snapshot for `user`. Used both on
+   *  initial subscribe AND on every fill/orderUpdate event so
+   *  subscribers get fresh state without polling. */
+  private async sendWebData2(ws: WebSocket, user: string): Promise<void> {
+    try {
+      const [clearinghouseState, openOrders] = await Promise.all([
+        getClearinghouseState(user),
+        getFrontendOpenOrders(user),
+      ]);
+      this.send(ws, {
+        channel: 'webData2',
+        data: { user, clearinghouseState, openOrders, serverTime: Date.now() },
+      });
+    } catch (err) {
+      logger.warn({ err, user }, 'webData2 build failed');
+    }
+  }
+
+  /** Broadcast webData2 to every subscriber for `user`. Called from
+   *  fill / orderUpdate event listeners so user state stays live. */
+  private async broadcastWebData2(user: string): Promise<void> {
+    const key = `webData2:${user.toLowerCase()}`;
+    const subs = this.subscriptionIndex.get(key);
+    if (!subs || subs.size === 0) return;
+    try {
+      const [clearinghouseState, openOrders] = await Promise.all([
+        getClearinghouseState(user),
+        getFrontendOpenOrders(user),
+      ]);
+      const json = JSON.stringify({
+        channel: 'webData2',
+        data: { user: user.toLowerCase(), clearinghouseState, openOrders, serverTime: Date.now() },
+      });
+      for (const ws of subs) {
+        if (ws.readyState === WebSocket.OPEN) ws.send(json);
+      }
+    } catch (err) {
+      logger.warn({ err, user }, 'webData2 broadcast failed');
+    }
   }
 
   private handleUnsubscribe(state: ClientState, sub: WsSubscription): void {
@@ -164,6 +211,8 @@ export class HyPaperWsServer {
         return sub.user ? `orderUpdates:${sub.user}` : null;
       case 'userFills':
         return sub.user ? `userFills:${sub.user}` : null;
+      case 'webData2':
+        return sub.user ? `webData2:${sub.user.toLowerCase()}` : null;
       default:
         return null;
     }
@@ -189,6 +238,9 @@ export class HyPaperWsServer {
         data: { isSnapshot: false, user: event.userId, fills: [event.fill] },
       });
       this.broadcast(`userFills:${event.userId}`, json);
+      // Fills change the user's positions + open orders → push fresh
+      // webData2 snapshot to subscribers.
+      void this.broadcastWebData2(event.userId);
     });
 
     this.eventBus.on('orderUpdate', (event: OrderUpdateEvent) => {
@@ -211,6 +263,8 @@ export class HyPaperWsServer {
         }],
       });
       this.broadcast(`orderUpdates:${event.userId}`, json);
+      // Open-order list changed → push webData2 too.
+      void this.broadcastWebData2(event.userId);
     });
   }
 

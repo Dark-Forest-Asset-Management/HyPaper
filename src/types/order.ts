@@ -45,4 +45,16 @@ export interface PaperFill {
   tid: number;
   cloid?: string;
   feeToken: string;
+  // HL prod always emits `twapId` on userFills entries (null when the
+  // fill wasn't part of a TWAP). Captured 2026-05-09 from open-hl-bracket
+  // userFills snapshot — every entry has the field.
+  twapId: string | null;
+  // Optional: only present when this fill was the counterparty to
+  // someone else's liquidation. HyPaper has no paper-liquidation engine
+  // so it never produces this; included for type parity with HL prod.
+  liquidation?: {
+    liquidatedUser: string;
+    markPx: string;
+    method: string;
+  };
 }

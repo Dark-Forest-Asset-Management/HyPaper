@@ -68,60 +68,79 @@ describe('margin calculations', () => {
 
   describe('calculateLiquidationPrice', () => {
     it('returns null for zero position', () => {
-      expect(calculateLiquidationPrice('0', '50000', '100000', 20)).toBeNull();
+      expect(calculateLiquidationPrice('0', '50000', '100000', 20, false)).toBeNull();
     });
 
-    describe('long positions', () => {
+    describe('isolated long positions', () => {
       it('calculates liquidation price for a long', () => {
-        // Long 1 BTC @ 50000, 20x leverage
+        // Long 1 BTC @ 50000, 20x leverage, isolated
         // liqPx = entryPx * (1 - 1/lev + 1/(2*lev))
         // = 50000 * (1 - 0.05 + 0.025) = 50000 * 0.975 = 48750
-        const liqPx = calculateLiquidationPrice('1', '50000', '100000', 20);
+        const liqPx = calculateLiquidationPrice('1', '50000', '100000', 20, false);
         expect(liqPx).toBe('48750');
       });
 
       it('liquidation is closer to entry with higher leverage', () => {
-        const liq10x = calculateLiquidationPrice('1', '50000', '100000', 10);
-        const liq50x = calculateLiquidationPrice('1', '50000', '100000', 50);
-        // Higher leverage = closer liquidation
+        const liq10x = calculateLiquidationPrice('1', '50000', '100000', 10, false);
+        const liq50x = calculateLiquidationPrice('1', '50000', '100000', 50, false);
         expect(Number(liq50x)).toBeGreaterThan(Number(liq10x!));
       });
 
       it('does not return negative liquidation price', () => {
-        const liqPx = calculateLiquidationPrice('1', '100', '100000', 1);
+        const liqPx = calculateLiquidationPrice('1', '100', '100000', 1, false);
         expect(Number(liqPx)).toBeGreaterThanOrEqual(0);
       });
     });
 
-    describe('short positions', () => {
+    describe('isolated short positions', () => {
       it('calculates liquidation price for a short', () => {
-        // Short 1 BTC @ 50000, 20x leverage
-        // liqPx = entryPx * (1 + 1/lev - 1/(2*lev))
-        // = 50000 * (1 + 0.05 - 0.025) = 50000 * 1.025 = 51250
-        const liqPx = calculateLiquidationPrice('-1', '50000', '100000', 20);
+        const liqPx = calculateLiquidationPrice('-1', '50000', '100000', 20, false);
         expect(liqPx).toBe('51250');
       });
 
       it('liquidation is closer to entry with higher leverage', () => {
-        const liq10x = calculateLiquidationPrice('-1', '50000', '100000', 10);
-        const liq50x = calculateLiquidationPrice('-1', '50000', '100000', 50);
-        // Higher leverage for shorts = lower liq price (closer to entry)
+        const liq10x = calculateLiquidationPrice('-1', '50000', '100000', 10, false);
+        const liq50x = calculateLiquidationPrice('-1', '50000', '100000', 50, false);
         expect(Number(liq50x)).toBeLessThan(Number(liq10x!));
       });
     });
 
-    describe('leverage edge cases', () => {
+    describe('isolated leverage edge cases', () => {
       it('1x leverage: wide liquidation distance', () => {
-        const liqPx = calculateLiquidationPrice('1', '50000', '100000', 1);
-        // 50000 * (1 - 1 + 0.5) = 25000
+        const liqPx = calculateLiquidationPrice('1', '50000', '100000', 1, false);
         expect(liqPx).toBe('25000');
       });
 
       it('200x leverage: very tight liquidation', () => {
-        const liqPx = calculateLiquidationPrice('1', '50000', '100000', 200);
-        // Very close to entry
+        const liqPx = calculateLiquidationPrice('1', '50000', '100000', 200, false);
         expect(Number(liqPx)).toBeGreaterThan(49800);
         expect(Number(liqPx)).toBeLessThan(50000);
+      });
+    });
+
+    describe('cross-margin null behaviour (HL prod parity)', () => {
+      // Modeled on the captured HL prod response 2026-05-09 for an
+      // 8 XRP long @ 1.4161 with $144 account value, 5x cross — HL
+      // returned `liquidationPx: null` because cushion exceeded notional.
+      it('returns null when cushion exceeds notional (long)', () => {
+        const liqPx = calculateLiquidationPrice('8', '1.4161', '144', 5, true);
+        expect(liqPx).toBeNull();
+      });
+
+      it('returns null when cushion exceeds notional (short)', () => {
+        const liqPx = calculateLiquidationPrice('-8', '1.4161', '144', 5, true);
+        expect(liqPx).toBeNull();
+      });
+
+      // Sanity: a cross position with thin-but-positive cushion still
+      // gets a price. 100 units @ $50 with $1000 account value:
+      //   notional=5000, maintMargin=500, cushion=500 (< notional ✓),
+      //   offset=500/100=5, liqPx_long = 50 − 5 = 45.
+      it('returns a finite price when cushion is thin (long)', () => {
+        const liqPx = calculateLiquidationPrice('100', '50', '1000', 5, true);
+        expect(liqPx).not.toBeNull();
+        expect(Number(liqPx)).toBeLessThan(50);
+        expect(Number(liqPx)).toBeGreaterThan(0);
       });
     });
   });

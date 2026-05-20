@@ -22,10 +22,137 @@ export class OrderMatcher {
     try {
       await this.matchOpenOrders();
       await this.matchTriggerOrders();
+      await this.matchTwaps();
+      await this.sweepExpired();
     } catch (err) {
       logger.error({ err }, 'Order matcher error');
     } finally {
       this.isRunning = false;
+    }
+  }
+
+  /** Process active TWAPs by submitting an IOC market suborder for the
+   *  amount of progress that's elapsed since the last slice. HL spec is
+   *  ~30s suborders (max 3% slippage, up-to-3× catchup). v1 implements:
+   *    - 30s minimum gap between slices
+   *    - linear filling: target_filled = totalSize * (elapsed / duration)
+   *    - submit IOC market for (target_filled - current_filled)
+   *    - 3% slippage cap, 3× catchup are NOT modelled — flagged
+   *      approximation; revisit once HL testnet captures show real
+   *      suborder shapes. */
+  private async matchTwaps(): Promise<void> {
+    const ids = await redis.smembers(KEYS.TWAPS_ACTIVE);
+    if (ids.length === 0) return;
+    const now = Date.now();
+    for (const idStr of ids) {
+      const id = parseInt(idStr, 10);
+      const data = await redis.hgetall(KEYS.TWAP(id));
+      if (!data.twapId) {
+        await redis.srem(KEYS.TWAPS_ACTIVE, idStr);
+        continue;
+      }
+      if (data.status !== 'running') {
+        await redis.srem(KEYS.TWAPS_ACTIVE, idStr);
+        continue;
+      }
+      const startTime = parseInt(data.startTime, 10);
+      const endTime = parseInt(data.endTime, 10);
+      const totalSize = parseFloat(data.totalSize);
+      const filledSize = parseFloat(data.filledSize || '0');
+      const lastSubmittedAt = parseInt(data.lastSubmittedAt || '0', 10);
+
+      // Mark finished if past the end and (mostly) filled.
+      if (now >= endTime || filledSize >= totalSize) {
+        await redis.hset(KEYS.TWAP(id), 'status', 'finished', 'lastSubmittedAt', String(now));
+        await redis.srem(KEYS.TWAPS_ACTIVE, idStr);
+        this.eventBus.emit('twapUpdate', { userId: data.userId, twapId: id, status: 'finished' });
+        continue;
+      }
+
+      // 30s minimum gap between slices.
+      if (lastSubmittedAt && now - lastSubmittedAt < 30_000) continue;
+
+      const elapsedMs = now - startTime;
+      const totalMs = endTime - startTime;
+      const targetFilled = totalSize * (elapsedMs / totalMs);
+      const sliceSize = Math.max(0, targetFilled - filledSize);
+      if (sliceSize <= 0) continue;
+
+      const midPx = await redis.hget(KEYS.MARKET_MIDS, data.coin);
+      if (!midPx) continue;
+
+      // Submit IOC market via the engine. We import lazily to avoid a
+      // circular import (engine -> matcher -> engine).
+      const { placeOrders } = await import('../engine/order.js');
+      const slipPx = data.isBuy === 'true' ? parseFloat(midPx) * 1.05 : parseFloat(midPx) * 0.95;
+      const wire = {
+        a: parseInt(data.asset, 10),
+        b: data.isBuy === 'true',
+        p: slipPx.toFixed(8),
+        s: sliceSize.toFixed(8),
+        r: data.reduceOnly === 'true',
+        t: { limit: { tif: 'Ioc' as const } },
+      };
+      try {
+        const [result] = await placeOrders(data.userId, [wire], 'na');
+        // Update progress only if something actually filled.
+        if (typeof result === 'object' && result !== null && 'filled' in result && result.filled?.totalSz) {
+          const newFilled = filledSize + parseFloat(result.filled.totalSz);
+          await redis.hset(KEYS.TWAP(id), 'filledSize', String(newFilled), 'lastSubmittedAt', String(now));
+          this.eventBus.emit('twapUpdate', { userId: data.userId, twapId: id, status: 'running', filledSize: newFilled });
+        } else {
+          // Bump lastSubmittedAt so we don't hammer the matcher with the
+          // same failing slice every tick.
+          await redis.hset(KEYS.TWAP(id), 'lastSubmittedAt', String(now));
+        }
+      } catch (err) {
+        logger.warn({ err, twapId: id }, 'TWAP slice submit failed');
+        await redis.hset(KEYS.TWAP(id), 'lastSubmittedAt', String(now));
+      }
+    }
+  }
+
+  /** Cancel any open orders past their `expiresAfter` deadline. The
+   *  expiry sorted set is keyed by oid with score = expiry-ms; we pop
+   *  from the front while score <= now. */
+  private async sweepExpired(): Promise<void> {
+    const now = Date.now();
+    const expired = await redis.zrangebyscore(KEYS.ORDERS_EXPIRY, '-inf', String(now));
+    if (expired.length === 0) return;
+    for (const oidStr of expired) {
+      const oid = parseInt(oidStr, 10);
+      if (!Number.isFinite(oid)) continue;
+      const data = await redis.hgetall(KEYS.ORDER(oid));
+      await redis.zrem(KEYS.ORDERS_EXPIRY, oidStr);
+      if (!data.oid || data.status !== 'open') continue;
+      const pipeline = redis.pipeline();
+      pipeline.hset(KEYS.ORDER(oid), 'status', 'cancelled', 'updatedAt', String(now));
+      pipeline.srem(KEYS.ORDERS_OPEN, oidStr);
+      pipeline.srem(KEYS.ORDERS_TRIGGERS, oidStr);
+      await pipeline.exec();
+      this.eventBus.emit('orderUpdate', {
+        userId: data.userId,
+        order: {
+          oid,
+          coin: data.coin,
+          isBuy: data.isBuy === 'true',
+          sz: data.sz,
+          limitPx: data.limitPx,
+          status: 'cancelled' as const,
+          asset: parseInt(data.asset, 10),
+          userId: data.userId,
+          orderType: (data.orderType ?? 'limit') as 'limit' | 'trigger',
+          tif: (data.tif ?? 'Gtc') as 'Gtc' | 'Ioc' | 'Alo',
+          reduceOnly: data.reduceOnly === 'true',
+          grouping: (data.grouping ?? 'na') as 'na' | 'normalTpsl' | 'positionTpsl',
+          filledSz: data.filledSz ?? '0',
+          avgPx: data.avgPx ?? '0',
+          createdAt: parseInt(data.createdAt, 10),
+          updatedAt: now,
+          cloid: data.cloid || undefined,
+        } as PaperOrder,
+        status: 'cancelled',
+      });
     }
   }
 
@@ -226,6 +353,9 @@ export class OrderMatcher {
       tid,
       cloid: order.cloid,
       feeToken: 'USDC',
+      // HL prod always emits twapId on userFills entries; null for non-TWAP
+      // fills (every fill HyPaper produces, since HyPaper has no TWAP path).
+      twapId: null,
     };
 
     // Pre-read funding fields before pipeline
@@ -307,6 +437,90 @@ export class OrderMatcher {
       status: 'filled',
     });
     this.eventBus.emit('fill', { userId, fill });
+
+    // Bracket OCO: when one sibling fills, cancel the rest. HL's
+    // `normalTpsl` / `positionTpsl` groupings link orders so a TP fill
+    // auto-cancels its SL counterpart (and vice versa).
+    await this.cancelOrderSiblings(order.oid, userId);
+  }
+
+  /** Bracket cascade on fill. Two cases:
+   *    1. THIS oid is a PARENT (has CHILDREN registered) → fill it and
+   *       LEAVE children alive. Children now bracket the new position.
+   *    2. THIS oid is a CHILD (has BRACKET siblings registered) → cancel
+   *       sibling children (OCO: only one exit fires) and clean parent's
+   *       children-set so a later parent-cancel doesn't try to re-cancel
+   *       already-filled / already-cancelled legs.
+   *    3. Unlinked order → no-op.
+   */
+  private async cancelOrderSiblings(oid: number, userId: string): Promise<void> {
+    // Case 1: parent fill — children stay alive. Just clean the children
+    // set and the children's reverse pointers since the parent is gone.
+    const childrenOids = await redis.smembers(KEYS.ORDER_CHILDREN(oid));
+    if (childrenOids.length > 0) {
+      const pipeline = redis.pipeline();
+      pipeline.del(KEYS.ORDER_CHILDREN(oid));
+      for (const childStr of childrenOids) {
+        const childOid = parseInt(childStr, 10);
+        if (Number.isFinite(childOid)) pipeline.del(KEYS.ORDER_PARENT(childOid));
+      }
+      await pipeline.exec();
+      return;
+    }
+
+    // Case 2/3: this oid is a child (or unlinked). Walk its sibling set.
+    const siblings = await redis.smembers(KEYS.ORDER_BRACKET(oid));
+    if (siblings.length === 0) {
+      // Unlinked or already drained — nothing to do.
+      await redis.del(KEYS.ORDER_PARENT(oid));
+      return;
+    }
+    // Pull the parent so we can clean its children-set too.
+    const parentStr = await redis.get(KEYS.ORDER_PARENT(oid));
+    const parentOid = parentStr ? parseInt(parentStr, 10) : null;
+    await redis.del(KEYS.ORDER_BRACKET(oid));
+    await redis.del(KEYS.ORDER_PARENT(oid));
+    if (parentOid && Number.isFinite(parentOid)) {
+      await redis.srem(KEYS.ORDER_CHILDREN(parentOid), oid.toString());
+    }
+    for (const sibStr of siblings) {
+      const sibOid = parseInt(sibStr, 10);
+      if (!Number.isFinite(sibOid)) continue;
+      const sibData = await redis.hgetall(KEYS.ORDER(sibOid));
+      if (!sibData.oid || sibData.status !== 'open') continue;
+      const now = Date.now();
+      const pipeline = redis.pipeline();
+      pipeline.hset(KEYS.ORDER(sibOid), 'status', 'cancelled', 'updatedAt', now.toString());
+      pipeline.srem(KEYS.ORDERS_OPEN, sibStr);
+      pipeline.srem(KEYS.ORDERS_TRIGGERS, sibStr);
+      pipeline.del(KEYS.ORDER_BRACKET(sibOid));
+      pipeline.del(KEYS.ORDER_PARENT(sibOid));
+      if (parentOid && Number.isFinite(parentOid)) pipeline.srem(KEYS.ORDER_CHILDREN(parentOid), sibStr);
+      await pipeline.exec();
+      this.eventBus.emit('orderUpdate', {
+        userId,
+        order: {
+          oid: sibOid,
+          coin: sibData.coin,
+          isBuy: sibData.isBuy === 'true',
+          sz: sibData.sz,
+          limitPx: sibData.limitPx,
+          status: 'cancelled' as const,
+          asset: parseInt(sibData.asset, 10),
+          userId,
+          orderType: (sibData.orderType ?? 'limit') as 'limit' | 'trigger',
+          tif: (sibData.tif ?? 'Gtc') as 'Gtc' | 'Ioc' | 'Alo',
+          reduceOnly: sibData.reduceOnly === 'true',
+          grouping: (sibData.grouping ?? 'na') as 'na' | 'normalTpsl' | 'positionTpsl',
+          filledSz: sibData.filledSz ?? '0',
+          avgPx: sibData.avgPx ?? '0',
+          createdAt: parseInt(sibData.createdAt, 10),
+          updatedAt: now,
+          cloid: sibData.cloid || undefined,
+        } as PaperOrder,
+        status: 'cancelled',
+      });
+    }
   }
 
   private getFillDir(startPosition: string, signedFillSz: string): string {

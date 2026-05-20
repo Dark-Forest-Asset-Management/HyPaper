@@ -1,7 +1,7 @@
 import type { EventEmitter } from 'node:events';
 import { eq } from 'drizzle-orm';
 import { db } from './db.js';
-import { users, orders, fills } from './schema.js';
+import { users, orders, fills, consentRecords } from './schema.js';
 import { logger } from '../utils/logger.js';
 import type { PaperOrder, PaperFill } from '../types/order.js';
 
@@ -98,5 +98,23 @@ export function updateUserBalance(userId: string, balance: string): void {
     await db.update(users)
       .set({ balance })
       .where(eq(users.userId, userId));
+  });
+}
+
+/** Fire-and-forget consent-record insert. Drops `id` collisions
+ *  silently (same-ms inserts are rare and re-prompting would be more
+ *  annoying than missing one audit row). */
+export function recordConsent(record: {
+  id: number;
+  ts: number;
+  ipHash: string | null;
+  userAgent: string | null;
+  policyVersion: number;
+  analytics: boolean;
+  advertising: boolean;
+  adPersonalization: boolean;
+}): void {
+  enqueueWrite(async () => {
+    await db.insert(consentRecords).values(record).onConflictDoNothing();
   });
 }

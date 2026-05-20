@@ -214,14 +214,28 @@ export interface HlOpenOrder {
   cloid?: string;
 }
 
-export interface HlFrontendOpenOrder extends HlOpenOrder {
-  children?: HlTpSlChild[];
-  tif: string;
+/** HL prod /info frontendOpenOrders — captured 2026-05-09 against a
+ *  normalTpsl bracket on XRP. Every field below is present on every
+ *  entry; explicit `null` for `tif` and `cloid` on triggers, prose
+ *  string for `triggerCondition`, empty array for `children` (not
+ *  optional). `triggerPx` is `'0.0'` for non-trigger orders, not omitted. */
+export interface HlFrontendOpenOrder {
+  coin: string;
+  side: 'B' | 'A';
+  limitPx: string;
+  sz: string;
+  oid: number;
+  timestamp: number;
+  triggerCondition: string;
+  isTrigger: boolean;
+  triggerPx: string;
+  children: HlTpSlChild[];
+  isPositionTpsl: boolean;
+  reduceOnly: boolean;
   orderType: string;
-  triggerPx?: string;
-  triggerCondition?: string;
-  isPositionTpsl?: boolean;
-  reduceOnly?: boolean;
+  origSz: string;
+  tif: string | null;
+  cloid: string | null;
 }
 
 export interface HlTpSlChild {
@@ -248,6 +262,16 @@ export interface HlUserFill {
   tid: number;
   cloid?: string;
   feeToken: string;
+  twapId: string | null;
+  // Present only when this fill was the counterparty to a liquidation
+  // (3 of 2000 fills in the captured HL prod sample). HyPaper has no
+  // paper-liquidation simulation so it never emits this field, but
+  // consumers should still know it can appear.
+  liquidation?: {
+    liquidatedUser: string;
+    markPx: string;
+    method: string;
+  };
 }
 
 // === Order status response ===
