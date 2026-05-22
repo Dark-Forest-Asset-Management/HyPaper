@@ -1,0 +1,60 @@
+{
+  "request": {
+    "action": {
+      "type": "order",
+      "orders": [
+        {
+          "a": 3,
+          "b": true,
+          "p": "70415",
+          "s": "0.00039",
+          "r": false,
+          "t": {
+            "limit": {
+              "tif": "Gtc"
+            }
+          }
+        },
+        {
+          "a": 3,
+          "b": true,
+          "p": "69633",
+          "s": "0.00039",
+          "r": false,
+          "t": {
+            "limit": {
+              "tif": "Gtc"
+            }
+          }
+        }
+      ],
+      "grouping": "na"
+    },
+    "nonce": 1778996623277,
+    "signature": {
+      "r": "0x50b5c1e6c4c98bbf2d80d491ebf01beb77e5959c854b5ed508587a37538b6332",
+      "s": "0x36b09e48739b283144a3ea56eac58af627417326798b8b75211ae57ea9c2e6f1",
+      "v": 27
+    }
+  },
+  "response": {
+    "status": "ok",
+    "response": {
+      "type": "order",
+      "data": {
+        "statuses": [
+          {
+            "resting": {
+              "oid": 53244215259
+            }
+          },
+          {
+            "resting": {
+              "oid": 53244215260
+            }
+          }
+        ]
+      }
+    }
+  }
+}

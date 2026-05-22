@@ -1,0 +1,25 @@
+{
+  "request": {
+    "type": "userFills",
+    "user": "0x4A1AE5A6cFB24390a704b1cc1aB88d0F89eF596B"
+  },
+  "response": [
+    {
+      "coin": "BTC",
+      "px": "80942.0",
+      "sz": "0.00246",
+      "side": "B",
+      "time": 1778656572106,
+      "startPosition": "0.0",
+      "dir": "Open Long",
+      "closedPnl": "0.0",
+      "hash": "0xc4faa211b88c4494c6740421bb7b9e010a00b9f7538f636668c34d6477801e7f",
+      "oid": 52998490771,
+      "crossed": true,
+      "fee": "0.089602",
+      "tid": 42195709352155,
+      "feeToken": "USDC",
+      "twapId": null
+    }
+  ]
+}

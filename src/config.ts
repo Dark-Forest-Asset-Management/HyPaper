@@ -17,6 +17,16 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
   WS_RECONNECT_MIN_MS: z.coerce.number().default(1000),
   WS_RECONNECT_MAX_MS: z.coerce.number().default(30000),
+  // L2 book transport. true (default): the worker subscribes l2Book over WS
+  // and the matcher reads the book Redis-first. false: skip the subscription
+  // so getL2Book falls back to HTTP /info polling (the original behavior). A
+  // kill-switch to roll the WS path back without a redeploy — not a second
+  // first-class mode. NOTE: can't use z.coerce.boolean() here — it treats any
+  // non-empty string (incl. "false") as true — so parse explicitly.
+  L2_WS_ENABLED: z
+    .string()
+    .default('true')
+    .transform((v) => !['false', '0', 'no', 'off'].includes(v.trim().toLowerCase())),
   // Match HL prod's documented IP rate limit: 1200 requests per minute
   // per IP (https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/rate-limits).
   // The previous default of 120/min was 10× stricter than HL and

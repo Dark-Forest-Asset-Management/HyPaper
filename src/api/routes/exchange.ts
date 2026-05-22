@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { placeOrders, cancelOrders, cancelByCloid, updateLeverage, modifyOrder, batchModifyOrders, placeTwap, cancelTwap } from '../../engine/order.js';
+import { placeOrders, cancelOrders, cancelByCloid, updateLeverage, modifyOrder, batchModifyOrders, createTwapOrder, cancelTwapOrder } from '../../engine/order.js';
 import { ensureAccount } from '../middleware/auth.js';
 import { recoverHlSigner } from '../middleware/recoverHlSigner.js';
 import { logger } from '../../utils/logger.js';
@@ -156,38 +156,6 @@ exchangeRouter.post('/', async (c) => {
         return c.json({ status: 'ok', response: { type: 'default' } });
       }
 
-      case 'twapOrder': {
-        if (!action.twap || typeof action.twap !== 'object') {
-          return c.json({ status: 'err', response: 'twapOrder requires twap object' }, 400);
-        }
-        const t = action.twap;
-        if (typeof t.a !== 'number' || typeof t.b !== 'boolean' ||
-            typeof t.s !== 'string' || typeof t.r !== 'boolean' ||
-            typeof t.m !== 'number' || typeof t.t !== 'boolean') {
-          return c.json({ status: 'err', response: 'twap requires a, b, s, r, m, t' }, 400);
-        }
-        const result = await placeTwap(wallet, t);
-        if (result.status === 'err') {
-          return c.json({ status: 'err', response: result.error }, 400);
-        }
-        // HL response: `{type:'twapOrder', data:{status:{running:{twapId}}}}`
-        return c.json({
-          status: 'ok',
-          response: { type: 'twapOrder', data: { status: { running: { twapId: result.twapId } } } },
-        });
-      }
-
-      case 'twapCancel': {
-        if (typeof action.a !== 'number' || typeof action.t !== 'number') {
-          return c.json({ status: 'err', response: 'twapCancel requires a (asset) and t (twapId)' }, 400);
-        }
-        const result = await cancelTwap(wallet, action.t);
-        if (result.status === 'err') {
-          return c.json({ status: 'err', response: result.error }, 400);
-        }
-        return c.json({ status: 'ok', response: { type: 'default' } });
-      }
-
       case 'cancel': {
         if (!Array.isArray(action.cancels) || action.cancels.length === 0) {
           return c.json({ status: 'err', response: 'Missing cancels array' }, 400);
@@ -228,6 +196,41 @@ exchangeRouter.post('/', async (c) => {
         });
       }
 
+      case 'twapOrder': {
+        const tw = action.twap;
+        if (
+          typeof tw?.a !== 'number' || typeof tw?.b !== 'boolean' ||
+          typeof tw?.s !== 'string' || typeof tw?.r !== 'boolean' ||
+          typeof tw?.m !== 'number' || typeof tw?.t !== 'boolean'
+        ) {
+          return c.json({ status: 'err', response: 'twapOrder requires twap.{a,b,s,r,m,t}' }, 400);
+        }
+        if (tw.m < 5) {
+          return c.json({ status: 'err', response: 'TWAP duration minimum is 5 minutes' }, 400);
+        }
+        const twapResult = await createTwapOrder(wallet, tw.a, tw.b, tw.s, tw.r, tw.m);
+        if ('error' in twapResult) {
+          return c.json({ status: 'ok', response: { type: 'twapOrder', data: { status: { error: twapResult.error } } } });
+        }
+        return c.json({
+          status: 'ok',
+          response: { type: 'twapOrder', data: { status: { running: { twapId: twapResult.twapId } } } },
+        });
+      }
+
+      case 'twapCancel': {
+        if (typeof action.a !== 'number' || typeof action.t !== 'number') {
+          return c.json({ status: 'err', response: 'twapCancel requires a (asset) and t (twapId)' }, 400);
+        }
+        const cancelResult = await cancelTwapOrder(wallet, action.t);
+        if ('error' in cancelResult) {
+          return c.json({ status: 'err', response: cancelResult.error }, 400);
+        }
+        return c.json({
+          status: 'ok',
+          response: { type: 'twapCancel', data: { status: 'success' } },
+        });
+      }
       case 'updateLeverage': {
         if (typeof action.asset !== 'number' || typeof action.leverage !== 'number' || typeof action.isCross !== 'boolean') {
           return c.json({ status: 'err', response: 'updateLeverage requires asset (number), leverage (number), isCross (boolean)' }, 400);

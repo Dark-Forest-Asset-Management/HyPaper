@@ -1,0 +1,63 @@
+{
+  "request": {
+    "action": {
+      "type": "batchModify",
+      "modifies": [
+        {
+          "oid": 53244215259,
+          "order": {
+            "a": 3,
+            "b": true,
+            "p": "70493",
+            "s": "0.00039",
+            "r": false,
+            "t": {
+              "limit": {
+                "tif": "Gtc"
+              }
+            }
+          }
+        },
+        {
+          "oid": 53244215260,
+          "order": {
+            "a": 3,
+            "b": true,
+            "p": "69711",
+            "s": "0.00039",
+            "r": false,
+            "t": {
+              "limit": {
+                "tif": "Gtc"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "nonce": 1778996629271,
+    "signature": {
+      "r": "0xc8a623c7485d70bcdd1d8ec5520b76d8a4fe3899d9791dad261b8f978fdc2ca2",
+      "s": "0x7d3a324ca213e14528d8e731b908c0080bbc9db1f76345c4da9f066fbd970e57",
+      "v": 28
+    }
+  },
+  "response": {
+    "status": "ok",
+    "response": {
+      "type": "order",
+      "data": {
+        "statuses": [
+          {
+            "error": "Cannot modify canceled or filled order"
+          },
+          {
+            "resting": {
+              "oid": 53244219349
+            }
+          }
+        ]
+      }
+    }
+  }
+}

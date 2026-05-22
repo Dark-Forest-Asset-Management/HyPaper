@@ -10,5 +10,5 @@ export async function nextTid(): Promise<number> {
 }
 
 export async function nextTwapId(): Promise<number> {
-  return redis.incr(KEYS.SEQ_TWAP_ID);
+  return redis.incr(KEYS.SEQ_TWAP);
 }

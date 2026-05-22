@@ -1,0 +1,30 @@
+{
+  "request": {
+    "action": {
+      "type": "modify",
+      "oid": 99999999,
+      "order": {
+        "a": 3,
+        "b": true,
+        "p": "70415",
+        "s": "0.00039",
+        "r": false,
+        "t": {
+          "limit": {
+            "tif": "Gtc"
+          }
+        }
+      }
+    },
+    "nonce": 1778996639603,
+    "signature": {
+      "r": "0x7bfc2e126aa5e7cd465c91bf7e5f297add02e6ba65216449951095f3cbf6ad67",
+      "s": "0x44af9766364c5af332e96f22586393f8e2688f1ec6be60b83a67e82e5b81de7c",
+      "v": 28
+    }
+  },
+  "response": {
+    "status": "err",
+    "response": "Cannot modify canceled or filled order"
+  }
+}
