@@ -57,7 +57,73 @@ export class Worker {
 
     this.fundingWorker.start();
 
+    // Periodic HTTP mid trueup. Belt-and-suspenders against the case where
+    // HL's WS allMids stream drops or stops delivering ticks for individual
+    // sub-DEX coins (real bug seen 2026-05-19: xyz:MU stayed at its seed
+    // value of 684.28 from yesterday while HL had moved through 720+ and
+    // the user's SL trigger at 714.42 never fired because the matcher reads
+    // from market:mids which the WS subscription wasn't updating).
+    //
+    // Strategy: every TRUEUP_INTERVAL_MS, hit HL HTTP `allMids` for main +
+    // each sub-DEX. Bulk-write to Redis. Cheap — 1 HTTP request per DEX per
+    // interval, returns every coin's current mid in a single response.
+    // Doesn't replace the WS path (still cheaper for live ticks), just
+    // ensures stale mids get refreshed on a bounded cadence.
+    this.startMidTrueup();
+
     logger.info('Worker started');
+  }
+
+  private midTrueupTimer: NodeJS.Timeout | null = null;
+  private readonly TRUEUP_INTERVAL_MS = 5_000;
+
+  private startMidTrueup(): void {
+    const tick = async (): Promise<void> => {
+      try {
+        // Main DEX
+        await this.trueupOneDex(undefined);
+        // Sub-DEXes from cached perpDexs list (already populated in seedMarketData)
+        const perpDexsRaw = await redis.get(KEYS.MARKET_PERPDEXS);
+        if (perpDexsRaw) {
+          const dexList: Array<{ name: string } | null> = JSON.parse(perpDexsRaw);
+          for (const d of dexList) {
+            if (d && d.name) {
+              try { await this.trueupOneDex(d.name); }
+              catch (e) { logger.debug({ err: (e as Error).message, dex: d.name }, 'trueup sub-DEX failed'); }
+            }
+          }
+        }
+      } catch (e) {
+        logger.debug({ err: (e as Error).message }, 'trueup tick failed');
+      }
+    };
+    this.midTrueupTimer = setInterval(tick, this.TRUEUP_INTERVAL_MS);
+    // Fire once immediately so the first refresh doesn't wait the full interval
+    void tick();
+  }
+
+  private async trueupOneDex(dex: string | undefined): Promise<void> {
+    const body: { type: 'allMids'; dex?: string } = { type: 'allMids' };
+    if (dex) body.dex = dex;
+    const res = await fetch(`${config.HL_API_URL}/info`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const mids = await res.json() as Record<string, string>;
+    if (!mids || typeof mids !== 'object') return;
+    const entries = Object.entries(mids);
+    if (entries.length === 0) return;
+    const args: string[] = [];
+    for (const [coin, px] of entries) {
+      if (px) args.push(coin, String(px));
+    }
+    if (args.length === 0) return;
+    await redis.hset(KEYS.MARKET_MIDS, ...args);
+    // Wake the matcher so any trigger orders whose mid just refreshed get
+    // re-evaluated immediately instead of waiting for the next WS tick.
+    this.orderMatcher.matchAll();
   }
 
   private async seedMarketData(): Promise<void> {
@@ -173,6 +239,10 @@ export class Worker {
   }
 
   stop(): void {
+    if (this.midTrueupTimer) {
+      clearInterval(this.midTrueupTimer);
+      this.midTrueupTimer = null;
+    }
     this.fundingWorker.stop();
     this.wsClient?.close();
     logger.info('Worker stopped');
