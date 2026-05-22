@@ -1,0 +1,44 @@
+{
+  "request": {
+    "type": "frontendOpenOrders",
+    "user": "0x4A1AE5A6cFB24390a704b1cc1aB88d0F89eF596B"
+  },
+  "response": [
+    {
+      "coin": "BTC",
+      "side": "B",
+      "limitPx": "69711.0",
+      "sz": "0.00039",
+      "oid": 53244219349,
+      "timestamp": 1779044353234,
+      "triggerCondition": "N/A",
+      "isTrigger": false,
+      "triggerPx": "0.0",
+      "children": [],
+      "isPositionTpsl": false,
+      "reduceOnly": false,
+      "orderType": "Limit",
+      "origSz": "0.00039",
+      "tif": "Gtc",
+      "cloid": null
+    },
+    {
+      "coin": "BTC",
+      "side": "B",
+      "limitPx": "70806.0",
+      "sz": "0.00039",
+      "oid": 53244216266,
+      "timestamp": 1779044350017,
+      "triggerCondition": "N/A",
+      "isTrigger": false,
+      "triggerPx": "0.0",
+      "children": [],
+      "isPositionTpsl": false,
+      "reduceOnly": false,
+      "orderType": "Limit",
+      "origSz": "0.00039",
+      "tif": "Gtc",
+      "cloid": null
+    }
+  ]
+}

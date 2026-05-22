@@ -1,0 +1,34 @@
+{
+  "request": {
+    "action": {
+      "type": "twapOrder",
+      "twap": {
+        "a": 3,
+        "b": true,
+        "s": "0.00192",
+        "r": false,
+        "m": 5,
+        "t": false
+      }
+    },
+    "nonce": 1778996633157,
+    "signature": {
+      "r": "0xeca20a4e0291b2b39711aa3c5c488fa6444cf3952b8aef1d76d9b44b52e435e7",
+      "s": "0x55471fa2bf13da180ad4c811a628a6977ff4ed65261b2bb59c2a85a705d6ad29",
+      "v": 28
+    }
+  },
+  "response": {
+    "status": "ok",
+    "response": {
+      "type": "twapOrder",
+      "data": {
+        "status": {
+          "running": {
+            "twapId": 15503
+          }
+        }
+      }
+    }
+  }
+}

@@ -109,7 +109,7 @@ export async function placeOrders(
   return results;
 }
 
-async function placeSingleOrder(
+export async function placeSingleOrder(
   userId: string,
   wire: HlOrderWire,
   grouping: string,
@@ -456,137 +456,194 @@ export async function updateLeverage(
   );
 }
 
-/** Atomic cancel-and-replace. HL's `modify` is one operation server-side;
- *  HyPaper does it as `cancelOrders` + `placeOrders` back-to-back. There's
- *  a tiny window between the two where the order is missing from the book —
- *  acceptable for a paper-trading sim, but worth noting if the user uses
- *  modify for time-critical strategies. */
+// ─── modify ──────────────────────────────────────────────────────────────────
+// HL modify = atomic cancel-and-replace.
+// We cancel the old order and place a new one. The new OID is returned
+// but HL's response shape for modify is just { type: 'default' } — the
+// caller does not get the new OID back (confirmed from testnet capture).
+
 export async function modifyOrder(
   userId: string,
-  target: number | string,
+  oid: number,
   newWire: HlOrderWire,
-): Promise<HlOrderResponseStatus> {
-  // Resolve oid: numbers are direct order ids; strings are cloids.
-  let oid: number;
-  if (typeof target === 'number') {
-    oid = target;
-  } else {
-    const oidStr = await redis.hget(KEYS.USER_CLOIDS(userId), target);
-    if (!oidStr) return { error: `cloid ${target} not found` };
-    oid = parseInt(oidStr, 10);
-  }
-
-  // Verify the order exists and belongs to this user before cancelling.
+): Promise<{ ok: true } | { error: string }> {
+  // Load the existing order
   const orderData = await redis.hgetall(KEYS.ORDER(oid));
   if (!orderData.oid || orderData.userId !== userId) {
     return { error: `Order ${oid} not found` };
   }
   if (orderData.status !== 'open') {
-    return { error: `Order ${oid} is not open (status: ${orderData.status})` };
+    return { error: `Cannot modify canceled or filled order` };
   }
 
-  // Cancel the original. We don't surface its result on the wire — modify's
-  // canonical HL response is `{ type: 'default' }` regardless.
-  await cancelOrders(userId, [{ a: parseInt(orderData.asset, 10), o: oid }]);
+  // Cancel the old order
+  const now = Date.now();
+  const pipeline = redis.pipeline();
+  pipeline.hset(KEYS.ORDER(oid), 'status', 'cancelled', 'updatedAt', now.toString());
+  pipeline.srem(KEYS.ORDERS_OPEN, oid.toString());
+  pipeline.srem(KEYS.ORDERS_TRIGGERS, oid.toString());
+  await pipeline.exec();
+eventBus.emit('orderUpdate', { userId, order: { oid } as any, status: 'cancelled' });
+  // Place the replacement order (same grouping as original)
+  const grouping = orderData.grouping ?? 'na';
+  await placeSingleOrder(userId, newWire, grouping);
 
-  // Place the replacement. Use `na` grouping by default — modify shouldn't
-  // re-link an order to an unrelated bracket on its own.
-  const [result] = await placeOrders(userId, [newWire], 'na');
-  return result;
+  return { ok: true };
 }
 
-/** Loop apply of `modify`. HL atomicizes the whole batch server-side; we
- *  don't, but the API surface matches. */
+// ─── batchModify ─────────────────────────────────────────────────────────────
+// Run modifyOrder for each entry. Returns one status per modify,
+// same shape as placeOrders statuses (resting | filled | error).
+// Confirmed from testnet: batchModify response type is 'order' with statuses.
+
 export async function batchModifyOrders(
   userId: string,
-  modifies: Array<{ oid: number | string; order: HlOrderWire }>,
+  modifies: Array<{ oid: number; order: HlOrderWire }>,
 ): Promise<HlOrderResponseStatus[]> {
   const results: HlOrderResponseStatus[] = [];
+
   for (const m of modifies) {
-    results.push(await modifyOrder(userId, m.oid, m.order));
+    try {
+      const orderData = await redis.hgetall(KEYS.ORDER(m.oid));
+      if (!orderData.oid || orderData.userId !== userId) {
+        results.push({ error: `Order ${m.oid} not found` });
+        continue;
+      }
+      if (orderData.status !== 'open') {
+        results.push({ error: `Cannot modify canceled or filled order` });
+        continue;
+      }
+
+      // Cancel old
+      const now = Date.now();
+      const pipeline = redis.pipeline();
+      pipeline.hset(KEYS.ORDER(m.oid), 'status', 'cancelled', 'updatedAt', now.toString());
+      pipeline.srem(KEYS.ORDERS_OPEN, m.oid.toString());
+      pipeline.srem(KEYS.ORDERS_TRIGGERS, m.oid.toString());
+      await pipeline.exec();
+
+      // Place replacement and get its status
+      const grouping = orderData.grouping ?? 'na';
+      const status = await placeSingleOrder(userId, m.order, grouping);
+      results.push(status);
+    } catch (err) {
+      logger.error({ err, oid: m.oid }, 'batchModify error');
+      results.push({ error: String(err) });
+    }
   }
+
   return results;
 }
 
-/** Active TWAP record persisted in Redis. The matcher reads these on each
- *  tick and submits suborders as time elapses. */
-export interface PaperTwap {
-  twapId: number;
-  userId: string;
-  asset: number;
-  coin: string;
-  isBuy: boolean;
-  totalSize: string;
-  reduceOnly: boolean;
-  durationMin: number;
-  randomize: boolean;
-  startTime: number;          // ms
-  endTime: number;            // ms
-  filledSize: string;
-  status: 'running' | 'finished' | 'cancelled' | 'error';
-  lastSubmittedAt: number;    // ms — tracks last suborder time
-  createdAt: number;
-}
+// ─── twapOrder ────────────────────────────────────────────────────────────────
+// Basic TWAP: generate a twapId, store metadata in Redis, schedule
+// sub-orders every 30 seconds over m minutes using setInterval.
+// Each sub-order = totalSize / numSlices placed as an IOC market order.
+// This is a v1 approximation — no 3× scaling for under-fills.
 
-/** Register a TWAP order. The matcher then drives the actual suborder
- *  schedule (see `worker/order-matcher.ts:matchTwaps`). HL spec is ~30s
- *  suborders with a 3% slippage cap and up-to-3× catchup; HyPaper's v1
- *  ticks slices proportionally to elapsed time without the catchup math.
- *  Documented as a known approximation. */
-export async function placeTwap(
+export async function createTwapOrder(
   userId: string,
-  twap: HlTwapWire,
-): Promise<{ status: 'ok' | 'err'; twapId?: number; error?: string }> {
-  const coin = await resolveAssetCoin(twap.a);
-  if (!coin) return { status: 'err', error: `Unknown asset ${twap.a}` };
-  if (twap.m <= 0 || twap.m > 24 * 60) return { status: 'err', error: 'Duration must be 1..1440 minutes' };
-  const totalSize = Number(twap.s);
-  if (!Number.isFinite(totalSize) || totalSize <= 0) return { status: 'err', error: 'Size must be a positive number' };
+  asset: number,
+  isBuy: boolean,
+  totalSz: string,
+  reduceOnly: boolean,
+  minutes: number,
+): Promise<{ twapId: number } | { error: string }> {
+  const coin = await resolveAssetCoin(asset);
+  if (!coin) return { error: `Unknown asset ${asset}` };
 
-  const twapId = await nextTwapId();
-  const now = Date.now();
-  const record: PaperTwap = {
-    twapId,
+  // Generate twapId
+  const twapId = await redis.incr(KEYS.SEQ_TWAP);
+
+  // Compute slices: HL uses ~30s intervals
+  const intervalMs  = 30_000;
+  const numSlices   = Math.max(1, Math.round((minutes * 60_000) / intervalMs));
+  const sliceSzNum  = parseFloat(totalSz) / numSlices;
+  const szDecimals  = await getAssetDecimals(asset);
+  const sliceSz     = sliceSzNum.toFixed(szDecimals);
+
+  // Store TWAP metadata in Redis
+  await redis.hset(KEYS.TWAP(twapId), {
+    twapId:    twapId.toString(),
     userId,
-    asset: twap.a,
+    asset:     asset.toString(),
     coin,
-    isBuy: twap.b,
-    totalSize: twap.s,
-    reduceOnly: twap.r,
-    durationMin: twap.m,
-    randomize: twap.t,
-    startTime: now,
-    endTime: now + twap.m * 60_000,
-    filledSize: '0',
-    status: 'running',
-    lastSubmittedAt: 0,
-    createdAt: now,
-  };
+    isBuy:     isBuy.toString(),
+    totalSz,
+    sliceSz,
+    reduceOnly: reduceOnly.toString(),
+    minutes:   minutes.toString(),
+    numSlices: numSlices.toString(),
+    filled:    '0',
+    status:    'running',
+    createdAt: Date.now().toString(),
+  });
+  await redis.sadd(KEYS.TWAPS_ACTIVE, twapId.toString());
 
-  const pipeline = redis.pipeline();
-  pipeline.hset(KEYS.TWAP(twapId), record as unknown as Record<string, string | number>);
-  pipeline.sadd(KEYS.TWAPS_ACTIVE, twapId.toString());
-  pipeline.zadd(KEYS.USER_TWAPS(userId), now, twapId.toString());
-  await pipeline.exec();
+  // Schedule sub-orders
+  let slicesFired = 0;
+  const interval = setInterval(async () => {
+    try {
+      // Check if cancelled
+      const twapStatus = await redis.hget(KEYS.TWAP(twapId), 'status');
+      if (twapStatus !== 'running') {
+        clearInterval(interval);
+        return;
+      }
 
-  eventBus.emit('twapUpdate', { userId, twap: record, status: 'running' });
-  return { status: 'ok', twapId };
+      slicesFired++;
+
+      // Get current mid price for this slice
+      const midPx = await redis.hget(KEYS.MARKET_MIDS, coin);
+      if (!midPx) {
+        logger.warn({ twapId, coin }, 'TWAP slice skipped — no mid price');
+        return;
+      }
+
+      // Place slice as GTC limit at mid price (best approximation of market)
+      const wire: HlOrderWire = {
+        a: asset,
+        b: isBuy,
+        p: midPx,
+        s: sliceSz,
+        r: reduceOnly,
+        t: { limit: { tif: 'Ioc' } },
+      };
+
+      const status = await placeSingleOrder(userId, wire, 'na');
+      logger.info({ twapId, slicesFired, numSlices, status }, 'TWAP slice executed');
+
+      // Update filled count
+      await redis.hincrby(KEYS.TWAP(twapId), 'filled', 1);
+
+      // Stop when all slices fired
+      if (slicesFired >= numSlices) {
+        clearInterval(interval);
+        await redis.hset(KEYS.TWAP(twapId), 'status', 'completed');
+        await redis.srem(KEYS.TWAPS_ACTIVE, twapId.toString());
+        logger.info({ twapId }, 'TWAP completed');
+      }
+    } catch (err) {
+      logger.error({ err, twapId }, 'TWAP slice error');
+    }
+  }, intervalMs);
+
+  return { twapId };
 }
 
-/** Mark a TWAP cancelled. Any in-flight suborder loop will skip it on the
- *  next matcher tick. HL accepts a `twapCancel` action (asset + twapId). */
-export async function cancelTwap(
+// ─── twapCancel ───────────────────────────────────────────────────────────────
+
+export async function cancelTwapOrder(
   userId: string,
   twapId: number,
-): Promise<{ status: 'ok' | 'err'; error?: string }> {
-  const data = await redis.hgetall(KEYS.TWAP(twapId));
-  if (!data.twapId || data.userId !== userId) return { status: 'err', error: `TWAP ${twapId} not found` };
-  if (data.status !== 'running') return { status: 'err', error: `TWAP ${twapId} not running` };
+): Promise<{ ok: true } | { error: string }> {
+  const twapData = await redis.hgetall(KEYS.TWAP(twapId));
+  if (!twapData.twapId) return { error: `TWAP ${twapId} not found` };
+  if (twapData.userId !== userId) return { error: `TWAP ${twapId} not found` };
+  if (twapData.status !== 'running') return { error: `TWAP ${twapId} is not running` };
 
-  const pipeline = redis.pipeline();
-  pipeline.hset(KEYS.TWAP(twapId), 'status', 'cancelled', 'lastSubmittedAt', Date.now().toString());
-  pipeline.srem(KEYS.TWAPS_ACTIVE, twapId.toString());
-  await pipeline.exec();
-  eventBus.emit('twapUpdate', { userId, twapId, status: 'cancelled' });
-  return { status: 'ok' };
+  await redis.hset(KEYS.TWAP(twapId), 'status', 'cancelled');
+  await redis.srem(KEYS.TWAPS_ACTIVE, twapId.toString());
+
+  return { ok: true };
 }

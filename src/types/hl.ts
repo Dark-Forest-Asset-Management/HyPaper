@@ -78,27 +78,22 @@ export interface HlUpdateLeverageAction {
   leverage: number;
 }
 
-/** TWAP order — split into ~30s suborders, max 3% slippage per slice. */
-export interface HlTwapWire {
-  a: number;       // asset
-  b: boolean;      // isBuy
-  s: string;       // total size
-  r: boolean;      // reduceOnly
-  m: number;       // duration in minutes
-  t: boolean;      // randomize toggle
-}
-
 export interface HlTwapOrderAction {
   type: 'twapOrder';
-  twap: HlTwapWire;
+  twap: {
+    a: number;   // asset
+    b: boolean;  // isBuy
+    s: string;   // size
+    r: boolean;  // reduceOnly
+    m: number;   // minutes
+    t: boolean;  // randomize
+  };
 }
 
-/** Cancel an in-flight TWAP. We surface this for completeness even though
- *  HyPaper's TWAP impl is approximate. */
 export interface HlTwapCancelAction {
   type: 'twapCancel';
-  a: number;       // asset
-  t: number;       // twapId
+  a: number;   // asset
+  t: number;   // twapId
 }
 
 export type HlExchangeAction =
@@ -110,7 +105,6 @@ export type HlExchangeAction =
   | HlUpdateLeverageAction
   | HlTwapOrderAction
   | HlTwapCancelAction;
-
 // === Info request types ===
 
 export interface HlInfoRequest {

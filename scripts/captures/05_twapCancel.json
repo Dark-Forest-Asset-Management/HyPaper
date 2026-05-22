@@ -1,0 +1,24 @@
+{
+  "request": {
+    "action": {
+      "type": "twapCancel",
+      "a": 3,
+      "t": 15503
+    },
+    "nonce": 1778996635796,
+    "signature": {
+      "r": "0xe9769af91bcd1641b2c43f7cf2d5893df28db1e21bf8d84fdac28f422d43a94d",
+      "s": "0x25ff3ef1f15109af65c1f02fd22606e1ceb2487d874cece304f3a90eeed393b2",
+      "v": 28
+    }
+  },
+  "response": {
+    "status": "ok",
+    "response": {
+      "type": "twapCancel",
+      "data": {
+        "status": "success"
+      }
+    }
+  }
+}
