@@ -62,7 +62,14 @@ export class Worker {
     // handler) instead of HTTP-fetching HL public per fill. The HTTP path
     // (l2-cache.ts) remains as a hard-timeout-bounded fallback for coins
     // that aren't yet WS-subscribed (e.g. one-shot market orders).
-    this.startL2Subscriptions();
+    // Gated by L2_WS_ENABLED (default true): disabling it skips the
+    // subscription, so getL2Book degrades to HTTP l2Book polling — the
+    // original behavior, available as a no-redeploy rollback lever.
+    if (config.L2_WS_ENABLED) {
+      this.startL2Subscriptions();
+    } else {
+      logger.info('L2_WS_ENABLED=false — skipping l2Book WS subscription; getL2Book will use HTTP polling');
+    }
 
     // Periodic HTTP mid trueup. Belt-and-suspenders against the case where
     // HL's WS allMids stream drops or stops delivering ticks for individual
