@@ -55,8 +55,5 @@ export const KEYS = {
   // Sequences
   SEQ_OID: 'seq:oid',
   SEQ_TID: 'seq:tid',
-  // TWAP orders
-  TWAP: (twapId: number) => `twap:${twapId}`,
-  TWAPS_ACTIVE: 'twaps:active',
   SEQ_TWAP: 'seq:twapId',
 } as const;

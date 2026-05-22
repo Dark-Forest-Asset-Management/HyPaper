@@ -156,38 +156,6 @@ exchangeRouter.post('/', async (c) => {
         return c.json({ status: 'ok', response: { type: 'default' } });
       }
 
-      case 'twapOrder': {
-        if (!action.twap || typeof action.twap !== 'object') {
-          return c.json({ status: 'err', response: 'twapOrder requires twap object' }, 400);
-        }
-        const t = action.twap;
-        if (typeof t.a !== 'number' || typeof t.b !== 'boolean' ||
-            typeof t.s !== 'string' || typeof t.r !== 'boolean' ||
-            typeof t.m !== 'number' || typeof t.t !== 'boolean') {
-          return c.json({ status: 'err', response: 'twap requires a, b, s, r, m, t' }, 400);
-        }
-        const result = await placeTwap(wallet, t);
-        if (result.status === 'err') {
-          return c.json({ status: 'err', response: result.error }, 400);
-        }
-        // HL response: `{type:'twapOrder', data:{status:{running:{twapId}}}}`
-        return c.json({
-          status: 'ok',
-          response: { type: 'twapOrder', data: { status: { running: { twapId: result.twapId } } } },
-        });
-      }
-
-      case 'twapCancel': {
-        if (typeof action.a !== 'number' || typeof action.t !== 'number') {
-          return c.json({ status: 'err', response: 'twapCancel requires a (asset) and t (twapId)' }, 400);
-        }
-        const result = await cancelTwap(wallet, action.t);
-        if (result.status === 'err') {
-          return c.json({ status: 'err', response: result.error }, 400);
-        }
-        return c.json({ status: 'ok', response: { type: 'default' } });
-      }
-
       case 'cancel': {
         if (!Array.isArray(action.cancels) || action.cancels.length === 0) {
           return c.json({ status: 'err', response: 'Missing cancels array' }, 400);
@@ -225,32 +193,6 @@ exchangeRouter.post('/', async (c) => {
             type: 'cancel',
             data: { statuses },
           },
-        });
-      }
-case 'modify': {
-        if (typeof action.oid !== 'number' || !action.order) {
-          return c.json({ status: 'err', response: 'modify requires oid (number) and order' }, 400);
-        }
-        const result = await modifyOrder(wallet, action.oid, action.order);
-        if ('error' in result) {
-          return c.json({ status: 'err', response: result.error }, 400);
-        }
-        return c.json({ status: 'ok', response: { type: 'default' } });
-      }
-
-      case 'batchModify': {
-        if (!Array.isArray(action.modifies) || action.modifies.length === 0) {
-          return c.json({ status: 'err', response: 'batchModify requires modifies array' }, 400);
-        }
-        for (const m of action.modifies) {
-          if (typeof m.oid !== 'number' || !m.order) {
-            return c.json({ status: 'err', response: 'Each modify needs oid and order' }, 400);
-          }
-        }
-        const statuses = await batchModifyOrders(wallet, action.modifies);
-        return c.json({
-          status: 'ok',
-          response: { type: 'order', data: { statuses } },
         });
       }
 
