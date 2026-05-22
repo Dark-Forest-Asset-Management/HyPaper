@@ -57,6 +57,13 @@ export class Worker {
 
     this.fundingWorker.start();
 
+    // Subscribe l2Book over WS for coins with open/trigger orders so the
+    // matcher reads fresh book depth from Redis (via price-updater's l2Book
+    // handler) instead of HTTP-fetching HL public per fill. The HTTP path
+    // (l2-cache.ts) remains as a hard-timeout-bounded fallback for coins
+    // that aren't yet WS-subscribed (e.g. one-shot market orders).
+    this.startL2Subscriptions();
+
     // Periodic HTTP mid trueup. Belt-and-suspenders against the case where
     // HL's WS allMids stream drops or stops delivering ticks for individual
     // sub-DEX coins (real bug seen 2026-05-19: xyz:MU stayed at its seed
@@ -72,6 +79,49 @@ export class Worker {
     this.startMidTrueup();
 
     logger.info('Worker started');
+  }
+
+  // ─── L2 book WS subscriptions ────────────────────────────────────────────
+  // Tracks which coins we've subscribed l2Book for. Grows as new coins get
+  // open orders; we don't unsubscribe (bounded set per paper account — the
+  // distinct coins traded is small). Reconciler runs on an interval so orders
+  // placed after startup get an L2 subscription within L2_RECONCILE_MS.
+  private l2Subscribed = new Set<string>();
+  private l2ReconcileTimer: NodeJS.Timeout | null = null;
+  private readonly L2_RECONCILE_MS = 5_000;
+
+  private startL2Subscriptions(): void {
+    const reconcile = async (): Promise<void> => {
+      try {
+        const coins = await this.getOpenOrderCoins();
+        for (const coin of coins) {
+          if (!this.l2Subscribed.has(coin)) {
+            this.wsClient!.subscribe({ type: 'l2Book', coin });
+            this.l2Subscribed.add(coin);
+            logger.info({ coin }, 'Subscribed l2Book for open-order coin');
+          }
+        }
+      } catch (e) {
+        logger.debug({ err: (e as Error).message }, 'L2 subscription reconcile failed');
+      }
+    };
+    this.l2ReconcileTimer = setInterval(reconcile, this.L2_RECONCILE_MS);
+    void reconcile();
+  }
+
+  /** Distinct coins across open + trigger orders (the resting orders that
+   *  need book depth when they eventually fill). */
+  private async getOpenOrderCoins(): Promise<Set<string>> {
+    const coins = new Set<string>();
+    const oids = [
+      ...(await redis.smembers(KEYS.ORDERS_OPEN)),
+      ...(await redis.smembers(KEYS.ORDERS_TRIGGERS)),
+    ];
+    for (const oidStr of oids) {
+      const coin = await redis.hget(KEYS.ORDER(parseInt(oidStr, 10)), 'coin');
+      if (coin) coins.add(coin);
+    }
+    return coins;
   }
 
   private midTrueupTimer: NodeJS.Timeout | null = null;
@@ -242,6 +292,10 @@ export class Worker {
     if (this.midTrueupTimer) {
       clearInterval(this.midTrueupTimer);
       this.midTrueupTimer = null;
+    }
+    if (this.l2ReconcileTimer) {
+      clearInterval(this.l2ReconcileTimer);
+      this.l2ReconcileTimer = null;
     }
     this.fundingWorker.stop();
     this.wsClient?.close();
