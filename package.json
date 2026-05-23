@@ -19,7 +19,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "test:realtime": "node scripts/test-realtime-endpoints.mjs"
+    "test:realtime": "node scripts/test-realtime-endpoints.mjs",
+    "parity": "tsx test-scripts/parity/check.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.8",

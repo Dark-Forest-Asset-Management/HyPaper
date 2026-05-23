@@ -19,6 +19,36 @@ const matcher = new OrderMatcher(eventBus);
 const SUB_DEX_OFFSET = 100_000;
 const SUB_DEX_STRIDE = 10_000;
 
+// HL spot assets are encoded as `10_000 + spotPairIndex`. The range
+// [10_000, 100_000) is exclusively spot — main-DEX perp universe indices are
+// in the low hundreds, and sub-DEX assets start at 100_000. Without this
+// branch a spot asset id (e.g. 10_000 for the first pair) was misread as a
+// main-DEX universe index and rejected as "Unknown asset".
+const SPOT_OFFSET = 10_000;
+
+interface SpotMetaCache {
+  tokens: Array<{ name: string; szDecimals: number; index: number }>;
+  universe: Array<{ name: string; tokens: [number, number]; index: number }>;
+}
+
+/** Decode a spot asset id → { pair name, base-token szDecimals }. */
+async function loadSpotEntry(asset: number): Promise<{ name: string; szDecimals: number } | null> {
+  const raw = await redis.get(KEYS.MARKET_SPOT_META);
+  if (!raw) return null;
+  const spot: SpotMetaCache = JSON.parse(raw);
+  const idx = asset - SPOT_OFFSET;
+  // universe is index-aligned, but match on `.index` defensively.
+  const pair = spot.universe[idx]?.index === idx
+    ? spot.universe[idx]
+    : spot.universe.find((u) => u.index === idx);
+  if (!pair) return null;
+  const baseTokenIdx = pair.tokens[0];
+  const baseTok = spot.tokens[baseTokenIdx]?.index === baseTokenIdx
+    ? spot.tokens[baseTokenIdx]
+    : spot.tokens.find((t) => t.index === baseTokenIdx);
+  return { name: pair.name, szDecimals: baseTok?.szDecimals ?? 0 };
+}
+
 async function loadUniverseEntry(asset: number): Promise<{ universe: HlMeta['universe']; localIdx: number } | null> {
   if (asset < SUB_DEX_OFFSET) {
     const metaRaw = await redis.get(KEYS.MARKET_META);
@@ -44,11 +74,19 @@ async function loadUniverseEntry(asset: number): Promise<{ universe: HlMeta['uni
 }
 
 export async function resolveAssetCoin(asset: number): Promise<string | null> {
+  if (asset >= SPOT_OFFSET && asset < SUB_DEX_OFFSET) {
+    const spot = await loadSpotEntry(asset);
+    return spot ? spot.name : null;
+  }
   const found = await loadUniverseEntry(asset);
   return found ? found.universe[found.localIdx].name : null;
 }
 
 export async function getAssetDecimals(asset: number): Promise<number> {
+  if (asset >= SPOT_OFFSET && asset < SUB_DEX_OFFSET) {
+    const spot = await loadSpotEntry(asset);
+    return spot ? spot.szDecimals : 0;
+  }
   const found = await loadUniverseEntry(asset);
   return found ? found.universe[found.localIdx].szDecimals : 0;
 }

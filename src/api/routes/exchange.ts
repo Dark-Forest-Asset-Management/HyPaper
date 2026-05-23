@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { placeOrders, cancelOrders, cancelByCloid, updateLeverage, modifyOrder, batchModifyOrders, createTwapOrder, cancelTwapOrder } from '../../engine/order.js';
 import { ensureAccount } from '../middleware/auth.js';
 import { recoverHlSigner } from '../middleware/recoverHlSigner.js';
+import { recoverUserSignedAction, isUserSignedActionType } from '../middleware/recoverUserSignedAction.js';
 import { logger } from '../../utils/logger.js';
 import { redis } from '../../store/redis.js';
 import { KEYS } from '../../store/keys.js';
@@ -50,7 +51,11 @@ exchangeRouter.post('/', async (c) => {
   let wallet: string;
   if (body.signature && body.action && typeof body.nonce === 'number') {
     try {
-      wallet = recoverHlSigner(body.action, body.nonce, body.signature, body.vaultAddress);
+      // User-signed actions (transfers/approvals/staking) use a different
+      // EIP-712 scheme than L1 actions — route by action type.
+      wallet = isUserSignedActionType(body.action.type)
+        ? recoverUserSignedAction(body.action, body.signature)
+        : recoverHlSigner(body.action, body.nonce, body.signature, body.vaultAddress);
     } catch (err) {
       return c.json({
         status: 'err',

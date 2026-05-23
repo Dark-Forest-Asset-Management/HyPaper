@@ -35,8 +35,55 @@ function getCacheKey(body: Record<string, unknown>): string {
   return JSON.stringify(body);
 }
 
-// Endpoints proxied to real HL API
+// Market/reference endpoints we always proxy to real HL (not user-scoped).
 const PROXIED_TYPES = new Set(Object.keys(PROXY_TTL));
+
+// ── User-scoped routing gate (the paper-mode invariant) ──────────────────
+// HyPaper IS the paper backend, so a request that names a `user` (or
+// `vaultAddress` / `oid`) describes the SIMULATED account. Proxying such a
+// read to live HL would pollute the paper view with the wallet's real
+// on-chain state — the exact bug slushy already hit on the WS side
+// (hlClient.ts:26-39). So: user-scoped reads are NEVER proxied unless they
+// have no paper equivalent (PROXY_ANYWAY_USER_TYPES). Anything else falls
+// back to a correctly-typed empty + a warn, never live data.
+
+/** A request targets simulated account state if it carries any of these. */
+function isUserScoped(body: Record<string, unknown>): boolean {
+  return body.user !== undefined
+    || body.vaultAddress !== undefined
+    || body.oid !== undefined;
+}
+
+// User-scoped info types with NO paper-state equivalent yet, deliberately
+// passed through to live HL until their dedicated epic lands. As each is
+// implemented as a local `case` (Phase 1-4), REMOVE it here. Passthrough
+// for these (staking/vaults/referral/spot-balances/etc.) is the lesser evil
+// vs returning empty for data the sim doesn't model. A real wallet's role is
+// "user" and its rate-limit is real, so those are harmless to passthrough.
+const PROXY_ANYWAY_USER_TYPES = new Set<string>([
+  'spotClearinghouseState',
+  'delegations', 'delegatorSummary', 'delegatorHistory', 'delegatorRewards',
+  'vaultDetails', 'userVaultEquities',
+  'referral', 'subAccounts', 'extraAgents',
+  'maxBuilderFee', 'builderFeeApproval',
+  'userRole', 'userRateLimit',
+  'userToMultiSigSigners', 'legalCheck', 'isVip', 'preTransferCheck',
+  'userAbstraction', 'userDexAbstraction',
+]);
+
+// User-scoped types we intend to serve from paper state (Phase 1.1) but
+// haven't implemented yet. Until then they fail safe to a typed empty so the
+// paper account is never polluted with real on-chain history. Object-shaped
+// responses are listed here; everything else defaults to an empty array
+// (most HL user history endpoints are arrays).
+const USER_EMPTY_OBJECT_TYPES = new Set<string>([
+  'userFees',
+  'activeAssetData',
+]);
+
+function userEmptyFor(type: string): unknown {
+  return USER_EMPTY_OBJECT_TYPES.has(type) ? {} : [];
+}
 
 infoRouter.post('/', async (c) => {
   const body = await c.req.json();
@@ -117,8 +164,21 @@ infoRouter.post('/', async (c) => {
       }
 
       default: {
-        // Try to proxy unknown types to HL (with default TTL)
-        return cachedProxyToHL(c, body);
+        // Unknown type. Two paths:
+        //  - NOT user-scoped (market/reference) → proxy to live HL. Keeps
+        //    HyPaper forward-compatible with new market types automatically.
+        //  - user-scoped → NEVER proxy (would pollute paper state with real
+        //    on-chain data). Passthrough only the explicitly no-paper-
+        //    equivalent set; everything else fails safe to a typed empty.
+        if (!isUserScoped(body)) {
+          return cachedProxyToHL(c, body);
+        }
+        if (PROXY_ANYWAY_USER_TYPES.has(type)) {
+          logger.debug({ type }, 'Proxying no-paper-equivalent user-scoped info type to live HL');
+          return cachedProxyToHL(c, body);
+        }
+        logger.warn({ type, user }, 'Refusing to proxy user-scoped info type in paper mode — returning typed empty (no paper handler yet)');
+        return c.json(userEmptyFor(type));
       }
     }
   } catch (err) {

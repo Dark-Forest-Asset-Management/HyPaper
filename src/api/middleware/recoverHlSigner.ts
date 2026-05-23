@@ -20,6 +20,14 @@
 
 import { ethers } from 'ethers';
 import { encode as msgpackEncode } from '@msgpack/msgpack';
+import { config } from '../../config.js';
+
+// HL's phantom-agent `source` is "a" on mainnet, "b" on testnet
+// (construct_phantom_agent in signing.py). Recovering with the wrong source
+// yields a phantom address, so derive it from the configured HL endpoint
+// instead of hardcoding. slushy.trade runs mainnet exclusively.
+const HL_IS_MAINNET = !/testnet/i.test(config.HL_API_URL);
+const HL_SOURCE = HL_IS_MAINNET ? 'a' : 'b';
 
 // HL's L1-action EIP-712 domain. Identical to what slushy signs
 // against. chainId 1337 is HL's hardcoded value for L1 actions.
@@ -78,7 +86,7 @@ export function recoverHlSigner(
   vaultAddress?: string,
 ): string {
   const connectionId = buildConnectionId(action, nonce, vaultAddress);
-  const message = { source: 'a', connectionId };
+  const message = { source: HL_SOURCE, connectionId };
   // Reassemble the 65-byte signature from { r, s, v } parts.
   const r = signature.r.startsWith('0x') ? signature.r.slice(2) : signature.r;
   const s = signature.s.startsWith('0x') ? signature.s.slice(2) : signature.s;

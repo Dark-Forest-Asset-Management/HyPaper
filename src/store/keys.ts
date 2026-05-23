@@ -10,6 +10,10 @@ export const KEYS = {
   // used to decode HL's asset id encoding back to a coin name.
   MARKET_PERPDEXS: 'market:perpdexs',
   MARKET_META_DEX: (dex: string) => `market:meta:${dex}`,
+  // Spot universe (tokens + pairs) from /info spotMeta. Used to decode HL's
+  // spot asset id encoding (10_000 + spotPairIndex) back to a pair name +
+  // base-token szDecimals.
+  MARKET_SPOT_META: 'market:spotmeta',
 
   // User account
   USER_ACCOUNT: (userId: string) => `user:${userId}:account`,

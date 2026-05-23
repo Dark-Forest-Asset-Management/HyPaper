@@ -237,6 +237,37 @@ export class Worker {
       const allMids = await midsRes.json() as Record<string, string>;
       await this.priceUpdater.seedMids(allMids);
 
+      // ── Spot seeding ──
+      // Cache spotMeta so resolveAssetCoin can decode HL's `10_000 +
+      // spotPairIndex` encoding, and seed spot mids (keyed by pair name,
+      // e.g. "PURR/USDC") so spot orders can price. Best-effort: spot
+      // trading degrades gracefully if this fetch fails.
+      try {
+        const spotRes = await fetch(`${config.HL_API_URL}/info`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'spotMetaAndAssetCtxs' }),
+        });
+        const spotData = await spotRes.json() as [
+          { tokens: unknown[]; universe: Array<{ name: string }> },
+          Array<{ midPx?: string; markPx?: string }>,
+        ];
+        const [spotMeta, spotCtxs] = spotData;
+        await redis.set(KEYS.MARKET_SPOT_META, JSON.stringify(spotMeta));
+
+        const spotMids: Record<string, string> = {};
+        for (let i = 0; i < spotMeta.universe.length && i < spotCtxs.length; i++) {
+          const coin = spotMeta.universe[i].name;
+          const ctx = spotCtxs[i];
+          const livePx = ctx?.midPx ?? ctx?.markPx;
+          if (livePx) spotMids[coin] = livePx;
+        }
+        await this.priceUpdater.seedMids(spotMids);
+        logger.info({ pairs: spotMeta.universe.length }, 'Seeded spot meta');
+      } catch (e) {
+        logger.warn({ err: e }, 'Failed to seed spot meta — spot trading disabled');
+      }
+
       // ── Sub-DEX seeding ──
       // Cache the perpDexs list so resolveAssetCoin can decode HL's
       // `100_000 + perpDexIdx*10_000 + uIdx` encoding. For each non-null
