@@ -122,6 +122,15 @@ export async function placeSingleOrder(
   const sz = wire.s;
   const limitPx = wire.p;
   const reduceOnly = wire.r;
+
+  // Reject non-finite / non-positive sizes before they reach the fill +
+  // position math. Internal callers (matchTwaps via placeOrders) bypass the
+  // route-layer validateOrderWire, so without this a NaN size silently
+  // corrupts the position (szi/entryPx/accountValue all become NaN).
+  if (!Number.isFinite(parseFloat(sz)) || parseFloat(sz) <= 0) {
+    return { error: `Invalid order size: ${sz}` };
+  }
+
   const trigger = wire.t.trigger;
 
   // For trigger orders. Real HL wires include both `t.limit.tif` (as the
@@ -536,11 +545,16 @@ export async function batchModifyOrders(
 }
 
 // ─── twapOrder ────────────────────────────────────────────────────────────────
-// Basic TWAP: generate a twapId, store metadata in Redis, schedule
-// sub-orders every 30 seconds over m minutes using setInterval.
-// Each sub-order = totalSize / numSlices placed as an IOC market order.
-// This is a v1 approximation — no 3× scaling for under-fills.
-
+// Persist the TWAP record and add it to the active set. Slice execution is
+// driven ENTIRELY by the matcher loop (OrderMatcher.matchTwaps), which reads
+// this record each tick, computes the next slice from elapsed time, submits
+// it, and marks the TWAP finished at endTime. The field names written here
+// MUST match what matchTwaps reads (startTime/endTime/totalSize/filledSize).
+//
+// Do NOT add a setInterval executor here. A previous version did, running a
+// SECOND executor concurrently with matchTwaps — the two used incompatible
+// field schemas, so matchTwaps read undefined→NaN and submitted NaN-size
+// slices that corrupted the position/account value to NaN.
 export async function createTwapOrder(
   userId: string,
   asset: number,
@@ -552,81 +566,29 @@ export async function createTwapOrder(
   const coin = await resolveAssetCoin(asset);
   if (!coin) return { error: `Unknown asset ${asset}` };
 
-  // Generate twapId
+  const totalNum = parseFloat(totalSz);
+  if (!Number.isFinite(totalNum) || totalNum <= 0) return { error: `Invalid TWAP size: ${totalSz}` };
+
   const twapId = await redis.incr(KEYS.SEQ_TWAP);
+  const now = Date.now();
 
-  // Compute slices: HL uses ~30s intervals
-  const intervalMs  = 30_000;
-  const numSlices   = Math.max(1, Math.round((minutes * 60_000) / intervalMs));
-  const sliceSzNum  = parseFloat(totalSz) / numSlices;
-  const szDecimals  = await getAssetDecimals(asset);
-  const sliceSz     = sliceSzNum.toFixed(szDecimals);
-
-  // Store TWAP metadata in Redis
+  // Schema consumed by OrderMatcher.matchTwaps — keep field names in sync.
   await redis.hset(KEYS.TWAP(twapId), {
-    twapId:    twapId.toString(),
+    twapId:     twapId.toString(),
     userId,
-    asset:     asset.toString(),
+    asset:      asset.toString(),
     coin,
-    isBuy:     isBuy.toString(),
-    totalSz,
-    sliceSz,
+    isBuy:      isBuy.toString(),
     reduceOnly: reduceOnly.toString(),
-    minutes:   minutes.toString(),
-    numSlices: numSlices.toString(),
-    filled:    '0',
-    status:    'running',
-    createdAt: Date.now().toString(),
+    totalSize:  totalSz,
+    filledSize: '0',
+    startTime:  now.toString(),
+    endTime:    (now + minutes * 60_000).toString(),
+    minutes:    minutes.toString(),
+    status:     'running',
+    createdAt:  now.toString(),
   });
   await redis.sadd(KEYS.TWAPS_ACTIVE, twapId.toString());
-
-  // Schedule sub-orders
-  let slicesFired = 0;
-  const interval = setInterval(async () => {
-    try {
-      // Check if cancelled
-      const twapStatus = await redis.hget(KEYS.TWAP(twapId), 'status');
-      if (twapStatus !== 'running') {
-        clearInterval(interval);
-        return;
-      }
-
-      slicesFired++;
-
-      // Get current mid price for this slice
-      const midPx = await redis.hget(KEYS.MARKET_MIDS, coin);
-      if (!midPx) {
-        logger.warn({ twapId, coin }, 'TWAP slice skipped — no mid price');
-        return;
-      }
-
-      // Place slice as GTC limit at mid price (best approximation of market)
-      const wire: HlOrderWire = {
-        a: asset,
-        b: isBuy,
-        p: midPx,
-        s: sliceSz,
-        r: reduceOnly,
-        t: { limit: { tif: 'Ioc' } },
-      };
-
-      const status = await placeSingleOrder(userId, wire, 'na');
-      logger.info({ twapId, slicesFired, numSlices, status }, 'TWAP slice executed');
-
-      // Update filled count
-      await redis.hincrby(KEYS.TWAP(twapId), 'filled', 1);
-
-      // Stop when all slices fired
-      if (slicesFired >= numSlices) {
-        clearInterval(interval);
-        await redis.hset(KEYS.TWAP(twapId), 'status', 'completed');
-        await redis.srem(KEYS.TWAPS_ACTIVE, twapId.toString());
-        logger.info({ twapId }, 'TWAP completed');
-      }
-    } catch (err) {
-      logger.error({ err, twapId }, 'TWAP slice error');
-    }
-  }, intervalMs);
 
   return { twapId };
 }

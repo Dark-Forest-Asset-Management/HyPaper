@@ -61,6 +61,16 @@ export class OrderMatcher {
       const filledSize = parseFloat(data.filledSize || '0');
       const lastSubmittedAt = parseInt(data.lastSubmittedAt || '0', 10);
 
+      // Guard a malformed/legacy record: missing numeric fields parse to NaN.
+      // Without this the NaN flows into the slice size and corrupts the
+      // position. Finish + drop it rather than spin on it every tick.
+      if (!Number.isFinite(totalSize) || !Number.isFinite(startTime) || !Number.isFinite(endTime)) {
+        logger.warn({ twapId: id }, 'TWAP record has non-finite fields — finishing');
+        await redis.hset(KEYS.TWAP(id), 'status', 'finished');
+        await redis.srem(KEYS.TWAPS_ACTIVE, idStr);
+        continue;
+      }
+
       // Mark finished if past the end and (mostly) filled.
       if (now >= endTime || filledSize >= totalSize) {
         await redis.hset(KEYS.TWAP(id), 'status', 'finished', 'lastSubmittedAt', String(now));
@@ -76,7 +86,7 @@ export class OrderMatcher {
       const totalMs = endTime - startTime;
       const targetFilled = totalSize * (elapsedMs / totalMs);
       const sliceSize = Math.max(0, targetFilled - filledSize);
-      if (sliceSize <= 0) continue;
+      if (!Number.isFinite(sliceSize) || sliceSize <= 0) continue;
 
       const midPx = await redis.hget(KEYS.MARKET_MIDS, data.coin);
       if (!midPx) continue;
