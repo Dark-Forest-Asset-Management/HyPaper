@@ -3,6 +3,7 @@ import { KEYS } from '../store/keys.js';
 import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { mul, add, neg, isZero } from '../utils/math.js';
+import { recordFunding } from '../store/pg-sink.js';
 
 export class FundingWorker {
   private intervalId: ReturnType<typeof setInterval> | null = null;
@@ -80,6 +81,17 @@ export class FundingWorker {
         );
 
         hasCharge = true;
+
+        // Persist the funding payment for /info userFunding. usdc is the
+        // signed account delta (negative = user paid), matching HL.
+        recordFunding(userId, {
+          time: Date.now(),
+          coin,
+          usdc: neg(fundingCharge),
+          szi,
+          fundingRate,
+          nSamples: 1,
+        });
 
         logger.debug({
           userId,

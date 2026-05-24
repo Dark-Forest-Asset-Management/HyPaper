@@ -4,7 +4,8 @@ import { KEYS } from '../../store/keys.js';
 import { config } from '../../config.js';
 import { getClearinghouseState, getOpenOrders, getFrontendOpenOrders, getOrderStatus } from '../../engine/position.js';
 import { getUserFills, getUserFillsByTime } from '../../engine/fill.js';
-import { getHistoricalOrdersPg } from '../../store/pg-queries.js';
+import { getHistoricalOrdersPg, getUserFundingPg, getLedgerUpdatesPg } from '../../store/pg-queries.js';
+import { getPortfolio, getUserFees, getUserRateLimit, getActiveAssetData } from '../../engine/account.js';
 import { logger } from '../../utils/logger.js';
 import { ensureAccount } from '../middleware/auth.js';
 
@@ -66,20 +67,17 @@ const PROXY_ANYWAY_USER_TYPES = new Set<string>([
   'vaultDetails', 'userVaultEquities',
   'referral', 'subAccounts', 'extraAgents',
   'maxBuilderFee', 'builderFeeApproval',
-  'userRole', 'userRateLimit',
   'userToMultiSigSigners', 'legalCheck', 'isVip', 'preTransferCheck',
   'userAbstraction', 'userDexAbstraction',
 ]);
 
-// User-scoped types we intend to serve from paper state (Phase 1.1) but
-// haven't implemented yet. Until then they fail safe to a typed empty so the
-// paper account is never polluted with real on-chain history. Object-shaped
+// User-scoped types we intend to serve from paper state but haven't
+// implemented yet. Until then they fail safe to a typed empty so the paper
+// account is never polluted with real on-chain history. Object-shaped
 // responses are listed here; everything else defaults to an empty array
-// (most HL user history endpoints are arrays).
-const USER_EMPTY_OBJECT_TYPES = new Set<string>([
-  'userFees',
-  'activeAssetData',
-]);
+// (most HL user history endpoints are arrays). Phase 3 will add
+// userTwapSliceFills / twapHistory handlers and drop them from the fail-safe.
+const USER_EMPTY_OBJECT_TYPES = new Set<string>([]);
 
 function userEmptyFor(type: string): unknown {
   return USER_EMPTY_OBJECT_TYPES.has(type) ? {} : [];
@@ -155,6 +153,42 @@ infoRouter.post('/', async (c) => {
         if (!user) return c.json({ error: 'Missing user' }, 400);
         const rows = await getHistoricalOrdersPg(user, body.limit ?? 200);
         return c.json(rows);
+      }
+
+      case 'userFunding': {
+        if (!user) return c.json({ error: 'Missing user' }, 400);
+        return c.json(await getUserFundingPg(user, body.startTime ?? 0, body.endTime));
+      }
+
+      case 'userNonFundingLedgerUpdates': {
+        if (!user) return c.json({ error: 'Missing user' }, 400);
+        return c.json(await getLedgerUpdatesPg(user, body.startTime ?? 0, body.endTime));
+      }
+
+      case 'portfolio': {
+        if (!user) return c.json({ error: 'Missing user' }, 400);
+        return c.json(await getPortfolio(user));
+      }
+
+      case 'userFees': {
+        if (!user) return c.json({ error: 'Missing user' }, 400);
+        return c.json(await getUserFees(user));
+      }
+
+      case 'userRateLimit': {
+        if (!user) return c.json({ error: 'Missing user' }, 400);
+        return c.json(await getUserRateLimit(user));
+      }
+
+      case 'userRole': {
+        // Paper accounts are always plain users (no agents/vaults/sub-accounts).
+        return c.json({ role: 'user' });
+      }
+
+      case 'activeAssetData': {
+        if (!user) return c.json({ error: 'Missing user' }, 400);
+        if (!body.coin) return c.json({ error: 'Missing coin' }, 400);
+        return c.json(await getActiveAssetData(user, body.coin));
       }
 
       case 'activeAssetCtx': {

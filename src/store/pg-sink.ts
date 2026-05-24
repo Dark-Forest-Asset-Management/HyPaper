@@ -1,11 +1,20 @@
 import type { EventEmitter } from 'node:events';
 import { eq } from 'drizzle-orm';
+import { id as keccakId } from 'ethers';
 import { db } from './db.js';
-import { users, orders, fills, consentRecords } from './schema.js';
+import { users, orders, fills, consentRecords, funding, ledgerUpdates } from './schema.js';
 import { logger } from '../utils/logger.js';
 import type { PaperOrder, PaperFill } from '../types/order.js';
 
+// HL emits an all-zero hash for funding rows.
+const ZERO_HASH = '0x' + '0'.repeat(64);
+
 let writeQueue: Promise<void> = Promise.resolve();
+
+// Captured in startPgSink so the record* helpers can push WS events for
+// userFundings / userNonFundingLedgerUpdates / userEvents without importing
+// the worker module (avoids an import cycle).
+let bus: EventEmitter | null = null;
 
 function enqueueWrite(task: () => Promise<void>): void {
   writeQueue = writeQueue
@@ -16,6 +25,7 @@ function enqueueWrite(task: () => Promise<void>): void {
 }
 
 export function startPgSink(eventBus: EventEmitter): void {
+  bus = eventBus;
   eventBus.on('fill', (event: { userId: string; fill: PaperFill }) => {
     enqueueWrite(async () => {
       await db.insert(fills)
@@ -80,6 +90,38 @@ export function startPgSink(eventBus: EventEmitter): void {
   });
 
   logger.info('pg-sink listeners attached');
+}
+
+/** Record a funding payment (→ /info userFunding). usdc is the signed
+ *  account delta (negative = the user paid funding). */
+export function recordFunding(userId: string, r: {
+  time: number; coin: string; usdc: string; szi: string; fundingRate: string; nSamples: number;
+}): void {
+  enqueueWrite(async () => {
+    await db.insert(funding).values({
+      userId, time: r.time, coin: r.coin, usdc: r.usdc, szi: r.szi,
+      fundingRate: r.fundingRate, nSamples: r.nSamples, hash: ZERO_HASH,
+    });
+  });
+  // WS userFundings / userEvents stream this. The WS funding element is FLAT
+  // (no hash/delta wrapper, unlike /info userFunding).
+  bus?.emit('funding', { userId, funding: r });
+}
+
+/** Record a non-funding balance change (→ /info userNonFundingLedgerUpdates).
+ *  Paper emits 'deposit' on account creation + balance top-ups, 'withdraw'
+ *  on decreases. Hash is synthesized deterministically (paper has no chain). */
+export function recordLedgerUpdate(userId: string, r: {
+  time: number; deltaType: 'deposit' | 'withdraw'; usdc: string;
+}): void {
+  const hash = keccakId(`${userId}:${r.time}:${r.deltaType}:${r.usdc}`);
+  enqueueWrite(async () => {
+    await db.insert(ledgerUpdates).values({
+      userId, time: r.time, hash, deltaType: r.deltaType, usdc: r.usdc,
+    });
+  });
+  // WS userNonFundingLedgerUpdates streams the /info-shaped element.
+  bus?.emit('ledger', { userId, update: { time: r.time, hash, delta: { type: r.deltaType, usdc: r.usdc } } });
 }
 
 export function upsertUser(userId: string, balance: string): void {

@@ -4,7 +4,8 @@ import { KEYS } from '../../store/keys.js';
 import { config } from '../../config.js';
 import { logger } from '../../utils/logger.js';
 import { ensureAccount } from '../middleware/auth.js';
-import { upsertUser, updateUserBalance } from '../../store/pg-sink.js';
+import { upsertUser, updateUserBalance, recordLedgerUpdate } from '../../store/pg-sink.js';
+import { sub, isZero, gt, abs } from '../../utils/math.js';
 
 export const hypaperRouter = new Hono();
 
@@ -66,10 +67,22 @@ hypaperRouter.post('/', async (c) => {
         if (balance === undefined || typeof balance !== 'number' || !Number.isFinite(balance) || balance < 0) {
           return c.json({ error: 'Missing or invalid balance (must be a finite non-negative number)' }, 400);
         }
+        const prevBalance = (await redis.hget(KEYS.USER_ACCOUNT(normalizedUser), 'balance')) ?? '0';
         await redis.hset(KEYS.USER_ACCOUNT(normalizedUser), 'balance', balance.toString());
 
         // Fire-and-forget sync to Postgres
         updateUserBalance(normalizedUser, balance.toString());
+
+        // Record the balance change as a ledger deposit/withdraw so it
+        // surfaces in /info userNonFundingLedgerUpdates.
+        const delta = sub(balance.toString(), prevBalance);
+        if (!isZero(delta)) {
+          recordLedgerUpdate(normalizedUser, {
+            time: Date.now(),
+            deltaType: gt(delta, '0') ? 'deposit' : 'withdraw',
+            usdc: abs(delta),
+          });
+        }
 
         return c.json({ status: 'ok', balance: balance.toString() });
       }

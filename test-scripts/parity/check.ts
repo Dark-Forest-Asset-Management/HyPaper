@@ -94,6 +94,20 @@ function report(label: string, mm: Mismatch[]): void {
   report('frontendOpenOrders', compareToGolden(golden('06_openOrders.json'), await info({ type: 'frontendOpenOrders', user: W })));
   report('userFills', compareToGolden(golden('07_userFills.json'), await info({ type: 'userFills', user: W })));
 
+  // ── Phase 1.1 account-state endpoints ──
+  // setBalance above (1_000_000) + first-touch deposit produced ledger rows.
+  const ledger = await info({ type: 'userNonFundingLedgerUpdates', user: W, startTime: 0 });
+  const gLedgerDeposit = (golden('11_userNonFundingLedgerUpdates.json') as any[]).find((x) => x.delta.type === 'deposit');
+  const ledgerDeposit = Array.isArray(ledger) ? ledger.find((x: any) => x.delta?.type === 'deposit') : undefined;
+  report('userNonFundingLedgerUpdates(deposit)', compareToGolden(gLedgerDeposit, ledgerDeposit ?? {}));
+  report('portfolio', compareToGolden(golden('12_portfolio.json'), await info({ type: 'portfolio', user: W })));
+  report('userFees', compareToGolden(golden('13_userFees.json'), await info({ type: 'userFees', user: W })));
+  report('userRateLimit', compareToGolden(golden('15_userRateLimit.json'), await info({ type: 'userRateLimit', user: W })));
+  report('userRole', compareToGolden(golden('14_userRole.json'), await info({ type: 'userRole', user: W })));
+  report('activeAssetData', compareToGolden(golden('16_activeAssetData.json'), await info({ type: 'activeAssetData', user: W, coin: 'BTC' })));
+  // userFunding requires the funding worker to fire (8h cadence) — covered by
+  // test-scripts/tmp-epic-1.1-account-state.ts which drives it directly.
+
   await hypaper({ type: 'resetAccount', user: W });
 
   console.log(`\n${hardFails === 0 ? 'PARITY OK — no missing/type-drifted fields' : `${hardFails} hard parity failure(s)`}`);

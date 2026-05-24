@@ -112,6 +112,38 @@ export const consentRecords = pgTable('consent_records', {
   index('consent_records_ip_hash_idx').on(table.ipHash),
 ]);
 
+// Funding payments applied by the funding worker. One row per (user, coin)
+// per funding interval. Mirrors HL /info userFunding: each row maps to
+// `{ time, hash, delta: { type:'funding', coin, usdc, szi, fundingRate, nSamples } }`.
+export const funding = pgTable('funding', {
+  id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+  userId: text('user_id').notNull().references(() => users.userId),
+  time: bigint('time', { mode: 'number' }).notNull(),
+  coin: text('coin').notNull(),
+  usdc: text('usdc').notNull(),          // signed USDC delta (negative = paid)
+  szi: text('szi').notNull(),            // position size at funding time
+  fundingRate: text('funding_rate').notNull(),
+  nSamples: integer('n_samples'),
+  hash: text('hash').notNull(),
+}, (t) => [
+  index('funding_user_time_idx').on(t.userId, t.time),
+]);
+
+// Non-funding balance changes (deposits / withdrawals / transfers). Mirrors
+// HL /info userNonFundingLedgerUpdates: `{ time, hash, delta: { type, usdc } }`.
+// Paper emits `deposit` on account creation + balance top-ups, `withdraw` on
+// balance decreases.
+export const ledgerUpdates = pgTable('ledger_updates', {
+  id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+  userId: text('user_id').notNull().references(() => users.userId),
+  time: bigint('time', { mode: 'number' }).notNull(),
+  hash: text('hash').notNull(),
+  deltaType: text('delta_type').notNull(),   // 'deposit' | 'withdraw'
+  usdc: text('usdc').notNull(),
+}, (t) => [
+  index('ledger_user_time_idx').on(t.userId, t.time),
+]);
+
 export const fills = pgTable('fills', {
   tid: integer('tid').primaryKey(),
   userId: text('user_id').notNull().references(() => users.userId),

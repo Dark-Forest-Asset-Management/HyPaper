@@ -24,6 +24,9 @@ export const KEYS = {
   USER_CLOIDS: (userId: string) => `user:${userId}:cloids`,
   USER_FILLS: (userId: string) => `user:${userId}:fills`,
   USER_FUNDINGS: (userId: string) => `user:${userId}:fundings`,
+  // Account-value/PnL snapshot history for /info portfolio. Sorted set:
+  // score = sample time (ms), member = `${time}:${accountValue}:${pnl}`.
+  USER_AVHIST: (userId: string) => `user:${userId}:avhist`,
 
   // Orders
   ORDER: (oid: number) => `order:${oid}`,

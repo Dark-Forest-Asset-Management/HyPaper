@@ -1,0 +1,9 @@
+{
+  "request": {
+    "type": "userRole",
+    "user": "0xAf952a3543fea6B718f479E13E304F8f91440FCD"
+  },
+  "response": {
+    "role": "user"
+  }
+}

@@ -22,7 +22,18 @@ export type WsSubscription =
   // Combined user-state push. Mirrors HL prod's webData2 channel —
   // emits clearinghouseState + openOrders on every change. Replaces
   // slushy's 2s REST poll for those.
-  | { type: 'webData2'; user: string };
+  | { type: 'webData2'; user: string }
+  // Market feeds relayed verbatim from HL (1.2b).
+  | { type: 'trades'; coin: string }
+  | { type: 'bbo'; coin: string }
+  | { type: 'candle'; coin: string; interval: string }
+  | { type: 'activeAssetCtx'; coin: string }
+  | { type: 'notification'; user: string }
+  // User feeds sourced from paper state (1.2c).
+  | { type: 'userEvents'; user: string }
+  | { type: 'userFundings'; user: string }
+  | { type: 'userNonFundingLedgerUpdates'; user: string }
+  | { type: 'activeAssetData'; user: string; coin: string };
 
 // === Outbound (server → client) ===
 

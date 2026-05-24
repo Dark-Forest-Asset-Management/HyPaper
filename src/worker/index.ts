@@ -7,6 +7,7 @@ import { HlWebSocketClient } from './ws-client.js';
 import { PriceUpdater } from './price-updater.js';
 import { OrderMatcher } from './order-matcher.js';
 import { FundingWorker } from './funding-worker.js';
+import { snapshotPortfolios } from '../engine/account.js';
 import type { HlMeta, HlAssetCtx } from '../types/hl.js';
 
 export const eventBus = new EventEmitter();
@@ -84,8 +85,33 @@ export class Worker {
     // Doesn't replace the WS path (still cheaper for live ticks), just
     // ensures stale mids get refreshed on a bounded cadence.
     this.startMidTrueup();
+    this.startPortfolioSnapshots();
 
     logger.info('Worker started');
+  }
+
+  // Periodic account-value/PnL snapshots for /info portfolio. 5-min cadence
+  // keeps history accruing for active accounts even when portfolio isn't
+  // being polled (getPortfolio also appends on each query).
+  private portfolioTimer: NodeJS.Timeout | null = null;
+  private readonly PORTFOLIO_SNAPSHOT_MS = 300_000;
+
+  private startPortfolioSnapshots(): void {
+    this.portfolioTimer = setInterval(() => {
+      snapshotPortfolios().catch((e) => logger.debug({ err: (e as Error).message }, 'portfolio snapshot tick failed'));
+    }, this.PORTFOLIO_SNAPSHOT_MS);
+  }
+
+  // On-demand upstream market subscription. The /ws server calls this when a
+  // client subscribes to trades/bbo/candle/activeAssetCtx so HyPaper starts
+  // receiving those frames from HL and relays them. Deduped — forwarding the
+  // client's subscription object verbatim (same shape HL expects).
+  private upstreamSubs = new Set<string>();
+  ensureUpstreamMarketSub(sub: { type: string; coin?: string; interval?: string }): void {
+    const key = JSON.stringify(sub);
+    if (this.upstreamSubs.has(key)) return;
+    this.upstreamSubs.add(key);
+    this.wsClient?.subscribe(sub);
   }
 
   // ─── L2 book WS subscriptions ────────────────────────────────────────────
@@ -327,6 +353,10 @@ export class Worker {
   }
 
   stop(): void {
+    if (this.portfolioTimer) {
+      clearInterval(this.portfolioTimer);
+      this.portfolioTimer = null;
+    }
     if (this.midTrueupTimer) {
       clearInterval(this.midTrueupTimer);
       this.midTrueupTimer = null;

@@ -1,0 +1,24 @@
+{
+  "request": {
+    "type": "activeAssetData",
+    "user": "0xAf952a3543fea6B718f479E13E304F8f91440FCD",
+    "coin": "BTC"
+  },
+  "response": {
+    "user": "0xaf952a3543fea6b718f479e13e304f8f91440fcd",
+    "coin": "BTC",
+    "leverage": {
+      "type": "cross",
+      "value": 20
+    },
+    "maxTradeSzs": [
+      "0.00058",
+      "0.00058"
+    ],
+    "availableToTrade": [
+      "2.220075",
+      "2.220075"
+    ],
+    "markPx": "75943.0"
+  }
+}

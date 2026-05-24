@@ -1,7 +1,7 @@
 import { redis } from '../../store/redis.js';
 import { KEYS } from '../../store/keys.js';
 import { config } from '../../config.js';
-import { upsertUser } from '../../store/pg-sink.js';
+import { upsertUser, recordLedgerUpdate } from '../../store/pg-sink.js';
 
 /**
  * Ensure a wallet address has an account in Redis and Postgres.
@@ -26,4 +26,15 @@ export async function ensureAccount(wallet: string): Promise<void> {
   const balance = (await redis.hget(KEYS.USER_ACCOUNT(wallet), 'balance'))
     ?? config.DEFAULT_BALANCE.toString();
   upsertUser(wallet, balance);
+
+  // First-touch funding shows up as a deposit in /info
+  // userNonFundingLedgerUpdates. Enqueued AFTER upsertUser so the users-row
+  // FK is satisfied (the write queue is FIFO).
+  if (!exists) {
+    recordLedgerUpdate(wallet, {
+      time: Date.now(),
+      deltaType: 'deposit',
+      usdc: config.DEFAULT_BALANCE.toString(),
+    });
+  }
 }
