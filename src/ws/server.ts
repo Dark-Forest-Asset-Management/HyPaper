@@ -4,6 +4,7 @@ import { redis } from '../store/redis.js';
 import { KEYS } from '../store/keys.js';
 import { logger } from '../utils/logger.js';
 import { getClearinghouseState, getFrontendOpenOrders } from '../engine/position.js';
+import { getUserFills } from '../engine/fill.js';
 import { getUserFundingPg, getLedgerUpdatesPg } from '../store/pg-queries.js';
 import { getActiveAssetData } from '../engine/account.js';
 import { app } from '../api/server.js';
@@ -204,6 +205,16 @@ export class HyPaperWsServer {
     }
 
     // ── User-feed snapshots (1.2c), sourced from paper state ──
+    // userFills snapshot — mirrors live HL, which emits an `isSnapshot:true`
+    // fill-history frame on subscribe (verified against wss://api.hyperliquid.xyz/ws).
+    // Without this, a freshly-connected client sees an empty Trade History
+    // until the next fill arrives. Same fills source the REST `userFills`
+    // info endpoint uses (engine/fill.ts:getUserFills).
+    if (sub.type === 'userFills' && sub.user) {
+      const u = sub.user.toLowerCase();
+      const fills = await getUserFills(u);
+      this.send(state.ws, { channel: 'userFills', data: { isSnapshot: true, user: u, fills } });
+    }
     if (sub.type === 'userFundings' && sub.user) {
       const u = sub.user.toLowerCase();
       const rows = await getUserFundingPg(u, 0);
