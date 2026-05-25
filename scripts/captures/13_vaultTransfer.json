@@ -1,0 +1,20 @@
+{
+  "request": {
+    "action": {
+      "type": "vaultTransfer",
+      "vaultAddress": "0x0000000000000000000000000000000000000001",
+      "isDeposit": true,
+      "usd": 1000000
+    },
+    "nonce": 1779600701323,
+    "signature": {
+      "r": "0xfd925b7f2e29ef6061da3031e2dfa1c8af5d472980d3a8d5eda6e2c46bc7cd3e",
+      "s": "0x17da1d484ccb1a8d0169451044666cb268336b51acc501d7da3bb7dab3809c64",
+      "v": 27
+    }
+  },
+  "response": {
+    "status": "err",
+    "response": "Vault not registered: 0x0000000000000000000000000000000000000001"
+  }
+}

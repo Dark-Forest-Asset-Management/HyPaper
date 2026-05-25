@@ -44,19 +44,16 @@ export const KEYS = {
   /** Highest nonce seen per wallet. Replay protection. */
   USER_NONCE_MAX: (userId: string) => `user:${userId}:nonce:max`,
 
-  // TWAP — split into ~30s suborders, max 3% slippage per slice.
-  TWAP: (twapId: number) => `twap:${twapId}`,
-  TWAPS_ACTIVE: 'twaps:active',
-  USER_TWAPS: (userId: string) => `user:${userId}:twaps`,
-
   // Active users (for funding)
   USERS_ACTIVE: 'users:active',
 
   // Sequences
   SEQ_OID: 'seq:oid',
   SEQ_TID: 'seq:tid',
+
   // TWAP orders
   TWAP: (twapId: number) => `twap:${twapId}`,
   TWAPS_ACTIVE: 'twaps:active',
   SEQ_TWAP: 'seq:twapId',
+  USER_TWAPS: (userId: string) => `user:${userId}:twaps`,
 } as const;

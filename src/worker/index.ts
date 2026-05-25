@@ -1,25 +1,197 @@
-import { EventEmitter } from 'node:events';
-import { config } from '../config.js';
-import { redis } from '../store/redis.js';
-import { KEYS } from '../store/keys.js';
-import { logger } from '../utils/logger.js';
-import { HlWebSocketClient } from './ws-client.js';
-import { PriceUpdater } from './price-updater.js';
-import { OrderMatcher } from './order-matcher.js';
-import { FundingWorker } from './funding-worker.js';
-import type { HlMeta, HlAssetCtx } from '../types/hl.js';
+import { EventEmitter } from "node:events";
+import { config } from "../config.js";
+import { redis } from "../store/redis.js";
+import { KEYS } from "../store/keys.js";
+import { logger } from "../utils/logger.js";
+import { HlWebSocketClient } from "./ws-client.js";
+import { PriceUpdater } from "./price-updater.js";
+import { OrderMatcher } from "./order-matcher.js";
+import { FundingWorker } from "./funding-worker.js";
+import type { HlMeta, HlAssetCtx } from "../types/hl.js";
 
 export const eventBus = new EventEmitter();
+
+// ─── ScheduleCancelWorker ─────────────────────────────────────────────────────
+//
+// Implements the "dead man's switch" for scheduleCancel actions.
+//
+// When a user calls scheduleCancel with a future `time`, the exchange router
+// stores that deadline in Redis at key `user:{wallet}:schedule_cancel`.
+//
+// This worker polls every POLL_INTERVAL_MS and:
+//   1. Scans all `user:*:schedule_cancel` keys in Redis
+//   2. For each one whose deadline has passed:
+//      a. Loads all open orders for that wallet
+//      b. Cancels them all
+//      c. Deletes the schedule_cancel key so it doesn't fire again
+//
+// Real HL enforces a max of 10 triggers per day and resets at 00:00 UTC.
+// HyPaper doesn't track that count — it's a v1 approximation.
+
+class ScheduleCancelWorker {
+  private timer: NodeJS.Timeout | null = null;
+  private readonly POLL_INTERVAL_MS = 5_000; // check every 5 seconds
+
+  start(): void {
+    logger.info(
+      { intervalMs: this.POLL_INTERVAL_MS },
+      "ScheduleCancel worker started",
+    );
+    this.timer = setInterval(() => void this.tick(), this.POLL_INTERVAL_MS);
+    // Fire immediately so the first check doesn't wait the full interval
+    void this.tick();
+  }
+
+  stop(): void {
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
+    }
+  }
+
+  private async tick(): Promise<void> {
+    try {
+      // Scan all scheduled cancel keys.
+      // Pattern: user:*:schedule_cancel
+      // We use SCAN instead of KEYS to avoid blocking Redis on large datasets.
+      let cursor = "0";
+      const matchedKeys: string[] = [];
+
+      do {
+        const [nextCursor, keys] = await redis.scan(
+          cursor,
+          "MATCH",
+          "user:*:schedule_cancel",
+          "COUNT",
+          100,
+        );
+        cursor = nextCursor;
+        matchedKeys.push(...keys);
+      } while (cursor !== "0");
+
+      if (matchedKeys.length === 0) return;
+
+      const nowMs = Date.now();
+
+      for (const key of matchedKeys) {
+        try {
+          const timeStr = await redis.get(key);
+          if (!timeStr) continue;
+
+          const scheduledTime = parseInt(timeStr, 10);
+          if (!Number.isFinite(scheduledTime)) continue;
+
+          // Not yet time — skip
+          if (nowMs < scheduledTime) continue;
+
+          // Extract wallet address from key pattern: user:{wallet}:schedule_cancel
+          // key = "user:0x4a1ae...:schedule_cancel"
+          const parts = key.split(":");
+          // parts[0] = "user", parts[1] = wallet address, parts[2] = "schedule_cancel"
+          if (parts.length < 3) continue;
+          const wallet = parts[1];
+
+          logger.info(
+            { wallet, scheduledTime, nowMs },
+            "scheduleCancel deadline reached — cancelling all open orders",
+          );
+
+          // Get all open order IDs for this wallet from the user's sorted set
+          const oidStrs = await redis.zrange(KEYS.USER_ORDERS(wallet), 0, -1);
+
+          if (oidStrs.length > 0) {
+            // Filter to only open orders by checking each order's status
+            const cancels: Array<{ a: number; o: number }> = [];
+            for (const oidStr of oidStrs) {
+              const oid = parseInt(oidStr, 10);
+              if (!Number.isFinite(oid)) continue;
+              const orderData = await redis.hgetall(KEYS.ORDER(oid));
+              if (orderData.status !== "open") continue;
+              const asset = orderData.asset ? parseInt(orderData.asset, 10) : 0;
+              cancels.push({ a: asset, o: oid });
+            }
+
+            if (cancels.length > 0) {
+              const now2 = Date.now();
+              const pipeline = redis.pipeline();
+              for (const { o: oid } of cancels) {
+                pipeline.hset(
+                  KEYS.ORDER(oid),
+                  "status",
+                  "cancelled",
+                  "updatedAt",
+                  now2.toString(),
+                );
+                pipeline.srem(KEYS.ORDERS_OPEN, oid.toString());
+                pipeline.srem(KEYS.ORDERS_TRIGGERS, oid.toString());
+                pipeline.zrem(KEYS.ORDERS_EXPIRY, oid.toString()); // clean expiry set
+              }
+              await pipeline.exec();
+
+              // Emit WebSocket cancellation event for each order
+              // so Slushy frontend sees the update in real time
+              for (const { o: oid, a: asset } of cancels) {
+                const orderData = await redis.hgetall(KEYS.ORDER(oid));
+                eventBus.emit("orderUpdate", {
+                  userId: wallet,
+                  order: {
+                    oid,
+                    coin: orderData.coin,
+                    isBuy: orderData.isBuy === "true",
+                    sz: orderData.sz,
+                    limitPx: orderData.limitPx,
+                    status: "cancelled",
+                    asset,
+                    userId: wallet,
+                    orderType: orderData.orderType,
+                    tif: orderData.tif,
+                    reduceOnly: orderData.reduceOnly === "true",
+                    grouping: orderData.grouping,
+                    filledSz: orderData.filledSz ?? "0",
+                    avgPx: orderData.avgPx ?? "0",
+                    createdAt: parseInt(orderData.createdAt, 10),
+                    updatedAt: now2,
+                    cloid: orderData.cloid || undefined,
+                  },
+                  status: "cancelled",
+                });
+              }
+
+              logger.info(
+                { wallet, count: cancels.length, scheduledTime },
+                "scheduleCancel: cancelled open orders",
+              );
+            }
+          }
+
+          // Delete the scheduled cancel key — it has fired, don't fire again
+          await redis.del(key);
+        } catch (err) {
+          logger.error(
+            { err, key },
+            "scheduleCancel tick: error processing key",
+          );
+        }
+      }
+    } catch (err) {
+      logger.error({ err }, "scheduleCancel tick failed");
+    }
+  }
+}
+
+// ─── Worker ───────────────────────────────────────────────────────────────────
 
 export class Worker {
   private wsClient: HlWebSocketClient | null = null;
   private priceUpdater: PriceUpdater;
   private orderMatcher: OrderMatcher;
   private fundingWorker: FundingWorker;
+  private scheduleCancelWorker: ScheduleCancelWorker;
 
   constructor() {
     this.orderMatcher = new OrderMatcher(eventBus);
     this.fundingWorker = new FundingWorker();
+    this.scheduleCancelWorker = new ScheduleCancelWorker();
     this.priceUpdater = new PriceUpdater(() => {
       // Fire-and-forget match on every price update
       this.orderMatcher.matchAll();
@@ -31,7 +203,7 @@ export class Worker {
   }
 
   async start(): Promise<void> {
-    logger.info('Starting worker...');
+    logger.info("Starting worker...");
 
     // Fetch initial meta + prices from HL HTTP API
     await this.seedMarketData();
@@ -41,21 +213,23 @@ export class Worker {
     // param returns main DEX only). We add one allMids subscription per
     // perp DEX so sub-DEX assets like `xyz:AAPL` get live mark prices.
     this.wsClient!.connect();
-    this.wsClient!.subscribe({ type: 'allMids' });
-    this.wsClient!.subscribe({ type: 'activeAssetCtx' });
+    this.wsClient!.subscribe({ type: "allMids" });
+    this.wsClient!.subscribe({ type: "activeAssetCtx" });
     try {
       const perpDexsRaw = await redis.get(KEYS.MARKET_PERPDEXS);
       if (perpDexsRaw) {
         const dexList: Array<{ name: string } | null> = JSON.parse(perpDexsRaw);
         for (const d of dexList) {
-          if (d && d.name) this.wsClient!.subscribe({ type: 'allMids', dex: d.name });
+          if (d && d.name)
+            this.wsClient!.subscribe({ type: "allMids", dex: d.name });
         }
       }
     } catch (e) {
-      logger.warn({ err: e }, 'Failed to subscribe sub-DEX mids');
+      logger.warn({ err: e }, "Failed to subscribe sub-DEX mids");
     }
 
     this.fundingWorker.start();
+    this.scheduleCancelWorker.start();
 
     // Periodic HTTP mid trueup. Belt-and-suspenders against the case where
     // HL's WS allMids stream drops or stops delivering ticks for individual
@@ -71,7 +245,7 @@ export class Worker {
     // ensures stale mids get refreshed on a bounded cadence.
     this.startMidTrueup();
 
-    logger.info('Worker started');
+    logger.info("Worker started");
   }
 
   private midTrueupTimer: NodeJS.Timeout | null = null;
@@ -85,16 +259,23 @@ export class Worker {
         // Sub-DEXes from cached perpDexs list (already populated in seedMarketData)
         const perpDexsRaw = await redis.get(KEYS.MARKET_PERPDEXS);
         if (perpDexsRaw) {
-          const dexList: Array<{ name: string } | null> = JSON.parse(perpDexsRaw);
+          const dexList: Array<{ name: string } | null> =
+            JSON.parse(perpDexsRaw);
           for (const d of dexList) {
             if (d && d.name) {
-              try { await this.trueupOneDex(d.name); }
-              catch (e) { logger.debug({ err: (e as Error).message, dex: d.name }, 'trueup sub-DEX failed'); }
+              try {
+                await this.trueupOneDex(d.name);
+              } catch (e) {
+                logger.debug(
+                  { err: (e as Error).message, dex: d.name },
+                  "trueup sub-DEX failed",
+                );
+              }
             }
           }
         }
       } catch (e) {
-        logger.debug({ err: (e as Error).message }, 'trueup tick failed');
+        logger.debug({ err: (e as Error).message }, "trueup tick failed");
       }
     };
     this.midTrueupTimer = setInterval(tick, this.TRUEUP_INTERVAL_MS);
@@ -103,16 +284,16 @@ export class Worker {
   }
 
   private async trueupOneDex(dex: string | undefined): Promise<void> {
-    const body: { type: 'allMids'; dex?: string } = { type: 'allMids' };
+    const body: { type: "allMids"; dex?: string } = { type: "allMids" };
     if (dex) body.dex = dex;
     const res = await fetch(`${config.HL_API_URL}/info`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const mids = await res.json() as Record<string, string>;
-    if (!mids || typeof mids !== 'object') return;
+    const mids = (await res.json()) as Record<string, string>;
+    if (!mids || typeof mids !== "object") return;
     const entries = Object.entries(mids);
     if (entries.length === 0) return;
     const args: string[] = [];
@@ -130,21 +311,21 @@ export class Worker {
     try {
       // Fetch meta (universe info)
       const metaRes = await fetch(`${config.HL_API_URL}/info`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'meta' }),
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "meta" }),
       });
-      const meta: HlMeta = await metaRes.json() as HlMeta;
+      const meta: HlMeta = (await metaRes.json()) as HlMeta;
       await redis.set(KEYS.MARKET_META, JSON.stringify(meta));
-      logger.info({ assets: meta.universe.length }, 'Seeded market meta');
+      logger.info({ assets: meta.universe.length }, "Seeded market meta");
 
       // Fetch metaAndAssetCtxs for initial prices
       const ctxRes = await fetch(`${config.HL_API_URL}/info`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'metaAndAssetCtxs' }),
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "metaAndAssetCtxs" }),
       });
-      const ctxData = await ctxRes.json() as [HlMeta, HlAssetCtx[]];
+      const ctxData = (await ctxRes.json()) as [HlMeta, HlAssetCtx[]];
       const assetCtxs = ctxData[1];
 
       // Build initial mids from the best live price available.
@@ -157,15 +338,24 @@ export class Worker {
           mids[coin] = livePx;
         }
         // Store asset context
-        await redis.hset(KEYS.MARKET_CTX(coin),
-          'markPx', ctx.markPx ?? '',
-          'midPx', ctx.midPx ?? '',
-          'oraclePx', ctx.oraclePx ?? '',
-          'funding', ctx.funding ?? '',
-          'openInterest', ctx.openInterest ?? '',
-          'prevDayPx', ctx.prevDayPx ?? '',
-          'dayNtlVlm', ctx.dayNtlVlm ?? '',
-          'premium', ctx.premium ?? '',
+        await redis.hset(
+          KEYS.MARKET_CTX(coin),
+          "markPx",
+          ctx.markPx ?? "",
+          "midPx",
+          ctx.midPx ?? "",
+          "oraclePx",
+          ctx.oraclePx ?? "",
+          "funding",
+          ctx.funding ?? "",
+          "openInterest",
+          ctx.openInterest ?? "",
+          "prevDayPx",
+          ctx.prevDayPx ?? "",
+          "dayNtlVlm",
+          ctx.dayNtlVlm ?? "",
+          "premium",
+          ctx.premium ?? "",
         );
       }
 
@@ -173,11 +363,11 @@ export class Worker {
 
       // Fetch allMids for current mid prices
       const midsRes = await fetch(`${config.HL_API_URL}/info`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'allMids' }),
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "allMids" }),
       });
-      const allMids = await midsRes.json() as Record<string, string>;
+      const allMids = (await midsRes.json()) as Record<string, string>;
       await this.priceUpdater.seedMids(allMids);
 
       // ── Sub-DEX seeding ──
@@ -186,54 +376,82 @@ export class Worker {
       // sub-DEX, fetch its meta + ctxs + mids and cache under MARKET_META_DEX.
       try {
         const perpDexsRes = await fetch(`${config.HL_API_URL}/info`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'perpDexs' }),
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "perpDexs" }),
         });
-        const perpDexs = await perpDexsRes.json() as Array<{ name: string; fullName: string } | null>;
+        const perpDexs = (await perpDexsRes.json()) as Array<{
+          name: string;
+          fullName: string;
+        } | null>;
         await redis.set(KEYS.MARKET_PERPDEXS, JSON.stringify(perpDexs));
-        logger.info({ count: perpDexs.filter((d) => d != null).length }, 'Seeded perpDexs');
+        logger.info(
+          { count: perpDexs.filter((d) => d != null).length },
+          "Seeded perpDexs",
+        );
 
         for (const dex of perpDexs) {
           if (!dex || !dex.name) continue;
           try {
             const subRes = await fetch(`${config.HL_API_URL}/info`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ type: 'metaAndAssetCtxs', dex: dex.name }),
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ type: "metaAndAssetCtxs", dex: dex.name }),
             });
-            const subData = await subRes.json() as [HlMeta, HlAssetCtx[]];
+            const subData = (await subRes.json()) as [HlMeta, HlAssetCtx[]];
             const [subMeta, subCtxs] = subData;
-            await redis.set(KEYS.MARKET_META_DEX(dex.name), JSON.stringify(subMeta));
+            await redis.set(
+              KEYS.MARKET_META_DEX(dex.name),
+              JSON.stringify(subMeta),
+            );
 
             const subMids: Record<string, string> = {};
-            for (let i = 0; i < subMeta.universe.length && i < subCtxs.length; i++) {
-              const coin = subMeta.universe[i].name;  // already prefixed (e.g. "xyz:AAPL")
+            for (
+              let i = 0;
+              i < subMeta.universe.length && i < subCtxs.length;
+              i++
+            ) {
+              const coin = subMeta.universe[i].name; // already prefixed (e.g. "xyz:AAPL")
               const ctx = subCtxs[i];
               const livePx = ctx.midPx ?? ctx.markPx;
               if (livePx) subMids[coin] = livePx;
-              await redis.hset(KEYS.MARKET_CTX(coin),
-                'markPx', ctx.markPx ?? '',
-                'midPx', ctx.midPx ?? '',
-                'oraclePx', ctx.oraclePx ?? '',
-                'funding', ctx.funding ?? '',
-                'openInterest', ctx.openInterest ?? '',
-                'prevDayPx', ctx.prevDayPx ?? '',
-                'dayNtlVlm', ctx.dayNtlVlm ?? '',
-                'premium', ctx.premium ?? '',
+              await redis.hset(
+                KEYS.MARKET_CTX(coin),
+                "markPx",
+                ctx.markPx ?? "",
+                "midPx",
+                ctx.midPx ?? "",
+                "oraclePx",
+                ctx.oraclePx ?? "",
+                "funding",
+                ctx.funding ?? "",
+                "openInterest",
+                ctx.openInterest ?? "",
+                "prevDayPx",
+                ctx.prevDayPx ?? "",
+                "dayNtlVlm",
+                ctx.dayNtlVlm ?? "",
+                "premium",
+                ctx.premium ?? "",
               );
             }
             await this.priceUpdater.seedMids(subMids);
-            logger.info({ dex: dex.name, assets: subMeta.universe.length }, 'Seeded sub-DEX meta');
+            logger.info(
+              { dex: dex.name, assets: subMeta.universe.length },
+              "Seeded sub-DEX meta",
+            );
           } catch (e) {
-            logger.warn({ err: e, dex: dex.name }, 'Failed to seed sub-DEX');
+            logger.warn({ err: e, dex: dex.name }, "Failed to seed sub-DEX");
           }
         }
       } catch (e) {
-        logger.warn({ err: e }, 'Failed to seed perpDexs — sub-DEX trading disabled');
+        logger.warn(
+          { err: e },
+          "Failed to seed perpDexs — sub-DEX trading disabled",
+        );
       }
     } catch (err) {
-      logger.error({ err }, 'Failed to seed market data');
+      logger.error({ err }, "Failed to seed market data");
       throw err;
     }
   }
@@ -244,7 +462,8 @@ export class Worker {
       this.midTrueupTimer = null;
     }
     this.fundingWorker.stop();
+    this.scheduleCancelWorker.stop();
     this.wsClient?.close();
-    logger.info('Worker stopped');
+    logger.info("Worker stopped");
   }
 }

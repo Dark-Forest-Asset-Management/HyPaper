@@ -1,0 +1,18 @@
+{
+  "request": {
+    "action": {
+      "type": "scheduleCancel",
+      "time": 1779600755333
+    },
+    "nonce": 1779600695334,
+    "signature": {
+      "r": "0x1dbb3977d66d61d617ce4050323f98fa0a3fd90fa9b37b3003c93a2e331195f5",
+      "s": "0x704c96c4b6d466a2ac200130b0f16350ce15cc543ed4058cfbfa66ad6ecf355e",
+      "v": 28
+    }
+  },
+  "response": {
+    "status": "err",
+    "response": "Cannot set scheduled cancel time until enough volume traded. Required: $1000000. Traded: $250.35."
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "request": {
+    "action": {
+      "type": "subAccountTransfer",
+      "subAccountUser": "0x0000000000000000000000000000000000000001",
+      "isDeposit": true,
+      "usd": 1000000
+    },
+    "nonce": 1779600708222,
+    "signature": {
+      "r": "0x4326035590bcd8f6e4374e8e45bd72b3966da7ca84976fcaaa571e837649cb5d",
+      "s": "0x768ea7ee3a4fb64cef5c5c664b3554b3747e6ee3b41872b7150c4d091ce56ab4",
+      "v": 27
+    }
+  },
+  "response": {
+    "status": "err",
+    "response": "Action disabled when unified account is active"
+  }
+}

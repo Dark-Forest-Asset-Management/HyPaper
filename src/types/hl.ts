@@ -38,7 +38,7 @@ export interface HlCancelByCloidRequest {
 }
 
 export interface HlModifyRequest {
-  oid: number;
+  oid: number | string;   // numeric OID or cloid string
   order: HlOrderWire;
 }
 
@@ -48,6 +48,7 @@ export interface HlOrderAction {
   type: 'order';
   orders: HlOrderWire[];
   grouping: 'na' | 'normalTpsl' | 'positionTpsl';
+  builder?: { b: string; f: number };   // optional builder fee sub-object
 }
 
 export interface HlCancelAction {
@@ -62,7 +63,7 @@ export interface HlCancelByCloidAction {
 
 export interface HlModifyAction {
   type: 'modify';
-  oid: number;
+  oid: number | string;   // numeric OID or cloid string (HL spec: Number | Cloid)
   order: HlOrderWire;
 }
 
@@ -81,20 +82,85 @@ export interface HlUpdateLeverageAction {
 export interface HlTwapOrderAction {
   type: 'twapOrder';
   twap: {
-    a: number;   // asset
-    b: boolean;  // isBuy
-    s: string;   // size
-    r: boolean;  // reduceOnly
-    m: number;   // minutes
-    t: boolean;  // randomize
+    a: number;    // asset index
+    b: boolean;   // isBuy
+    s: string;    // total size
+    r: boolean;   // reduceOnly
+    m: number;    // minutes (minimum 5)
+    t: boolean;   // randomize slice timing
   };
 }
 
 export interface HlTwapCancelAction {
   type: 'twapCancel';
-  a: number;   // asset
-  t: number;   // twapId
+  a: number;    // asset index
+  t: number;    // twapId
 }
+
+// scheduleCancel — dead man's switch.
+// When `time` is provided, all open orders will be cancelled at that unix-ms
+// timestamp. Omitting `time` removes any previously scheduled cancel.
+export interface HlScheduleCancelAction {
+  type: 'scheduleCancel';
+  time?: number;    // optional unix-ms timestamp (must be >= now + 5s)
+}
+
+// updateIsolatedMargin — add or remove margin from an isolated position.
+// `ntli` is the amount in units of 1e-6 quote tokens (signed: + = add, - = remove).
+export interface HlUpdateIsolatedMarginAction {
+  type: 'updateIsolatedMargin';
+  asset: number;
+  isBuy: boolean;
+  ntli: number;   // integer, 1e-6 units
+}
+
+// usdClassTransfer — transfer USDC between spot and perp balances.
+// HyPaper acknowledges this with { type: 'default' } without moving funds
+// (no spot balance is simulated).
+export interface HlUsdClassTransferAction {
+  type: 'usdClassTransfer';
+  hyperliquidChain: 'Mainnet' | 'Testnet';
+  signatureChainId: string;
+  amount: string;
+  toPerp: boolean;
+  nonce: number;
+}
+
+// createSubAccount — HyPaper acknowledges but does not simulate sub-accounts.
+export interface HlCreateSubAccountAction {
+  type: 'createSubAccount';
+  name: string;
+}
+
+// subAccountTransfer — transfer between master and sub-account.
+export interface HlSubAccountTransferAction {
+  type: 'subAccountTransfer';
+  subAccountUser: string;
+  isDeposit: boolean;
+  usd: number;
+}
+
+// subAccountSpotTransfer — transfer spot assets to/from sub-account.
+export interface HlSubAccountSpotTransferAction {
+  type: 'subAccountSpotTransfer';
+  subAccountUser: string;
+  isDeposit: boolean;
+  token: string;
+  amount: string;
+}
+
+// vaultTransfer — deposit or withdraw from a vault.
+export interface HlVaultTransferAction {
+  type: 'vaultTransfer';
+  vaultAddress: string;
+  isDeposit: boolean;
+  usd: number;
+}
+
+// === HlExchangeAction union ===
+// All action types that the /exchange endpoint accepts.
+// Adding a new action type here is all that's needed for TypeScript to
+// allow the corresponding `case` block in exchange.ts.
 
 export type HlExchangeAction =
   | HlOrderAction
@@ -104,7 +170,15 @@ export type HlExchangeAction =
   | HlBatchModifyAction
   | HlUpdateLeverageAction
   | HlTwapOrderAction
-  | HlTwapCancelAction;
+  | HlTwapCancelAction
+  | HlScheduleCancelAction
+  | HlUpdateIsolatedMarginAction
+  | HlUsdClassTransferAction
+  | HlCreateSubAccountAction
+  | HlSubAccountTransferAction
+  | HlSubAccountSpotTransferAction
+  | HlVaultTransferAction;
+
 // === Info request types ===
 
 export interface HlInfoRequest {
