@@ -131,14 +131,31 @@ export async function placeOrders(
   //   child fills     → cancel sibling children (OCO; only one exit fires)
   //   child cancels   → no cascade (user-explicit one-leg cancel)
   if ((grouping === 'normalTpsl' || grouping === 'positionTpsl') && placedOids.length > 1) {
-    const [parentOid, ...childOids] = placedOids;
     const pipeline = redis.pipeline();
-    if (childOids.length > 0) {
-      pipeline.sadd(KEYS.ORDER_CHILDREN(parentOid), ...childOids.map(String));
-      for (const childOid of childOids) {
-        pipeline.set(KEYS.ORDER_PARENT(childOid), String(parentOid));
-        const sibs = childOids.filter((o) => o !== childOid).map(String);
-        if (sibs.length > 0) pipeline.sadd(KEYS.ORDER_BRACKET(childOid), ...sibs);
+    if (grouping === 'positionTpsl') {
+      // Entry-less bracket (TP/SL on an existing position): every leg is a
+      // MUTUAL OCO sibling — a TP fill cancels the SL and vice versa, matching
+      // real HL. BUG FIX: previously this used the parent/child wiring below,
+      // which made the first leg (TP) the "parent"; a TP fill was then handled
+      // by cancelOrderSiblings as a *parent* fill ("children stay alive"), so
+      // the SL was left resting and never cancelled.
+      for (const oid of placedOids) {
+        const sibs = placedOids.filter((o) => o !== oid).map(String);
+        if (sibs.length > 0) pipeline.sadd(KEYS.ORDER_BRACKET(oid), ...sibs);
+      }
+    } else {
+      // normalTpsl: first order = entry (PARENT); the rest = OCO children.
+      //   parent fills  → children survive to bracket the new position
+      //   parent cancels→ cascade-cancel children
+      //   child fills   → cancel sibling children (OCO)
+      const [parentOid, ...childOids] = placedOids;
+      if (childOids.length > 0) {
+        pipeline.sadd(KEYS.ORDER_CHILDREN(parentOid), ...childOids.map(String));
+        for (const childOid of childOids) {
+          pipeline.set(KEYS.ORDER_PARENT(childOid), String(parentOid));
+          const sibs = childOids.filter((o) => o !== childOid).map(String);
+          if (sibs.length > 0) pipeline.sadd(KEYS.ORDER_BRACKET(childOid), ...sibs);
+        }
       }
     }
     await pipeline.exec();
