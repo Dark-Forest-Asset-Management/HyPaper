@@ -158,16 +158,19 @@ infoRouter.post('/', async (c) => {
 
       case 'userFills': {
         if (!user) return c.json({ error: 'Missing user' }, 400);
-        const fills = await getUserFills(user);
+        const dex = typeof body.dex === 'string' ? body.dex : '';
+        const fills = await getUserFills(user, 100, dex);
         return c.json(fills);
       }
 
       case 'userFillsByTime': {
         if (!user) return c.json({ error: 'Missing user' }, 400);
+        const dex = typeof body.dex === 'string' ? body.dex : '';
         const fills = await getUserFillsByTime(
           user,
           body.startTime ?? 0,
           body.endTime,
+          dex,
         );
         return c.json(fills);
       }
@@ -191,12 +194,26 @@ infoRouter.post('/', async (c) => {
 
       case 'userFunding': {
         if (!user) return c.json({ error: 'Missing user' }, 400);
-        return c.json(await getUserFundingPg(user, body.startTime ?? 0, body.endTime));
+        const dex = typeof body.dex === 'string' ? body.dex : '';
+        const rows = await getUserFundingPg(user, body.startTime ?? 0, body.endTime);
+        // Funding rows are shaped `{ time, hash, delta: { coin, … } }` —
+        // filter by the `delta.coin` prefix to scope to a sub-DEX.
+        const filtered = !dex
+          ? rows.filter((r) => !r.delta.coin.includes(':'))
+          : rows.filter((r) => r.delta.coin.startsWith(`${dex}:`));
+        return c.json(filtered);
       }
 
       case 'userNonFundingLedgerUpdates': {
         if (!user) return c.json({ error: 'Missing user' }, 400);
-        return c.json(await getLedgerUpdatesPg(user, body.startTime ?? 0, body.endTime));
+        const dex = typeof body.dex === 'string' ? body.dex : '';
+        const rows = await getLedgerUpdatesPg(user, body.startTime ?? 0, body.endTime);
+        // HyPaper ledger rows are account-level only (`delta: {type, usdc}`,
+        // no coin) — deposits, withdrawals, the initial ensureAccount seed.
+        // Per-dex transfers aren't modeled yet, so for native scope we return
+        // everything as-is; sub-dex scope returns empty until perpDexTransfer
+        // lands (Phase 3).
+        return c.json(dex ? [] : rows);
       }
 
       case 'portfolio': {
