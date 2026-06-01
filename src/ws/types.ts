@@ -15,14 +15,25 @@ export interface WsUnsubscribeMessage {
 export type WsInboundMessage = WsSubscribeMessage | WsUnsubscribeMessage;
 
 export type WsSubscription =
-  | { type: 'allMids' }
+  | { type: 'allMids'; dex?: string }
   | { type: 'l2Book'; coin: string }
   | { type: 'orderUpdates'; user: string }
   | { type: 'userFills'; user: string }
   // Combined user-state push. Mirrors HL prod's webData2 channel —
   // emits clearinghouseState + openOrders on every change. Replaces
-  // slushy's 2s REST poll for those.
+  // slushy's 2s REST poll for those. HL doesn't accept `dex` here
+  // (verified on-wire 2026-05-30 — sub ack strips it, payload is
+  // native-only). Sub-dex state comes via the per-dex subs below.
   | { type: 'webData2'; user: string }
+  // Per-dex user state. HL accepts `dex` on these and echoes it back
+  // in the subscriptionResponse (verified on-wire). Sub-dex equity,
+  // positions, and resting orders for the dex's namespace.
+  | { type: 'clearinghouseState'; user: string; dex: string }
+  | { type: 'openOrders'; user: string; dex: string }
+  // Aggregate per-dex CHS in a single sub. Push payload:
+  //   { user, clearinghouseStates: [["", nativeCHS], ["xyz", xyzCHS], …] }
+  // Used by slushy to render per-dex equity rows without N subs.
+  | { type: 'allDexsClearinghouseState'; user: string }
   // Market feeds relayed verbatim from HL (1.2b).
   | { type: 'trades'; coin: string }
   | { type: 'bbo'; coin: string }

@@ -12,11 +12,15 @@ import {
 import { abs, sub, mul, div, isZero, gt, D } from '../utils/math.js';
 import type { HlClearinghouseState, HlAssetPosition, HlMeta } from '../types/hl.js';
 
-export async function getClearinghouseState(userId: string): Promise<HlClearinghouseState> {
-  const balance = await getBalance(userId);
-  const positionAssets = await redis.smembers(KEYS.USER_POSITIONS(userId));
+export async function getClearinghouseState(userId: string, scope = ''): Promise<HlClearinghouseState> {
+  const balance = await getBalance(userId, scope);
+  const positionAssets = await redis.smembers(KEYS.USER_POSITIONS_SCOPED(userId, scope));
   const mids = await redis.hgetall(KEYS.MARKET_MIDS);
-  const metaRaw = await redis.get(KEYS.MARKET_META);
+  // Sub-dex meta lives at MARKET_META_DEX(scope); native uses MARKET_META.
+  // maxLeverage is read from the scope-appropriate universe so an xyz: pos
+  // doesn't borrow native's maxLeverage.
+  const metaKey = scope ? KEYS.MARKET_META_DEX(scope) : KEYS.MARKET_META;
+  const metaRaw = await redis.get(metaKey);
   const meta: HlMeta | null = metaRaw ? JSON.parse(metaRaw) : null;
 
   const assetPositions: HlAssetPosition[] = [];
@@ -41,14 +45,18 @@ export async function getClearinghouseState(userId: string): Promise<HlClearingh
     const unrealizedPnl = calculatePositionUnrealizedPnl(pos.szi, pos.entryPx, midPx);
     const marginUsed = await calculatePositionMarginUsed(userId, asset, pos.szi, midPx);
 
-    const accountValue = await calculateAccountValue(userId);
+    const accountValue = await calculateAccountValue(userId, scope);
     const liqPx = calculateLiquidationPrice(pos.szi, pos.entryPx, accountValue, leverage, isCross);
 
     const roe = isZero(marginUsed)
       ? '0'
       : div(unrealizedPnl, marginUsed);
 
-    const maxLeverage = meta?.universe[asset]?.maxLeverage ?? 50;
+    // For native (scope==''), asset IS the universe index. For sub-dex,
+    // localIdx = asset - 100_000 - perpDexIdx*10_000 against the sub-dex meta.
+    // We look up by coin instead so the same line works for both.
+    const universeEntry = meta?.universe.find((u) => u.name === coin);
+    const maxLeverage = universeEntry?.maxLeverage ?? 50;
 
     totalNtlPos = D(totalNtlPos).plus(D(posValue)).toString();
     totalMarginUsed = D(totalMarginUsed).plus(D(marginUsed)).toString();
@@ -110,8 +118,8 @@ export async function getClearinghouseState(userId: string): Promise<HlClearingh
   };
 }
 
-export async function getOpenOrders(userId: string) {
-  const oids = await redis.zrange(KEYS.USER_ORDERS(userId), 0, -1);
+export async function getOpenOrders(userId: string, scope = '') {
+  const oids = await redis.zrange(KEYS.USER_ORDERS_SCOPED(userId, scope), 0, -1);
   const orders = [];
 
   for (const oidStr of oids) {
@@ -145,8 +153,8 @@ export async function getOpenOrders(userId: string) {
   return orders;
 }
 
-export async function getFrontendOpenOrders(userId: string) {
-  const oids = await redis.zrange(KEYS.USER_ORDERS(userId), 0, -1);
+export async function getFrontendOpenOrders(userId: string, scope = '') {
+  const oids = await redis.zrange(KEYS.USER_ORDERS_SCOPED(userId, scope), 0, -1);
   const orders = [];
 
   for (const oidStr of oids) {

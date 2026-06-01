@@ -112,20 +112,48 @@ infoRouter.post('/', async (c) => {
 
       case 'clearinghouseState': {
         if (!user) return c.json({ error: 'Missing user' }, 400);
-        const state = await getClearinghouseState(user);
+        // body.dex: '' / undefined → native; 'xyz'/'flx'/… → sub-dex subaccount.
+        // HL semantics: each sub-dex has its own equity/positions/margin.
+        const dex = typeof body.dex === 'string' ? body.dex : '';
+        const state = await getClearinghouseState(user, dex);
         return c.json(state);
       }
 
       case 'openOrders': {
         if (!user) return c.json({ error: 'Missing user' }, 400);
-        const orders = await getOpenOrders(user);
+        const dex = typeof body.dex === 'string' ? body.dex : '';
+        const orders = await getOpenOrders(user, dex);
         return c.json(orders);
       }
 
       case 'frontendOpenOrders': {
         if (!user) return c.json({ error: 'Missing user' }, 400);
-        const orders = await getFrontendOpenOrders(user);
+        const dex = typeof body.dex === 'string' ? body.dex : '';
+        const orders = await getFrontendOpenOrders(user, dex);
         return c.json(orders);
+      }
+
+      case 'perpDexs': {
+        // Mirror of live HL: returns the raw cached perpDexs list. Slushy gates
+        // sub-dex code on this returning a non-null entry at index >=1.
+        const raw = await redis.get(KEYS.MARKET_PERPDEXS);
+        return c.json(raw ? JSON.parse(raw) : []);
+      }
+
+      case 'allDexsClearinghouseState': {
+        if (!user) return c.json({ error: 'Missing user' }, 400);
+        // Per HL doc: single-sub aggregate that emits [["", nativeCHS], ["xyz", xyzCHS], …]
+        // covering every dex the user has touched (including empty ones at $0).
+        // Slushy uses this as a single subscription instead of per-dex chs polling.
+        const perpDexsRaw = await redis.get(KEYS.MARKET_PERPDEXS);
+        const dexNames: string[] = perpDexsRaw
+          ? (JSON.parse(perpDexsRaw) as Array<{ name?: string } | null>)
+              .map((d) => d?.name).filter((n): n is string => typeof n === 'string')
+          : [];
+        const entries: Array<[string, unknown]> = [];
+        entries.push(['', await getClearinghouseState(user, '')]);
+        for (const d of dexNames) entries.push([d, await getClearinghouseState(user, d)]);
+        return c.json({ user, clearinghouseStates: entries });
       }
 
       case 'userFills': {
@@ -151,8 +179,14 @@ infoRouter.post('/', async (c) => {
 
       case 'historicalOrders': {
         if (!user) return c.json({ error: 'Missing user' }, 400);
+        // body.dex filters to the dex's coin-prefix ("xyz:") rows. Native
+        // (no dex) returns rows whose coin does NOT contain ':'.
+        const dex = typeof body.dex === 'string' ? body.dex : '';
         const rows = await getHistoricalOrdersPg(user, body.limit ?? 200);
-        return c.json(rows);
+        const filtered = !dex
+          ? rows.filter((r) => !r.order.coin.includes(':'))
+          : rows.filter((r) => r.order.coin.startsWith(`${dex}:`));
+        return c.json(filtered);
       }
 
       case 'userFunding': {

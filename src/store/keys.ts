@@ -21,6 +21,23 @@ export const KEYS = {
   USER_POS: (userId: string, asset: number) => `user:${userId}:pos:${asset}`,
   USER_LEV: (userId: string, asset: number) => `user:${userId}:lev:${asset}`,
   USER_ORDERS: (userId: string) => `user:${userId}:orders`,
+
+  // ── Per-dex (HIP-3 sub-dex) scoping ───────────────────────────────────
+  // Each builder-deployed perp DEX (xyz, flx, vntl, …) is its own
+  // sub-account on HL. Balance, positions set, and orders set are scoped
+  // per dex. USER_POS/USER_LEV stay asset-keyed since the asset id itself
+  // already encodes (dex, localIdx) for asset >= 100_000.
+  //
+  //   scope === ''   → native dex, uses the unscoped keys above (back-compat).
+  //   scope === 'xyz' → uses these scoped keys.
+  //
+  // The scoped variants are NEVER used for scope==='' so the native account's
+  // existing on-disk layout is unchanged.
+  USER_BAL_FIELD: (scope: string) => scope ? `balance:${scope}` : 'balance',
+  USER_POSITIONS_SCOPED: (userId: string, scope: string) =>
+    scope ? `user:${userId}:positions:${scope}` : `user:${userId}:positions`,
+  USER_ORDERS_SCOPED: (userId: string, scope: string) =>
+    scope ? `user:${userId}:orders:${scope}` : `user:${userId}:orders`,
   USER_CLOIDS: (userId: string) => `user:${userId}:cloids`,
   USER_FILLS: (userId: string) => `user:${userId}:fills`,
   USER_FUNDINGS: (userId: string) => `user:${userId}:fundings`,

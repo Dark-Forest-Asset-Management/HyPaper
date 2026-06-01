@@ -73,6 +73,19 @@ async function loadUniverseEntry(asset: number): Promise<{ universe: HlMeta['uni
   return { universe: subMeta.universe, localIdx };
 }
 
+/** Sub-dex scope for an asset id. Returns the dex name ('xyz', 'flx', …) for
+ *  asset >= 100_000, or '' for native-perp and spot. Used by the rest of the
+ *  engine to key per-dex balance / positions / orders. */
+export async function scopeForAsset(asset: number): Promise<string> {
+  if (asset < SUB_DEX_OFFSET) return '';
+  const offset = asset - SUB_DEX_OFFSET;
+  const dexIdx = Math.floor(offset / SUB_DEX_STRIDE);
+  const perpDexsRaw = await redis.get(KEYS.MARKET_PERPDEXS);
+  if (!perpDexsRaw) return '';
+  const perpDexs: Array<{ name: string } | null> = JSON.parse(perpDexsRaw);
+  return perpDexs[dexIdx]?.name ?? '';
+}
+
 export async function resolveAssetCoin(asset: number): Promise<string | null> {
   if (asset >= SPOT_OFFSET && asset < SUB_DEX_OFFSET) {
     const spot = await loadSpotEntry(asset);
@@ -316,9 +329,13 @@ async function placeTriggeredOrder(
 
   await saveOrder(order);
 
-  // Add to triggers set
+  // Add to triggers set + scoped user-orders zset. Sub-dex orders land in
+  // `user:${u}:orders:${dex}` so getOpenOrders/getFrontendOpenOrders with
+  // dex===this dex pick them up; native orders stay in the legacy unscoped
+  // `user:${u}:orders` zset (USER_ORDERS_SCOPED returns it for scope==='').
+  const scope = await scopeForAsset(asset);
   await redis.sadd(KEYS.ORDERS_TRIGGERS, oid.toString());
-  await redis.zadd(KEYS.USER_ORDERS(userId), now, oid.toString());
+  await redis.zadd(KEYS.USER_ORDERS_SCOPED(userId, scope), now, oid.toString());
 
   eventBus.emit('orderUpdate', { userId, order, status: 'open' });
 
@@ -395,9 +412,12 @@ async function saveOrder(order: PaperOrder): Promise<void> {
 }
 
 async function restOrder(order: PaperOrder): Promise<void> {
+  // Scope by asset so sub-dex limits land in the dex's USER_ORDERS_SCOPED
+  // zset, not native's. Native scope ('') maps back to the legacy key.
+  const scope = await scopeForAsset(order.asset);
   const pipeline = redis.pipeline();
   pipeline.sadd(KEYS.ORDERS_OPEN, order.oid.toString());
-  pipeline.zadd(KEYS.USER_ORDERS(order.userId), order.createdAt, order.oid.toString());
+  pipeline.zadd(KEYS.USER_ORDERS_SCOPED(order.userId, scope), order.createdAt, order.oid.toString());
   await pipeline.exec();
 
   eventBus.emit('orderUpdate', { userId: order.userId, order, status: 'open' });

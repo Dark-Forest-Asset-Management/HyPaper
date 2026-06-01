@@ -2,19 +2,25 @@ import { redis } from '../store/redis.js';
 import { KEYS } from '../store/keys.js';
 import { D, add, sub, mul, div, abs, gt, gte, lt, lte, isZero, neg } from '../utils/math.js';
 
-export async function calculateAccountValue(userId: string): Promise<string> {
-  const balance = await getBalance(userId);
-  const unrealizedPnl = await calculateTotalUnrealizedPnl(userId);
+// ── Per-dex scope ─────────────────────────────────────────────────────────
+// All public margin/account funcs accept an optional `scope` (dex name, or
+// '' for native). Scope=='' keeps the legacy unscoped keys → existing on-disk
+// state untouched. Sub-dex scopes use `balance:${scope}` field + scoped
+// USER_POSITIONS_SCOPED set. HL semantics: each sub-dex is its own subaccount.
+
+export async function calculateAccountValue(userId: string, scope = ''): Promise<string> {
+  const balance = await getBalance(userId, scope);
+  const unrealizedPnl = await calculateTotalUnrealizedPnl(userId, scope);
   return add(balance, unrealizedPnl);
 }
 
-export async function getBalance(userId: string): Promise<string> {
-  const balance = await redis.hget(KEYS.USER_ACCOUNT(userId), 'balance');
+export async function getBalance(userId: string, scope = ''): Promise<string> {
+  const balance = await redis.hget(KEYS.USER_ACCOUNT(userId), KEYS.USER_BAL_FIELD(scope));
   return balance ?? '0';
 }
 
-export async function calculateTotalUnrealizedPnl(userId: string): Promise<string> {
-  const positionAssets = await redis.smembers(KEYS.USER_POSITIONS(userId));
+export async function calculateTotalUnrealizedPnl(userId: string, scope = ''): Promise<string> {
+  const positionAssets = await redis.smembers(KEYS.USER_POSITIONS_SCOPED(userId, scope));
   if (positionAssets.length === 0) return '0';
 
   const mids = await redis.hgetall(KEYS.MARKET_MIDS);
@@ -46,8 +52,8 @@ export function calculatePositionUnrealizedPnl(szi: string, entryPx: string, mar
   }
 }
 
-export async function calculateTotalMarginUsed(userId: string): Promise<string> {
-  const positionAssets = await redis.smembers(KEYS.USER_POSITIONS(userId));
+export async function calculateTotalMarginUsed(userId: string, scope = ''): Promise<string> {
+  const positionAssets = await redis.smembers(KEYS.USER_POSITIONS_SCOPED(userId, scope));
   if (positionAssets.length === 0) return '0';
 
   const mids = await redis.hgetall(KEYS.MARKET_MIDS);
@@ -92,8 +98,11 @@ export async function checkMarginForOrder(
   sz: string,
   px: string,
 ): Promise<boolean> {
-  const accountValue = await calculateAccountValue(userId);
-  const currentMarginUsed = await calculateTotalMarginUsed(userId);
+  // Sub-dex orders draw from their dex's subaccount, not native.
+  const { scopeForAsset } = await import('./order.js');
+  const scope = await scopeForAsset(asset);
+  const accountValue = await calculateAccountValue(userId, scope);
+  const currentMarginUsed = await calculateTotalMarginUsed(userId, scope);
   const available = sub(accountValue, currentMarginUsed);
 
   // Calculate margin needed for this order

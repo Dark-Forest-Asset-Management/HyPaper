@@ -233,7 +233,101 @@ export class HyPaperWsServer {
     if (sub.type === 'activeAssetData' && sub.user && sub.coin) {
       this.send(state.ws, { channel: 'activeAssetData', data: await getActiveAssetData(sub.user.toLowerCase(), sub.coin) });
     }
+
+    // ── Per-dex user snapshots ──
+    // HL fires an initial snapshot on subscribe for these. Match that so the
+    // BottomPanel doesn't sit empty for an unbounded time after switching to
+    // paper mode.
+    if (sub.type === 'clearinghouseState' && sub.user && sub.dex) {
+      await this.sendClearinghouseStateForDex(state.ws, sub.user.toLowerCase(), sub.dex);
+    }
+    if (sub.type === 'openOrders' && sub.user && sub.dex) {
+      await this.sendOpenOrdersForDex(state.ws, sub.user.toLowerCase(), sub.dex);
+    }
+    if (sub.type === 'allDexsClearinghouseState' && sub.user) {
+      await this.sendAllDexsClearinghouseState(state.ws, sub.user.toLowerCase());
+    }
     // userEvents has no snapshot — HL pushes it live-only.
+  }
+
+  // ── Per-dex push helpers ─────────────────────────────────────────────────
+  // `getClearinghouseState` / `getFrontendOpenOrders` are now scope-aware
+  // (scope==='' → native, scope==='xyz' → xyz subaccount). The push body
+  // shape matches HL: payload carries `dex` so the client can route the
+  // push to its per-dex listener without ambiguity.
+
+  private async sendClearinghouseStateForDex(ws: WebSocket, user: string, dex: string): Promise<void> {
+    try {
+      const chs = await getClearinghouseState(user, dex);
+      this.send(ws, { channel: 'clearinghouseState', data: { dex, user, clearinghouseState: chs } });
+    } catch (err) { logger.warn({ err, user, dex }, 'clearinghouseState snapshot failed'); }
+  }
+
+  private async sendOpenOrdersForDex(ws: WebSocket, user: string, dex: string): Promise<void> {
+    try {
+      // Use the rich frontendOpenOrders shape on the wire — verified upstream
+      // that HL's openOrders WS push carries the full rich payload
+      // (orderType/isTrigger/triggerPx/etc), not the trimmed `WsBasicOrder`.
+      const orders = await getFrontendOpenOrders(user, dex);
+      this.send(ws, { channel: 'openOrders', data: { dex, user, orders } });
+    } catch (err) { logger.warn({ err, user, dex }, 'openOrders snapshot failed'); }
+  }
+
+  private async sendAllDexsClearinghouseState(ws: WebSocket, user: string): Promise<void> {
+    try {
+      const perpDexsRaw = await redis.get(KEYS.MARKET_PERPDEXS);
+      const dexNames: string[] = perpDexsRaw
+        ? (JSON.parse(perpDexsRaw) as Array<{ name?: string } | null>)
+            .map((d) => d?.name).filter((n): n is string => typeof n === 'string')
+        : [];
+      const entries: Array<[string, unknown]> = [];
+      entries.push(['', await getClearinghouseState(user, '')]);
+      for (const d of dexNames) entries.push([d, await getClearinghouseState(user, d)]);
+      this.send(ws, { channel: 'allDexsClearinghouseState', data: { user, clearinghouseStates: entries } });
+    } catch (err) { logger.warn({ err, user }, 'allDexsClearinghouseState snapshot failed'); }
+  }
+
+  /** Broadcast per-dex user state to any matching subscribers. Called from
+   *  the order/fill event listeners after a write so dex-subbed clients
+   *  see updates without polling. Mirrors `broadcastWebData2`. */
+  private async broadcastDexUserState(user: string, dex: string): Promise<void> {
+    const u = user.toLowerCase();
+    const chsKey = `clearinghouseState:${u}:${dex}`;
+    const ooKey  = `openOrders:${u}:${dex}`;
+    const allKey = `allDexsClearinghouseState:${u}`;
+
+    const chsSubs = this.subscriptionIndex.get(chsKey);
+    const ooSubs  = this.subscriptionIndex.get(ooKey);
+    const allSubs = this.subscriptionIndex.get(allKey);
+
+    if ((!chsSubs || chsSubs.size === 0) && (!ooSubs || ooSubs.size === 0) && (!allSubs || allSubs.size === 0)) return;
+
+    try {
+      if (chsSubs && chsSubs.size > 0) {
+        const chs = await getClearinghouseState(u, dex);
+        const json = JSON.stringify({ channel: 'clearinghouseState', data: { dex, user: u, clearinghouseState: chs } });
+        for (const ws of chsSubs) if (ws.readyState === WebSocket.OPEN) ws.send(json);
+      }
+      if (ooSubs && ooSubs.size > 0) {
+        const orders = await getFrontendOpenOrders(u, dex);
+        const json = JSON.stringify({ channel: 'openOrders', data: { dex, user: u, orders } });
+        for (const ws of ooSubs) if (ws.readyState === WebSocket.OPEN) ws.send(json);
+      }
+      if (allSubs && allSubs.size > 0) {
+        const perpDexsRaw = await redis.get(KEYS.MARKET_PERPDEXS);
+        const dexNames: string[] = perpDexsRaw
+          ? (JSON.parse(perpDexsRaw) as Array<{ name?: string } | null>)
+              .map((d) => d?.name).filter((n): n is string => typeof n === 'string')
+          : [];
+        const entries: Array<[string, unknown]> = [];
+        entries.push(['', await getClearinghouseState(u, '')]);
+        for (const d of dexNames) entries.push([d, await getClearinghouseState(u, d)]);
+        const json = JSON.stringify({ channel: 'allDexsClearinghouseState', data: { user: u, clearinghouseStates: entries } });
+        for (const ws of allSubs) if (ws.readyState === WebSocket.OPEN) ws.send(json);
+      }
+    } catch (err) {
+      logger.warn({ err, user: u, dex }, 'per-dex broadcast failed');
+    }
   }
 
   /** Build + send a webData2 snapshot for `user`. Used both on
@@ -326,6 +420,16 @@ export class HyPaperWsServer {
         return sub.user ? `userNonFundingLedgerUpdates:${sub.user.toLowerCase()}` : null;
       case 'activeAssetData':
         return sub.user && sub.coin ? `activeAssetData:${sub.user.toLowerCase()}:${sub.coin}` : null;
+      // Per-dex user subs. The dex field is part of the key so each per-dex
+      // listener fires only for its own dex's pushes — slushy's hlClient.ts
+      // had the same fanout bug and we fixed it client-side; doing the same
+      // server-side guarantees one push = one keyed broadcast.
+      case 'clearinghouseState':
+        return sub.user && sub.dex ? `clearinghouseState:${sub.user.toLowerCase()}:${sub.dex}` : null;
+      case 'openOrders':
+        return sub.user && sub.dex ? `openOrders:${sub.user.toLowerCase()}:${sub.dex}` : null;
+      case 'allDexsClearinghouseState':
+        return sub.user ? `allDexsClearinghouseState:${sub.user.toLowerCase()}` : null;
       default:
         return null;
     }
@@ -357,6 +461,15 @@ export class HyPaperWsServer {
       // webData2 snapshot + activeAssetData (maxTradeSzs/availableToTrade move).
       void this.broadcastWebData2(event.userId);
       void this.repushActiveAssetData(event.userId);
+      // Sub-dex coins look like "xyz:CRWV" — when a fill is on a sub-dex,
+      // push the per-dex CHS + openOrders + allDexs aggregate to any
+      // subscribers. Native fills don't touch the dex subs (the `coin`
+      // has no colon), so this branch is a no-op for native.
+      const colon = event.fill?.coin?.indexOf(':');
+      if (typeof colon === 'number' && colon > 0) {
+        const dex = event.fill.coin.slice(0, colon);
+        void this.broadcastDexUserState(event.userId, dex);
+      }
     });
 
     this.eventBus.on('orderUpdate', (event: OrderUpdateEvent) => {
@@ -381,6 +494,13 @@ export class HyPaperWsServer {
       this.broadcast(`orderUpdates:${event.userId}`, json);
       // Open-order list changed → push webData2 too.
       void this.broadcastWebData2(event.userId);
+      // Sub-dex order — fan out per-dex pushes too. Same colon-split as the
+      // fill branch above.
+      const colon = order.coin?.indexOf(':');
+      if (typeof colon === 'number' && colon > 0) {
+        const dex = order.coin.slice(0, colon);
+        void this.broadcastDexUserState(event.userId, dex);
+      }
     });
 
     // ── Market feeds relayed verbatim from HL (1.2b) ──

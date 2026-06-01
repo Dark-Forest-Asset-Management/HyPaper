@@ -379,6 +379,12 @@ export class OrderMatcher {
       }
     }
 
+    // Sub-dex scope for this fill (xyz, flx, …) or '' for native. Determines
+    // which USER_POSITIONS set the asset belongs to and which balance field
+    // PnL + fees write to. Each sub-dex is its own subaccount on HL.
+    const { scopeForAsset } = await import('../engine/order.js');
+    const scope = await scopeForAsset(asset);
+
     // Atomic pipeline
     const pipeline = redis.pipeline();
 
@@ -386,7 +392,7 @@ export class OrderMatcher {
     if (isZero(newSzi)) {
       // Position fully closed
       pipeline.del(KEYS.USER_POS(userId, asset));
-      pipeline.srem(KEYS.USER_POSITIONS(userId), asset.toString());
+      pipeline.srem(KEYS.USER_POSITIONS_SCOPED(userId, scope), asset.toString());
     } else {
       pipeline.hset(KEYS.USER_POS(userId, asset),
         'userId', userId,
@@ -398,20 +404,22 @@ export class OrderMatcher {
         'cumFundingSinceOpen', cumFundingSinceOpen,
         'cumFundingSinceChange', '0',
       );
-      pipeline.sadd(KEYS.USER_POSITIONS(userId), asset.toString());
+      pipeline.sadd(KEYS.USER_POSITIONS_SCOPED(userId, scope), asset.toString());
     }
 
     // Track active user for funding
     pipeline.sadd(KEYS.USERS_ACTIVE, userId);
 
-    // Credit closed PnL to balance
+    // Credit closed PnL to scoped balance field. Native: 'balance'. Sub-dex:
+    // 'balance:xyz' / 'balance:flx' / etc. — each subaccount is independent.
+    const balField = KEYS.USER_BAL_FIELD(scope);
     if (!isZero(closedPnl)) {
-      pipeline.hincrbyfloat(KEYS.USER_ACCOUNT(userId), 'balance', closedPnl);
+      pipeline.hincrbyfloat(KEYS.USER_ACCOUNT(userId), balField, closedPnl);
     }
 
-    // Deduct fee from balance
+    // Deduct fee from scoped balance field.
     if (!isZero(fee)) {
-      pipeline.hincrbyfloat(KEYS.USER_ACCOUNT(userId), 'balance', neg(fee));
+      pipeline.hincrbyfloat(KEYS.USER_ACCOUNT(userId), balField, neg(fee));
     }
 
     // Mark order as filled
