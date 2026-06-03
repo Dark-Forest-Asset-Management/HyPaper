@@ -415,7 +415,7 @@ export interface HlActiveAssetCtx {
   ctx: HlAssetCtx;
 }
 // ─────────────────────────────────────────────────────────────────────────────
-// TASK 1 ADDITIONS — Sub-account & Vault info response types
+// Sub-account & Vault info response types
 // ─────────────────────────────────────────────────────────────────────────────
 
 // === Sub-account info response types ===
@@ -681,7 +681,7 @@ export interface HlReferral {
   rewardHistory: unknown[];
 }
 // ─────────────────────────────────────────────────────────────────────────────
-// TASK 4 ADDITIONS — Staking / Delegation
+// Staking / Delegation
 // Append to the bottom of src/types/hl.ts
 // Field shapes confirmed from Go SDK (sonirico/go-hyperliquid) and HL node README.
 // ─────────────────────────────────────────────────────────────────────────────

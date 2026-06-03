@@ -1,7 +1,7 @@
 /**
  * probe-hl-testnet-transfers.ts
  *
- * Hyperliquid Testnet Probe — Task 2 (Transfers & Funding)
+ * Hyperliquid Testnet Probe — (Transfers & Funding)
  * ---------------------------------------------------------
  * Probes all transfer/funding /exchange actions against HL testnet to capture
  * their exact request/response shapes for HyPaper implementation.
@@ -552,7 +552,7 @@ async function main() {
   const account  = privateKeyToAccount(PRIVATE_KEY!);
   const account2 = privateKeyToAccount(PRIVATE_KEY_2!);
 
-  console.log('\n🔬 Hyperliquid Testnet Probe — Task 2 (Transfers & Funding) v3');
+  console.log('\n🔬 Hyperliquid Testnet Probe  (Transfers & Funding) v3');
   console.log('================================================================');
   console.log(`Wallet 1: ${account.address}  (master / signer)`);
   console.log(`Wallet 2: ${account2.address}  (recipient / agent)`);

@@ -98,7 +98,7 @@ infoRouter.post('/', async (c) => {
         return c.json(state);
       }
 
-      // ── Spot clearinghouse state (Task 2) ────────────────────────────────
+      // ── Spot clearinghouse state ────────────────────────────────
 
       case 'spotClearinghouseState': {
         if (!user) return c.json({ error: 'Missing user' }, 400);
@@ -166,7 +166,7 @@ infoRouter.post('/', async (c) => {
         return c.json(fills);
       }
 
-      // ── Sub-accounts (Task 1) ────────────────────────────────────────────
+      // ── Sub-accounts  ────────────────────────────────────────────
 
       case 'subAccounts': {
         if (!user) return c.json({ error: 'Missing user' }, 400);
@@ -174,7 +174,7 @@ infoRouter.post('/', async (c) => {
         return c.json(subAccounts);
       }
 
-      // ── Vaults (Task 1) ──────────────────────────────────────────────────
+      // ── Vaults  ──────────────────────────────────────────────────
 
       case 'vaultDetails': {
         if (!body.vaultAddress || typeof body.vaultAddress !== 'string') {
@@ -190,7 +190,7 @@ infoRouter.post('/', async (c) => {
         return c.json(equities);
       }
 
-      // ── API Wallets / Agents (Task 3) ────────────────────────────────────
+      // ── API Wallets / Agents  ────────────────────────────────────
       //
       // GET /info { type: 'extraAgents', user: '0x...' }
       //
@@ -208,7 +208,7 @@ infoRouter.post('/', async (c) => {
         return c.json(agents);
       }
 
-      // ── Builder Fees (Task 3) ────────────────────────────────────────────
+      // ── Builder Fees  ────────────────────────────────────────────
       //
       // GET /info { type: 'maxBuilderFee', user: '0x...', builder: '0x...' }
       //
@@ -241,7 +241,7 @@ infoRouter.post('/', async (c) => {
         return c.json(result);
       }
 
-      // ── Referrals (Task 3) ───────────────────────────────────────────────
+      // ── Referrals  ───────────────────────────────────────────────
       //
       // GET /info { type: 'referral', user: '0x...' }
       //
@@ -264,7 +264,7 @@ infoRouter.post('/', async (c) => {
         return c.json(result);
       }
 
-      // ── Staking / Delegation (Task 4) ────────────────────────────────────
+      // ── Staking / Delegation  ────────────────────────────────────
       //
       // GET /info { type: 'delegations', user: '0x...' }
       // Returns active delegations for the user.

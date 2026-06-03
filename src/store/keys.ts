@@ -17,7 +17,7 @@ export const KEYS = {
   USER_FILLS: (userId: string) => `user:${userId}:fills`,
   USER_FUNDINGS: (userId: string) => `user:${userId}:fundings`,
 
-  // Spot balances (Task 2)
+  // Spot balances
   USER_SPOT_BALANCES: (userId: string) => `user:${userId}:spot_balances`,
 
   // Orders
@@ -43,25 +43,25 @@ export const KEYS = {
   SEQ_TWAP: 'seq:twapId',
   USER_TWAPS: (userId: string) => `user:${userId}:twaps`,
 
-  // ── Sub-accounts (Task 1) ────────────────────────────────────────────────────
+  // ── Sub-accounts ────────────────────────────────────────────────────
   USER_SUBACCOUNTS: (masterUserId: string) => `user:${masterUserId}:subaccounts`,
   SUBACCOUNT_META: (subAddr: string) => `subaccount:${subAddr}:meta`,
   SUBACCOUNT_MASTER: (subAddr: string) => `subaccount:${subAddr}:master`,
 
-  // ── Vaults (Task 1) ──────────────────────────────────────────────────────────
+  // ── Vaults ──────────────────────────────────────────────────────────
   USER_VAULT_EQUITIES: (userId: string) => `user:${userId}:vault_equities`,
   VAULT_META: (vaultAddress: string) => `vault:${vaultAddress}:meta`,
 
-  // ── API Wallets / Agents (Task 3) ────────────────────────────────────────────
+  // ── API Wallets / Agents  ────────────────────────────────────────────
   USER_AGENTS: (userId: string) => `user:${userId}:agents`,
 
-  // ── Builder Fees (Task 3) ────────────────────────────────────────────────────
+  // ── Builder Fees  ────────────────────────────────────────────────────
   USER_BUILDER_FEES: (userId: string) => `user:${userId}:builder_fees`,
 
-  // ── Referrals (Task 3) ───────────────────────────────────────────────────────
+  // ── Referrals  ───────────────────────────────────────────────────────
   USER_REFERRER: (userId: string) => `user:${userId}:referrer`,
 
-  // ── Staking / Delegation (Task 4) ────────────────────────────────────────────
+  // ── Staking / Delegation  ────────────────────────────────────────────
   //
   // HYPE staking balance available in the staking account (not yet delegated).
   // Stored as wei string (1 HYPE = 1e8 wei = 100000000).

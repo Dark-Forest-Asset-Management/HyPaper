@@ -1,7 +1,7 @@
 /**
  * src/engine/staking.ts
  *
- * Engine functions for Task 4 — Staking / Delegation:
+ * Engine functions — Staking / Delegation:
  *   cDeposit      — move HYPE from spot balance into staking account
  *   cWithdraw     — initiate 7-day unstake queue (withdraw from staking)
  *   tokenDelegate — delegate/undelegate staked HYPE to a validator (1-day lockup)

@@ -1,7 +1,7 @@
 /**
  * src/engine/transfers.ts
  *
- * Engine functions for Task 2 transfer actions:
+ * Engine functions for transfer actions:
  *   usdClassTransfer  — spot ↔ perp USDC balance move (+ subaccount suffix parse)
  *   usdSend           — perp USDC → another wallet's perp balance
  *   spotSend          — spot token → another wallet
