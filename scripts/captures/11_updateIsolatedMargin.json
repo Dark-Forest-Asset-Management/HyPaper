@@ -1,0 +1,20 @@
+{
+  "request": {
+    "action": {
+      "type": "updateIsolatedMargin",
+      "asset": 0,
+      "isBuy": true,
+      "ntli": 1000000
+    },
+    "nonce": 1779600699016,
+    "signature": {
+      "r": "0x64055cb5d847db428e118d219a59a1ca9547e76b9b05703c0ee3d14e827dbc87",
+      "s": "0x7c0864f0c275d8b51aa05b7457099e38c2cb374f9af6b2bef162068130558775",
+      "v": 28
+    }
+  },
+  "response": {
+    "status": "err",
+    "response": "Position does not use isolated margin."
+  }
+}

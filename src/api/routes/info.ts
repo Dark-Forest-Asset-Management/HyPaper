@@ -8,6 +8,23 @@ import { getHistoricalOrdersPg, getUserFundingPg, getLedgerUpdatesPg } from '../
 import { getPortfolio, getUserFees, getUserRateLimit, getActiveAssetData } from '../../engine/account.js';
 import { logger } from '../../utils/logger.js';
 import { ensureAccount } from '../middleware/auth.js';
+import {
+  getSubAccounts,
+  getVaultDetails,
+  getUserVaultEquities,
+} from '../../engine/subaccount.js';
+import {
+  getExtraAgents,
+  getMaxBuilderFee,
+  getBuilderFeeApproval,
+  getReferral,
+} from '../../engine/agents.js';
+import {
+  getDelegations,
+  getDelegatorSummary,
+  getDelegatorHistory,
+  getDelegatorRewards,
+} from '../../engine/staking.js';
 
 export const infoRouter = new Hono();
 
@@ -103,12 +120,22 @@ infoRouter.post('/', async (c) => {
       await ensureAccount(user);
     }
 
-    // Handle locally from Redis
     switch (type) {
+
+      // ── Market data ──────────────────────────────────────────────────────
+
       case 'allMids': {
         const mids = await redis.hgetall(KEYS.MARKET_MIDS);
         return c.json(mids);
       }
+
+      case 'activeAssetCtx': {
+        if (!body.coin) return c.json({ error: 'Missing coin' }, 400);
+        const ctx = await redis.hgetall(KEYS.MARKET_CTX(body.coin));
+        return c.json({ coin: body.coin, ctx });
+      }
+
+      // ── Clearinghouse / account state ────────────────────────────────────
 
       case 'clearinghouseState': {
         if (!user) return c.json({ error: 'Missing user' }, 400);
@@ -118,6 +145,33 @@ infoRouter.post('/', async (c) => {
         const state = await getClearinghouseState(user, dex);
         return c.json(state);
       }
+
+      // ── Spot clearinghouse state ────────────────────────────────
+
+      case 'spotClearinghouseState': {
+        if (!user) return c.json({ error: 'Missing user' }, 400);
+        const acctRaw    = await redis.hgetall(KEYS.USER_ACCOUNT(user));
+        const usdcBalance = acctRaw.balance ?? '0';
+
+        const perpState  = await getClearinghouseState(user);
+        const holdAmount = (perpState as any)?.marginSummary?.totalMarginUsed ?? '0';
+        const available  = Math.max(0, parseFloat(usdcBalance) - parseFloat(holdAmount)).toFixed(6);
+
+        return c.json({
+          balances: [
+            {
+              coin:     'USDC',
+              token:    0,
+              total:    usdcBalance,
+              hold:     holdAmount,
+              entryNtl: '0.0',
+            },
+          ],
+          tokenToAvailableAfterMaintenance: [[0, available]],
+        });
+      }
+
+      // ── Orders ───────────────────────────────────────────────────────────
 
       case 'openOrders': {
         if (!user) return c.json({ error: 'Missing user' }, 400);
@@ -156,6 +210,19 @@ infoRouter.post('/', async (c) => {
         return c.json({ user, clearinghouseStates: entries });
       }
 
+      case 'orderStatus': {
+        const status = await getOrderStatus(body.oid);
+        return c.json(status);
+      }
+
+      case 'historicalOrders': {
+        if (!user) return c.json({ error: 'Missing user' }, 400);
+        const rows = await getHistoricalOrdersPg(user, body.limit ?? 200);
+        return c.json(rows);
+      }
+
+      // ── Fills ────────────────────────────────────────────────────────────
+
       case 'userFills': {
         if (!user) return c.json({ error: 'Missing user' }, 400);
         const dex = typeof body.dex === 'string' ? body.dex : '';
@@ -175,10 +242,7 @@ infoRouter.post('/', async (c) => {
         return c.json(fills);
       }
 
-      case 'orderStatus': {
-        const status = await getOrderStatus(body.oid);
-        return c.json(status);
-      }
+      // ── Orders history / portfolio / user state ──────────────────
 
       case 'historicalOrders': {
         if (!user) return c.json({ error: 'Missing user' }, 400);
@@ -242,11 +306,164 @@ infoRouter.post('/', async (c) => {
         return c.json(await getActiveAssetData(user, body.coin));
       }
 
-      case 'activeAssetCtx': {
-        if (!body.coin) return c.json({ error: 'Missing coin' }, 400);
-        const ctx = await redis.hgetall(KEYS.MARKET_CTX(body.coin));
-        return c.json({ coin: body.coin, ctx });
+      // ── Sub-accounts  ────────────────────────────────────────────
+
+      case 'subAccounts': {
+        if (!user) return c.json({ error: 'Missing user' }, 400);
+        const subAccounts = await getSubAccounts(user);
+        return c.json(subAccounts);
       }
+
+      // ── Vaults  ──────────────────────────────────────────────────
+
+      case 'vaultDetails': {
+        if (!body.vaultAddress || typeof body.vaultAddress !== 'string') {
+          return c.json({ error: 'Missing vaultAddress' }, 400);
+        }
+        const details = await getVaultDetails(body.vaultAddress, user);
+        return c.json(details);
+      }
+
+      case 'userVaultEquities': {
+        if (!user) return c.json({ error: 'Missing user' }, 400);
+        const equities = await getUserVaultEquities(user);
+        return c.json(equities);
+      }
+
+      // ── API Wallets / Agents  ────────────────────────────────────
+      //
+      // GET /info { type: 'extraAgents', user: '0x...' }
+      //
+      // Returns the list of approved agent wallets for a master account.
+      // Real HL response shape (confirmed from Dwellir docs):
+      // [
+      //   { "address": "0x...", "name": "AGENT_NAME", "validUntil": null },
+      //   ...
+      // ]
+      // Named agents include their name; unnamed agent has name: "".
+
+      case 'extraAgents': {
+        if (!user) return c.json({ error: 'Missing user' }, 400);
+        const agents = await getExtraAgents(user);
+        return c.json(agents);
+      }
+
+      // ── Builder Fees  ────────────────────────────────────────────
+      //
+      // GET /info { type: 'maxBuilderFee', user: '0x...', builder: '0x...' }
+      //
+      // Returns the max fee rate the user approved for a specific builder.
+      // Real HL response shape (confirmed from Chainstack docs):
+      // { "maxFeeRate": "0.001%" }  — or null if not approved
+
+      case 'maxBuilderFee': {
+        if (!user) return c.json({ error: 'Missing user' }, 400);
+        if (!body.builder || typeof body.builder !== 'string') {
+          return c.json({ error: 'Missing builder address' }, 400);
+        }
+        const result = await getMaxBuilderFee(user, body.builder);
+        return c.json(result ?? null);
+      }
+
+      // GET /info { type: 'builderFeeApproval', user: '0x...', builder: '0x...' }
+      //
+      // Returns whether the user has approved this builder and at what rate.
+      // Real HL response shape:
+      // { "builder": "0x...", "maxFeeRate": "0.001%", "approved": true }
+      // — or { "approved": false }
+
+      case 'builderFeeApproval': {
+        if (!user) return c.json({ error: 'Missing user' }, 400);
+        if (!body.builder || typeof body.builder !== 'string') {
+          return c.json({ error: 'Missing builder address' }, 400);
+        }
+        const result = await getBuilderFeeApproval(user, body.builder);
+        return c.json(result);
+      }
+
+      // ── Referrals  ───────────────────────────────────────────────
+      //
+      // GET /info { type: 'referral', user: '0x...' }
+      //
+      // Returns referral state for the user.
+      // Real HL response shape:
+      // {
+      //   "referrerState": {
+      //     "data": { "code": "MYCODE", "builderCode": null },
+      //     "stage": "percentageReferrer"
+      //   },
+      //   "referredBy": null,
+      //   "cumVlm": "0.0",
+      //   "rewardHistory": []
+      // }
+      // — or referrerState.stage = "noReferrer" if no code set
+
+      case 'referral': {
+        if (!user) return c.json({ error: 'Missing user' }, 400);
+        const result = await getReferral(user);
+        return c.json(result);
+      }
+
+      // ── Staking / Delegation  ────────────────────────────────────
+      //
+      // GET /info { type: 'delegations', user: '0x...' }
+      // Returns active delegations for the user.
+      // Real HL response shape:
+      // [
+      //   { "validator": "0x...", "amount": "100.0",
+      //     "lockedUntilTimestamp": 1234567890000, "nSince": 1234567890000 },
+      //   ...
+      // ]
+
+      case 'delegations': {
+        if (!user) return c.json({ error: 'Missing user' }, 400);
+        const result = await getDelegations(user);
+        return c.json(result);
+      }
+
+      // GET /info { type: 'delegatorSummary', user: '0x...' }
+      // Returns a summary of the user's staking state.
+      // Real HL response shape:
+      // {
+      //   "delegated": "100.0",
+      //   "undelegated": "50.0",
+      //   "totalPendingWithdrawal": "25.0",
+      //   "nPendingWithdrawals": 1
+      // }
+
+      case 'delegatorSummary': {
+        if (!user) return c.json({ error: 'Missing user' }, 400);
+        const result = await getDelegatorSummary(user);
+        return c.json(result);
+      }
+
+      // GET /info { type: 'delegatorHistory', user: '0x...' }
+      // Returns staking event history (most recent first).
+      // Real HL response shape:
+      // [
+      //   { "type": "delegate", "validator": "0x...", "amount": "100.0", "time": 1234567890000 },
+      //   { "type": "cDeposit", "validator": null, "amount": "200.0", "time": 1234567890000 },
+      //   ...
+      // ]
+
+      case 'delegatorHistory': {
+        if (!user) return c.json({ error: 'Missing user' }, 400);
+        const result = await getDelegatorHistory(user);
+        return c.json(result);
+      }
+
+      // GET /info { type: 'delegatorRewards', user: '0x...' }
+      // Returns staking rewards. HyPaper returns zeros (no reward simulation).
+      // Real HL response shape:
+      // { "pendingRewards": "0.0", "totalRewards": "0.0", "rewardHistory": [] }
+
+      case 'delegatorRewards': {
+        if (!user) return c.json({ error: 'Missing user' }, 400);
+        const result = await getDelegatorRewards(user);
+        return c.json(result);
+      }
+
+      // ── Default: proxy to real HL ────────────────────────────────────────
 
       default: {
         // Unknown type. Two paths:
@@ -291,7 +508,6 @@ async function cachedProxyToHL(c: any, body: Record<string, unknown>) {
   const ttl = PROXY_TTL[body.type as string] ?? DEFAULT_PROXY_TTL;
   proxyCache.set(key, { data, expiry: now + ttl });
 
-  // Evict expired entries periodically (keep map from growing unbounded)
   if (proxyCache.size > 500) {
     for (const [k, v] of proxyCache) {
       if (v.expiry <= now) proxyCache.delete(k);

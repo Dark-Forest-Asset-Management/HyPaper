@@ -1,14 +1,20 @@
-import { redis } from '../store/redis.js';
-import { KEYS } from '../store/keys.js';
-import { logger } from '../utils/logger.js';
-import { lte, gte, isZero, gt, lt } from '../utils/math.js';
-import { nextOid, nextTwapId } from '../utils/id.js';
-import { checkMarginForOrder } from './margin.js';
-import { OrderMatcher } from '../worker/order-matcher.js';
-import { computeFillPrice } from '../utils/slippage.js';
-import { eventBus } from '../worker/index.js';
-import type { HlOrderWire, HlCancelRequest, HlCancelByCloidRequest, HlOrderResponseStatus, HlMeta } from '../types/hl.js';
-import type { PaperOrder } from '../types/order.js';
+import { redis } from "../store/redis.js";
+import { KEYS } from "../store/keys.js";
+import { logger } from "../utils/logger.js";
+import { lte, gte, isZero, gt, lt } from "../utils/math.js";
+import { nextOid } from "../utils/id.js";
+import { checkMarginForOrder } from "./margin.js";
+import { OrderMatcher } from "../worker/order-matcher.js";
+import { computeFillPrice } from "../utils/slippage.js";
+import { eventBus } from "../worker/index.js";
+import type {
+  HlOrderWire,
+  HlCancelRequest,
+  HlCancelByCloidRequest,
+  HlOrderResponseStatus,
+  HlMeta,
+} from "../types/hl.js";
+import type { PaperOrder } from "../types/order.js";
 
 const matcher = new OrderMatcher(eventBus);
 
@@ -119,12 +125,14 @@ export async function placeOrders(
       results.push(result);
       // Collect oids of orders that successfully made it onto the book or
       // fully filled — we'll wire OCO bracket links across them below.
-      if (typeof result === 'object' && result !== null) {
-        if ('resting' in result && result.resting?.oid) placedOids.push(result.resting.oid);
-        else if ('filled' in result && result.filled?.oid) placedOids.push(result.filled.oid);
+      if (typeof result === "object" && result !== null) {
+        if ("resting" in result && result.resting?.oid)
+          placedOids.push(result.resting.oid);
+        else if ("filled" in result && result.filled?.oid)
+          placedOids.push(result.filled.oid);
       }
     } catch (err) {
-      logger.error({ err, wire }, 'Error placing order');
+      logger.error({ err, wire }, "Error placing order");
       results.push({ error: String(err) });
     }
   }
@@ -206,10 +214,21 @@ export async function placeSingleOrder(
   // some clients send trigger-only — guard the limit access so we don't
   // crash before reaching the branch.
   if (trigger) {
-    return placeTriggeredOrder(userId, wire.a, coin, isBuy, sz, limitPx, reduceOnly, trigger, wire.c, grouping);
+    return placeTriggeredOrder(
+      userId,
+      wire.a,
+      coin,
+      isBuy,
+      sz,
+      limitPx,
+      reduceOnly,
+      trigger,
+      wire.c,
+      grouping,
+    );
   }
   if (!wire.t.limit?.tif) {
-    return { error: 'Order missing both t.limit.tif and t.trigger' };
+    return { error: "Order missing both t.limit.tif and t.trigger" };
   }
   const tif = wire.t.limit.tif;
 
@@ -217,27 +236,47 @@ export async function placeSingleOrder(
   const midPx = await redis.hget(KEYS.MARKET_MIDS, coin);
 
   // IOC: fill immediately if price crosses, otherwise cancel
-  if (tif === 'Ioc') {
-    if (!midPx) return { error: 'No market price available' };
+  if (tif === "Ioc") {
+    if (!midPx) return { error: "No market price available" };
 
     const wouldFill = isBuy ? lte(midPx, limitPx) : gte(midPx, limitPx);
     if (!wouldFill) {
       // IOC that can't fill immediately is cancelled
-      return { error: 'IOC order could not be filled' };
+      return { error: "IOC order could not be filled" };
     }
 
     // Check margin
     if (!reduceOnly) {
-      const hasMargin = await checkMarginForOrder(userId, wire.a, isBuy, sz, midPx);
-      if (!hasMargin) return { error: 'Insufficient margin' };
+      const hasMargin = await checkMarginForOrder(
+        userId,
+        wire.a,
+        isBuy,
+        sz,
+        midPx,
+      );
+      if (!hasMargin) return { error: "Insufficient margin" };
     }
 
     // Create and immediately fill
     const oid = await nextOid();
     const now = Date.now();
-    const order = buildOrder(oid, userId, wire.a, coin, isBuy, sz, limitPx, 'limit', tif, reduceOnly, grouping, wire.c, now);
+    const order = buildOrder(
+      oid,
+      userId,
+      wire.a,
+      coin,
+      isBuy,
+      sz,
+      limitPx,
+      "limit",
+      tif,
+      reduceOnly,
+      grouping,
+      wire.c,
+      now,
+    );
 
-    await saveOrder(order);
+    await saveOrder(order, opts?.expiresAfter);
     const fillPx = await computeFillPrice(order, midPx);
     await matcher.executeFill(order, fillPx);
 
@@ -245,25 +284,45 @@ export async function placeSingleOrder(
   }
 
   // ALO: reject if would immediately fill (post-only)
-  if (tif === 'Alo') {
+  if (tif === "Alo") {
     if (midPx) {
       const wouldFill = isBuy ? lte(midPx, limitPx) : gte(midPx, limitPx);
       if (wouldFill) {
-        return { error: 'ALO order would have crossed' };
+        return { error: "ALO order would have crossed" };
       }
     }
 
     // Check margin for resting
     if (!reduceOnly) {
-      const hasMargin = await checkMarginForOrder(userId, wire.a, isBuy, sz, limitPx);
-      if (!hasMargin) return { error: 'Insufficient margin' };
+      const hasMargin = await checkMarginForOrder(
+        userId,
+        wire.a,
+        isBuy,
+        sz,
+        limitPx,
+      );
+      if (!hasMargin) return { error: "Insufficient margin" };
     }
 
     const oid = await nextOid();
     const now = Date.now();
-    const order = buildOrder(oid, userId, wire.a, coin, isBuy, sz, limitPx, 'limit', tif, reduceOnly, grouping, wire.c, now);
+    const order = buildOrder(
+      oid,
+      userId,
+      wire.a,
+      coin,
+      isBuy,
+      sz,
+      limitPx,
+      "limit",
+      tif,
+      reduceOnly,
+      grouping,
+      wire.c,
+      now,
+    );
 
-    await saveOrder(order);
+    await saveOrder(order, opts?.expiresAfter);
     await restOrder(order);
 
     return { resting: { oid, cloid: wire.c } };
@@ -275,15 +334,35 @@ export async function placeSingleOrder(
     if (wouldFill) {
       // Check margin
       if (!reduceOnly) {
-        const hasMargin = await checkMarginForOrder(userId, wire.a, isBuy, sz, midPx);
-        if (!hasMargin) return { error: 'Insufficient margin' };
+        const hasMargin = await checkMarginForOrder(
+          userId,
+          wire.a,
+          isBuy,
+          sz,
+          midPx,
+        );
+        if (!hasMargin) return { error: "Insufficient margin" };
       }
 
       const oid = await nextOid();
       const now = Date.now();
-      const order = buildOrder(oid, userId, wire.a, coin, isBuy, sz, limitPx, 'limit', tif, reduceOnly, grouping, wire.c, now);
+      const order = buildOrder(
+        oid,
+        userId,
+        wire.a,
+        coin,
+        isBuy,
+        sz,
+        limitPx,
+        "limit",
+        tif,
+        reduceOnly,
+        grouping,
+        wire.c,
+        now,
+      );
 
-      await saveOrder(order);
+      await saveOrder(order, opts?.expiresAfter);
       const fillPx = await computeFillPrice(order, midPx);
       await matcher.executeFill(order, fillPx);
 
@@ -293,15 +372,35 @@ export async function placeSingleOrder(
 
   // Rest the order
   if (!reduceOnly) {
-    const hasMargin = await checkMarginForOrder(userId, wire.a, isBuy, sz, limitPx);
-    if (!hasMargin) return { error: 'Insufficient margin' };
+    const hasMargin = await checkMarginForOrder(
+      userId,
+      wire.a,
+      isBuy,
+      sz,
+      limitPx,
+    );
+    if (!hasMargin) return { error: "Insufficient margin" };
   }
 
   const oid = await nextOid();
   const now = Date.now();
-  const order = buildOrder(oid, userId, wire.a, coin, isBuy, sz, limitPx, 'limit', tif, reduceOnly, grouping, wire.c, now);
+  const order = buildOrder(
+    oid,
+    userId,
+    wire.a,
+    coin,
+    isBuy,
+    sz,
+    limitPx,
+    "limit",
+    tif,
+    reduceOnly,
+    grouping,
+    wire.c,
+    now,
+  );
 
-  await saveOrder(order);
+  await saveOrder(order, opts?.expiresAfter);
   await restOrder(order);
 
   return { resting: { oid, cloid: wire.c } };
@@ -315,14 +414,28 @@ async function placeTriggeredOrder(
   sz: string,
   limitPx: string,
   reduceOnly: boolean,
-  trigger: { isMarket: boolean; triggerPx: string; tpsl: 'tp' | 'sl' },
+  trigger: { isMarket: boolean; triggerPx: string; tpsl: "tp" | "sl" },
   cloid: string | undefined,
   grouping: string,
 ): Promise<HlOrderResponseStatus> {
   const oid = await nextOid();
   const now = Date.now();
 
-  const order = buildOrder(oid, userId, asset, coin, isBuy, sz, limitPx, 'trigger', 'Gtc', reduceOnly, grouping, cloid, now);
+  const order = buildOrder(
+    oid,
+    userId,
+    asset,
+    coin,
+    isBuy,
+    sz,
+    limitPx,
+    "trigger",
+    "Gtc",
+    reduceOnly,
+    grouping,
+    cloid,
+    now,
+  );
   order.triggerPx = trigger.triggerPx;
   order.tpsl = trigger.tpsl;
   order.isMarket = trigger.isMarket;
@@ -337,7 +450,7 @@ async function placeTriggeredOrder(
   await redis.sadd(KEYS.ORDERS_TRIGGERS, oid.toString());
   await redis.zadd(KEYS.USER_ORDERS_SCOPED(userId, scope), now, oid.toString());
 
-  eventBus.emit('orderUpdate', { userId, order, status: 'open' });
+  eventBus.emit("orderUpdate", { userId, order, status: "open" });
 
   return { resting: { oid, cloid } };
 }
@@ -350,8 +463,8 @@ function buildOrder(
   isBuy: boolean,
   sz: string,
   limitPx: string,
-  orderType: 'limit' | 'trigger',
-  tif: 'Gtc' | 'Ioc' | 'Alo',
+  orderType: "limit" | "trigger",
+  tif: "Gtc" | "Ioc" | "Alo",
   reduceOnly: boolean,
   grouping: string,
   cloid: string | undefined,
@@ -369,16 +482,19 @@ function buildOrder(
     orderType,
     tif,
     reduceOnly,
-    grouping: grouping as PaperOrder['grouping'],
-    status: 'open',
-    filledSz: '0',
-    avgPx: '0',
+    grouping: grouping as PaperOrder["grouping"],
+    status: "open",
+    filledSz: "0",
+    avgPx: "0",
     createdAt: now,
     updatedAt: now,
   };
 }
 
-async function saveOrder(order: PaperOrder): Promise<void> {
+async function saveOrder(
+  order: PaperOrder,
+  expiresAfter?: number,
+): Promise<void> {
   const data: Record<string, string> = {
     oid: order.oid.toString(),
     userId: order.userId,
@@ -402,11 +518,20 @@ async function saveOrder(order: PaperOrder): Promise<void> {
   if (order.triggerPx) data.triggerPx = order.triggerPx;
   if (order.tpsl) data.tpsl = order.tpsl;
   if (order.isMarket !== undefined) data.isMarket = order.isMarket.toString();
+  if (expiresAfter !== undefined) data.expiresAfter = expiresAfter.toString();
 
   const pipeline = redis.pipeline();
   pipeline.hset(KEYS.ORDER(order.oid), data);
   if (order.cloid) {
-    pipeline.hset(KEYS.USER_CLOIDS(order.userId), order.cloid, order.oid.toString());
+    pipeline.hset(
+      KEYS.USER_CLOIDS(order.userId),
+      order.cloid,
+      order.oid.toString(),
+    );
+  }
+  // Register expiry in the sorted set so the matcher can sweep it
+  if (expiresAfter !== undefined) {
+    pipeline.zadd(KEYS.ORDERS_EXPIRY, expiresAfter, order.oid.toString());
   }
   await pipeline.exec();
 }
@@ -420,7 +545,7 @@ async function restOrder(order: PaperOrder): Promise<void> {
   pipeline.zadd(KEYS.USER_ORDERS_SCOPED(order.userId, scope), order.createdAt, order.oid.toString());
   await pipeline.exec();
 
-  eventBus.emit('orderUpdate', { userId: order.userId, order, status: 'open' });
+  eventBus.emit("orderUpdate", { userId: order.userId, order, status: "open" });
 }
 
 export async function cancelOrders(
@@ -436,16 +561,25 @@ export async function cancelOrders(
       continue;
     }
 
-    if (orderData.status !== 'open') {
-      results.push({ error: `Order ${cancel.o} is not open (status: ${orderData.status})` });
+    if (orderData.status !== "open") {
+      results.push({
+        error: `Order ${cancel.o} is not open (status: ${orderData.status})`,
+      });
       continue;
     }
 
     const now = Date.now();
     const pipeline = redis.pipeline();
-    pipeline.hset(KEYS.ORDER(cancel.o), 'status', 'cancelled', 'updatedAt', now.toString());
+    pipeline.hset(
+      KEYS.ORDER(cancel.o),
+      "status",
+      "cancelled",
+      "updatedAt",
+      now.toString(),
+    );
     pipeline.srem(KEYS.ORDERS_OPEN, cancel.o.toString());
     pipeline.srem(KEYS.ORDERS_TRIGGERS, cancel.o.toString());
+    pipeline.zrem(KEYS.ORDERS_EXPIRY, cancel.o.toString());
     await pipeline.exec();
 
     // Bracket cascade on cancel:
@@ -463,7 +597,11 @@ export async function cancelOrders(
         const childOid = parseInt(childStr, 10);
         if (!Number.isFinite(childOid)) continue;
         const childData = await redis.hgetall(KEYS.ORDER(childOid));
-        if (childData.oid && childData.status === 'open' && childData.userId === userId) {
+        if (
+          childData.oid &&
+          childData.status === "open" &&
+          childData.userId === userId
+        ) {
           childCancels.push({ a: parseInt(childData.asset, 10), o: childOid });
         }
         // Drop the child's reverse pointers regardless of status.
@@ -477,31 +615,31 @@ export async function cancelOrders(
       await redis.del(KEYS.ORDER_PARENT(cancel.o));
     }
 
-    eventBus.emit('orderUpdate', {
+    eventBus.emit("orderUpdate", {
       userId,
       order: {
         oid: cancel.o,
         coin: orderData.coin,
-        isBuy: orderData.isBuy === 'true',
+        isBuy: orderData.isBuy === "true",
         sz: orderData.sz,
         limitPx: orderData.limitPx,
-        status: 'cancelled',
+        status: "cancelled",
         asset: parseInt(orderData.asset, 10),
         userId,
         orderType: orderData.orderType,
         tif: orderData.tif,
-        reduceOnly: orderData.reduceOnly === 'true',
+        reduceOnly: orderData.reduceOnly === "true",
         grouping: orderData.grouping,
-        filledSz: orderData.filledSz ?? '0',
-        avgPx: orderData.avgPx ?? '0',
+        filledSz: orderData.filledSz ?? "0",
+        avgPx: orderData.avgPx ?? "0",
         createdAt: parseInt(orderData.createdAt, 10),
         updatedAt: now,
         cloid: orderData.cloid || undefined,
       } as PaperOrder,
-      status: 'cancelled',
+      status: "cancelled",
     });
 
-    results.push('success');
+    results.push("success");
   }
 
   return results;
@@ -534,10 +672,58 @@ export async function updateLeverage(
   isCross: boolean,
   leverage: number,
 ): Promise<void> {
-  await redis.hset(KEYS.USER_LEV(userId, asset),
-    'leverage', leverage.toString(),
-    'isCross', isCross.toString(),
+  await redis.hset(
+    KEYS.USER_LEV(userId, asset),
+    "leverage",
+    leverage.toString(),
+    "isCross",
+    isCross.toString(),
   );
+}
+
+export async function updateIsolatedMargin(
+  userId: string,
+  asset: number,
+  isBuy: boolean,
+  ntli: number,
+): Promise<{ ok: true } | { error: string }> {
+  // ntli is signed: positive = add margin, negative = remove margin.
+  // Convert from HL's 1e-6 integer units to a decimal string for Redis.
+  const deltaUsd = (ntli / 1_000_000).toFixed(6);
+  const posKey = KEYS.USER_POS(userId, asset);
+  const posRaw = await redis.hgetall(posKey);
+  if (!posRaw.asset) {
+    return { error: `No isolated position for asset ${asset}` };
+  }
+  // Store the delta — the margin accounting worker will reconcile on next
+  // funding tick. We only update the raw USD field here.
+  const current = parseFloat(posRaw.rawUsd ?? "0");
+  const updated = current + parseFloat(deltaUsd);
+  await redis.hset(posKey, "rawUsd", updated.toFixed(6));
+  return { ok: true };
+}
+
+export async function scheduleCancel(
+  userId: string,
+  time?: number,
+): Promise<{ ok: true } | { error: string }> {
+  // `time` is an optional unix-ms timestamp. When omitted, remove any
+  // previously scheduled cancel (dead man's switch reset).
+  const key = `user:${userId}:schedule_cancel`;
+  if (time === undefined) {
+    await redis.del(key);
+    return { ok: true };
+  }
+  const nowMs = Date.now();
+  if (time < nowMs + 5_000) {
+    return {
+      error: "scheduleCancel time must be at least 5 seconds in the future",
+    };
+  }
+  // Store the target time. A background worker polls this and cancels all
+  // open orders when the time is reached.
+  await redis.set(key, String(time));
+  return { ok: true };
 }
 
 // ─── modify ──────────────────────────────────────────────────────────────────
@@ -556,20 +742,52 @@ export async function modifyOrder(
   if (!orderData.oid || orderData.userId !== userId) {
     return { error: `Order ${oid} not found` };
   }
-  if (orderData.status !== 'open') {
+  if (orderData.status !== "open") {
     return { error: `Cannot modify canceled or filled order` };
   }
 
-  // Cancel the old order
+  // Cancel the old order atomically
   const now = Date.now();
   const pipeline = redis.pipeline();
-  pipeline.hset(KEYS.ORDER(oid), 'status', 'cancelled', 'updatedAt', now.toString());
+  pipeline.hset(
+    KEYS.ORDER(oid),
+    "status",
+    "cancelled",
+    "updatedAt",
+    now.toString(),
+  );
   pipeline.srem(KEYS.ORDERS_OPEN, oid.toString());
   pipeline.srem(KEYS.ORDERS_TRIGGERS, oid.toString());
+  pipeline.zrem(KEYS.ORDERS_EXPIRY, oid.toString());
   await pipeline.exec();
-eventBus.emit('orderUpdate', { userId, order: { oid } as any, status: 'cancelled' });
+
+  // Emit cancellation so WebSocket subscribers see the removal immediately
+  eventBus.emit("orderUpdate", {
+    userId,
+    order: {
+      oid,
+      coin: orderData.coin,
+      isBuy: orderData.isBuy === "true",
+      sz: orderData.sz,
+      limitPx: orderData.limitPx,
+      status: "cancelled",
+      asset: parseInt(orderData.asset, 10),
+      userId,
+      orderType: orderData.orderType,
+      tif: orderData.tif,
+      reduceOnly: orderData.reduceOnly === "true",
+      grouping: orderData.grouping,
+      filledSz: orderData.filledSz ?? "0",
+      avgPx: orderData.avgPx ?? "0",
+      createdAt: parseInt(orderData.createdAt, 10),
+      updatedAt: now,
+      cloid: orderData.cloid || undefined,
+    } as PaperOrder,
+    status: "cancelled",
+  });
+
   // Place the replacement order (same grouping as original)
-  const grouping = orderData.grouping ?? 'na';
+  const grouping = orderData.grouping ?? "na";
   await placeSingleOrder(userId, newWire, grouping);
 
   return { ok: true };
@@ -593,25 +811,57 @@ export async function batchModifyOrders(
         results.push({ error: `Order ${m.oid} not found` });
         continue;
       }
-      if (orderData.status !== 'open') {
+      if (orderData.status !== "open") {
         results.push({ error: `Cannot modify canceled or filled order` });
         continue;
       }
 
-      // Cancel old
+      // Cancel old atomically
       const now = Date.now();
       const pipeline = redis.pipeline();
-      pipeline.hset(KEYS.ORDER(m.oid), 'status', 'cancelled', 'updatedAt', now.toString());
+      pipeline.hset(
+        KEYS.ORDER(m.oid),
+        "status",
+        "cancelled",
+        "updatedAt",
+        now.toString(),
+      );
       pipeline.srem(KEYS.ORDERS_OPEN, m.oid.toString());
       pipeline.srem(KEYS.ORDERS_TRIGGERS, m.oid.toString());
+      pipeline.zrem(KEYS.ORDERS_EXPIRY, m.oid.toString());
       await pipeline.exec();
 
+      // Emit cancellation event for WebSocket subscribers
+      eventBus.emit("orderUpdate", {
+        userId,
+        order: {
+          oid: m.oid,
+          coin: orderData.coin,
+          isBuy: orderData.isBuy === "true",
+          sz: orderData.sz,
+          limitPx: orderData.limitPx,
+          status: "cancelled",
+          asset: parseInt(orderData.asset, 10),
+          userId,
+          orderType: orderData.orderType,
+          tif: orderData.tif,
+          reduceOnly: orderData.reduceOnly === "true",
+          grouping: orderData.grouping,
+          filledSz: orderData.filledSz ?? "0",
+          avgPx: orderData.avgPx ?? "0",
+          createdAt: parseInt(orderData.createdAt, 10),
+          updatedAt: now,
+          cloid: orderData.cloid || undefined,
+        } as PaperOrder,
+        status: "cancelled",
+      });
+
       // Place replacement and get its status
-      const grouping = orderData.grouping ?? 'na';
+      const grouping = orderData.grouping ?? "na";
       const status = await placeSingleOrder(userId, m.order, grouping);
       results.push(status);
     } catch (err) {
-      logger.error({ err, oid: m.oid }, 'batchModify error');
+      logger.error({ err, oid: m.oid }, "batchModify error");
       results.push({ error: String(err) });
     }
   }
@@ -664,6 +914,7 @@ export async function createTwapOrder(
     createdAt:  now.toString(),
   });
   await redis.sadd(KEYS.TWAPS_ACTIVE, twapId.toString());
+  await redis.zadd(KEYS.USER_TWAPS(userId), Date.now(), twapId.toString());
 
   return { twapId };
 }
@@ -676,10 +927,14 @@ export async function cancelTwapOrder(
 ): Promise<{ ok: true } | { error: string }> {
   const twapData = await redis.hgetall(KEYS.TWAP(twapId));
   if (!twapData.twapId) return { error: `TWAP ${twapId} not found` };
+  // Return same message for wrong-user as not-found to avoid enumeration
   if (twapData.userId !== userId) return { error: `TWAP ${twapId} not found` };
-  if (twapData.status !== 'running') return { error: `TWAP ${twapId} is not running` };
+  if (twapData.status !== "running")
+    return { error: `TWAP ${twapId} is not running` };
 
-  await redis.hset(KEYS.TWAP(twapId), 'status', 'cancelled');
+  // Setting status to 'cancelled' in Redis is picked up by the setInterval
+  // callback on its next tick, which then calls clearInterval on itself.
+  await redis.hset(KEYS.TWAP(twapId), "status", "cancelled");
   await redis.srem(KEYS.TWAPS_ACTIVE, twapId.toString());
 
   return { ok: true };
