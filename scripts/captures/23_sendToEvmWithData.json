@@ -1,0 +1,30 @@
+{
+  "request": {
+    "action": {
+      "type": "sendToEvmWithData",
+      "hyperliquidChain": "Testnet",
+      "signatureChainId": "0x3e6",
+      "token": "USDC:0xeb62eee3685fc4c43992febcd9e75443",
+      "amount": "0.1",
+      "sourceDex": "spot",
+      "destinationRecipient": "0xDF8187008Dd2084b553c9a5985be950c77fd76ed",
+      "addressEncoding": "hex",
+      "destinationChainId": 998,
+      "gasLimit": 100000,
+      "data": "0x",
+      "nonce": 1780148005857
+    },
+    "nonce": 1780148005857,
+    "signature": {
+      "r": "0x87b2048b95dceee6854ebbcf510ca8e3091ce1d6fcd4b8a0b9ae5993ea29dcb1",
+      "s": "0x1d455c29d00be1712e5844c612276f8d0194e1636dab5809b8f2a72c83ba42aa",
+      "v": 27
+    }
+  },
+  "response": {
+    "status": "ok",
+    "response": {
+      "type": "default"
+    }
+  }
+}

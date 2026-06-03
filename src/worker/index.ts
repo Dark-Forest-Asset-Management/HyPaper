@@ -7,6 +7,7 @@ import { HlWebSocketClient } from "./ws-client.js";
 import { PriceUpdater } from "./price-updater.js";
 import { OrderMatcher } from "./order-matcher.js";
 import { FundingWorker } from "./funding-worker.js";
+import { sweepStakingQueue } from "../engine/staking.js";
 import type { HlMeta, HlAssetCtx } from "../types/hl.js";
 
 export const eventBus = new EventEmitter();
@@ -179,6 +180,45 @@ class ScheduleCancelWorker {
   }
 }
 
+// ─── StakingWorker ────────────────────────────────────────────────────────────
+//
+// Sweeps the 7-day staking withdrawal queue every 60 seconds.
+// When a cWithdraw entry's unlockTime has passed, this worker completes
+// the withdrawal: moves HYPE back to the user's staking balance and removes
+// the entry from the queue.
+//
+// Uses sweepStakingQueue() from engine/staking.ts which handles the Redis
+// SCAN + zrangebyscore logic internally.
+
+class StakingWorker {
+  private timer: NodeJS.Timeout | null = null;
+  private readonly POLL_INTERVAL_MS = 60_000; // check every 60 seconds
+
+  start(): void {
+    logger.info(
+      { intervalMs: this.POLL_INTERVAL_MS },
+      "Staking worker started",
+    );
+    this.timer = setInterval(() => void this.tick(), this.POLL_INTERVAL_MS);
+    void this.tick();
+  }
+
+  stop(): void {
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
+    }
+  }
+
+  private async tick(): Promise<void> {
+    try {
+      await sweepStakingQueue();
+    } catch (err) {
+      logger.error({ err }, "Staking worker tick failed");
+    }
+  }
+}
+
 // ─── Worker ───────────────────────────────────────────────────────────────────
 
 export class Worker {
@@ -187,11 +227,13 @@ export class Worker {
   private orderMatcher: OrderMatcher;
   private fundingWorker: FundingWorker;
   private scheduleCancelWorker: ScheduleCancelWorker;
+  private stakingWorker: StakingWorker;
 
   constructor() {
     this.orderMatcher = new OrderMatcher(eventBus);
     this.fundingWorker = new FundingWorker();
     this.scheduleCancelWorker = new ScheduleCancelWorker();
+    this.stakingWorker = new StakingWorker();
     this.priceUpdater = new PriceUpdater(() => {
       // Fire-and-forget match on every price update
       this.orderMatcher.matchAll();
@@ -230,6 +272,7 @@ export class Worker {
 
     this.fundingWorker.start();
     this.scheduleCancelWorker.start();
+    this.stakingWorker.start();
 
     // Subscribe l2Book over WS for coins with open/trigger orders so the
     // matcher reads fresh book depth from Redis (via price-updater's l2Book
@@ -524,6 +567,7 @@ export class Worker {
     }
     this.fundingWorker.stop();
     this.scheduleCancelWorker.stop();
+    this.stakingWorker.stop();
     this.wsClient?.close();
     logger.info("Worker stopped");
   }

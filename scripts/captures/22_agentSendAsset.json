@@ -1,0 +1,24 @@
+{
+  "request": {
+    "action": {
+      "type": "agentSendAsset",
+      "destination": "0x4A1AE5A6cFB24390a704b1cc1aB88d0F89eF596B",
+      "sourceDex": "spot",
+      "destinationDex": "spot",
+      "token": "USDC:0xeb62eee3685fc4c43992febcd9e75443",
+      "amount": "0.1",
+      "fromSubAccount": "",
+      "nonce": 1780148004487
+    },
+    "nonce": 1780148004487,
+    "signature": {
+      "r": "0x3cec8d07a3c840e99a53d5268c75cda824bd9780568b3abd1bfd884c6154287f",
+      "s": "0x129c8db8c770f16643063305c051cd23c4757fc549325150f595d31afa3945b8",
+      "v": 27
+    }
+  },
+  "response": {
+    "status": "err",
+    "response": "Agent can only send asset to same user or their sub-accounts."
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "request": {
+    "action": {
+      "type": "usdClassTransfer",
+      "hyperliquidChain": "Testnet",
+      "signatureChainId": "0x3e6",
+      "amount": "1",
+      "toPerp": true,
+      "nonce": 1780147994903
+    },
+    "nonce": 1780147994903,
+    "signature": {
+      "r": "0x98b8532e7ee380f7428085d3aac2dde4b6e01188873f3a35e01068c8d9600e31",
+      "s": "0x3cd66a2bae7cca698de1849432380f9734217ae7a669b2719586f06b4c8e58f5",
+      "v": 28
+    }
+  },
+  "response": {
+    "status": "err",
+    "response": "Action disabled when unified account is active"
+  }
+}

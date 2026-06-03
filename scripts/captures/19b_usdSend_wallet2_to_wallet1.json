@@ -1,0 +1,22 @@
+{
+  "request": {
+    "action": {
+      "type": "usdSend",
+      "hyperliquidChain": "Testnet",
+      "signatureChainId": "0x3e6",
+      "destination": "0x4A1AE5A6cFB24390a704b1cc1aB88d0F89eF596B",
+      "amount": "0.5",
+      "time": 1780147999161
+    },
+    "nonce": 1780147999161,
+    "signature": {
+      "r": "0x121346e128c6965b8a2b717ff7db069bd8159a6241b621aff328db2ce5df5569",
+      "s": "0x427e57e0942a371e631dcb2874d4a3644788711dc563eab0e8059888ca2682b7",
+      "v": 28
+    }
+  },
+  "response": {
+    "status": "err",
+    "response": "Must deposit before performing actions. User: 0xdf8187008dd2084b553c9a5985be950c77fd76ed"
+  }
+}

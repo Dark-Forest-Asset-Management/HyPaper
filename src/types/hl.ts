@@ -177,7 +177,18 @@ export type HlExchangeAction =
   | HlCreateSubAccountAction
   | HlSubAccountTransferAction
   | HlSubAccountSpotTransferAction
-  | HlVaultTransferAction;
+  | HlVaultTransferAction
+  | HlUsdSendAction
+  | HlSpotSendAction           
+  | HlSendAssetAction          
+  | HlAgentSendAssetAction     
+  | HlSendToEvmWithDataAction
+  | HlApproveAgentAction
+  | HlApproveBuilderFeeAction
+  | HlSetReferrerAction
+  | HlCDepositAction
+  | HlCWithdrawAction
+  | HlTokenDelegateAction; 
 
 // === Info request types ===
 
@@ -402,4 +413,340 @@ export interface HlL2Level {
 export interface HlActiveAssetCtx {
   coin: string;
   ctx: HlAssetCtx;
+}
+// ─────────────────────────────────────────────────────────────────────────────
+// TASK 1 ADDITIONS — Sub-account & Vault info response types
+// ─────────────────────────────────────────────────────────────────────────────
+
+// === Sub-account info response types ===
+
+/** Single entry in the /info subAccounts response array. */
+export interface HlSubAccountInfo {
+  name: string;
+  subAccountUser: string;
+  master: string;
+  clearinghouseState: HlClearinghouseState;
+  spotState: HlSubAccountSpotState;
+}
+
+export interface HlSubAccountSpotState {
+  balances: HlSubAccountSpotBalance[];
+}
+
+export interface HlSubAccountSpotBalance {
+  coin: string;
+  token: number;
+  total: string;
+  hold: string;
+  entryNtl: string;
+}
+
+// === Vault info response types ===
+
+/** /info vaultDetails response shape. */
+export interface HlVaultDetails {
+  name: string;
+  vaultAddress: string;
+  leader: string;
+  description: string;
+  portfolio: unknown[];
+  apr: number;
+  followerState: HlVaultFollowerState | null;
+  leaderFraction: number;
+  leaderCommission: number;
+  followers: HlVaultFollower[];
+  maxDistributable: number;
+  maxWithdrawable: number;
+  isClosed: boolean;
+  relationship: { type: string };
+  allowDeposits: boolean;
+  alwaysCloseOnWithdraw: boolean;
+}
+
+export interface HlVaultFollowerState {
+  equity: string;
+  pnl: string;
+  allTimePnl: string;
+}
+
+export interface HlVaultFollower {
+  user: string;
+  vaultEquity: string;
+  pnl: string;
+  allTimePnl: string;
+  daysFollowing: number;
+  vaultEntryTime: number;
+  lockupUntil: number;
+}
+
+/** Single entry in the /info userVaultEquities response array. */
+export interface HlUserVaultEquity {
+  vaultAddress: string;
+  equity: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Transfer action types
+// All shapes confirmed from testnet captures 18-27.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// usdClassTransfer — spot ↔ perp USDC transfer
+// Signing: Pattern B (user-signed, HyperliquidTransaction:UsdClassTransfer)
+// Action body includes hyperliquidChain + signatureChainId (required by HL server)
+// Confirmed: disabled on unified accounts → "Action disabled when unified account is active"
+export interface HlUsdClassTransferAction {
+  type:              'usdClassTransfer';
+  hyperliquidChain:  'Mainnet' | 'Testnet';
+  signatureChainId:  string;   // "0x3e6" testnet, "0x66eee" mainnet
+  amount:            string;
+  toPerp:            boolean;
+  nonce:             number;
+}
+
+// usdSend — send USDC from perp balance to another wallet
+// Signing: Pattern B (HyperliquidTransaction:UsdSend)
+// `time` == outer nonce (both must match)
+// Confirmed: disabled on unified accounts
+export interface HlUsdSendAction {
+  type:              'usdSend';
+  hyperliquidChain:  'Mainnet' | 'Testnet';
+  signatureChainId:  string;
+  destination:       string;   // recipient wallet address
+  amount:            string;
+  time:              number;   // = outer nonce
+}
+
+// spotSend — send spot token to another wallet
+// Signing: Pattern B (HyperliquidTransaction:SpotSend)
+// token format: "NAME:0xTOKENID" (ID differs between mainnet and testnet)
+// Confirmed: disabled on unified accounts
+export interface HlSpotSendAction {
+  type:              'spotSend';
+  hyperliquidChain:  'Mainnet' | 'Testnet';
+  signatureChainId:  string;
+  destination:       string;
+  token:             string;   // e.g. "PURR:0xc4bf3f870c0e9465323c0b6ed28096c2"
+  amount:            string;
+  time:              number;
+}
+
+// sendAsset — generalised cross-DEX / cross-user token transfer
+// Signing: Pattern B (HyperliquidTransaction:SendAsset)
+// sourceDex / destinationDex: "" (perp), "spot", "evm"
+// fromSubAccount: sub-account address or "" for master
+// For unified accounts: sourceDex MUST be "spot"
+// Self-transfer → "Invalid send"
+// Cross-user transfer → { status: "ok", response: { type: "default" } }
+export interface HlSendAssetAction {
+  type:              'sendAsset';
+  hyperliquidChain:  'Mainnet' | 'Testnet';
+  signatureChainId:  string;
+  destination:       string;
+  sourceDex:         string;   // "" | "spot" | "evm"
+  destinationDex:    string;   // "" | "spot" | "evm"
+  token:             string;
+  amount:            string;
+  fromSubAccount:    string;   // "" or sub-account address
+  nonce:             number;
+}
+
+// agentSendAsset — sendAsset signed by an agent wallet (Pattern A — L1 Agent)
+// IMPORTANT: action has NO hyperliquidChain / signatureChainId fields
+// The agent can only send to the master account or its sub-accounts
+// Error: "Agent can only send asset to same user or their sub-accounts."
+export interface HlAgentSendAssetAction {
+  type:           'agentSendAsset';
+  // NO hyperliquidChain, NO signatureChainId — Pattern A
+  destination:    string;
+  sourceDex:      string;
+  destinationDex: string;
+  token:          string;
+  amount:         string;
+  fromSubAccount: string;
+  nonce:          number;
+}
+
+// sendToEvmWithData — send token from HyperCore to HyperEVM with calldata
+// Signing: Pattern B (HyperliquidTransaction:SendToEvmWithData)
+// CRITICAL: destinationChainId is uint32 in EIP-712 (NOT uint64)
+//   998 = testnet HyperEVM, 999 = mainnet HyperEVM
+// data: hex bytes, "0x" for plain transfer
+// addressEncoding: "hex" | "base58"
+// Success: { status: "ok", response: { type: "default" } }
+export interface HlSendToEvmWithDataAction {
+  type:                 'sendToEvmWithData';
+  hyperliquidChain:     'Mainnet' | 'Testnet';
+  signatureChainId:     string;
+  token:                string;
+  amount:               string;
+  sourceDex:            string;        // "" | "spot"
+  destinationRecipient: string;        // EVM contract/wallet address
+  addressEncoding:      'hex' | 'base58';
+  destinationChainId:   number;        // uint32: 998 testnet, 999 mainnet
+  gasLimit:             number;        // uint64
+  data:                 string;        // hex bytes e.g. "0x"
+  nonce:                number;
+}
+
+// ── Spot clearinghouse state response (new /info endpoint) ────────────────────
+// Discovered from probe captures 26/27 (spotClearinghouseState).
+
+export interface HlSpotClearinghouseState {
+  balances: HlSpotBalance[];
+  tokenToAvailableAfterMaintenance: [number, string][];
+}
+
+export interface HlSpotBalance {
+  coin:     string;
+  token:    number;
+  total:    string;
+  hold:     string;
+  entryNtl: string;
+}
+// ─────────────────────────────────────────────────────────────────────────────
+// API wallets / builder / referrals
+// Append these to the bottom of src/types/hl.ts
+// All shapes confirmed from HL docs and Python/Go SDK source.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// approveAgent — authorize an API wallet (agent) to sign on behalf of master
+// Signing: Pattern B (user-signed, HyperliquidTransaction:ApproveAgent)
+// Confirmed shape from Dwellir docs:
+// { type, signatureChainId, hyperliquidChain, agentAddress, agentName?, nonce }
+// agentName omitted = unnamed agent (max 1 per account)
+// agentName present = named agent (max 10, same name replaces previous)
+// agentAddress = zero address (0x000...000) = revoke that agent
+// Success: { status: "ok", response: { type: "default" } }
+export interface HlApproveAgentAction {
+  type:              'approveAgent';
+  hyperliquidChain:  'Mainnet' | 'Testnet';
+  signatureChainId:  string;
+  agentAddress:      string;
+  agentName?:        string;   // omit or empty for unnamed agent
+  nonce:             number;
+}
+
+// approveBuilderFee — set max fee rate for a builder address
+// Signing: Pattern B (user-signed, HyperliquidTransaction:ApproveBuilderFee)
+// MUST be signed by master wallet, not an agent wallet.
+// Confirmed shape from Python SDK:
+// { type, maxFeeRate, builder, nonce }
+// maxFeeRate format: "0.001%" (string, not numeric)
+// Success: { status: "ok", response: { type: "default" } }
+export interface HlApproveBuilderFeeAction {
+  type:        'approveBuilderFee';
+  maxFeeRate:  string;   // e.g. "0.001%"
+  builder:     string;   // builder wallet address
+  nonce:       number;
+}
+
+// setReferrer — record a referral code for this user
+// Signing: Pattern A (L1 Agent)
+// Confirmed shape from SDK: { type, code }
+// code: alphanumeric referral code string
+// Success: { status: "ok", response: { type: "default" } }
+export interface HlSetReferrerAction {
+  type: 'setReferrer';
+  code: string;
+}
+
+// ── /info response types ──────────────────────────────────────────────────────
+
+// extraAgents response — array of approved agents for a user
+// Confirmed shape from Dwellir docs
+export interface HlExtraAgent {
+  address:    string;
+  name:       string;       // empty string for unnamed agent
+  validUntil: number | null;
+}
+
+// maxBuilderFee response
+export interface HlMaxBuilderFee {
+  maxFeeRate: string;
+}
+
+// builderFeeApproval response
+export type HlBuilderFeeApproval =
+  | { builder: string; maxFeeRate: string; approved: true }
+  | { approved: false };
+
+// referral response
+export interface HlReferral {
+  referrerState: {
+    data:  { code: string; builderCode: string | null } | null;
+    stage: 'percentageReferrer' | 'noReferrer';
+  };
+  referredBy:    { referrer: string; code: string } | null;
+  cumVlm:        string;
+  rewardHistory: unknown[];
+}
+// ─────────────────────────────────────────────────────────────────────────────
+// TASK 4 ADDITIONS — Staking / Delegation
+// Append to the bottom of src/types/hl.ts
+// Field shapes confirmed from Go SDK (sonirico/go-hyperliquid) and HL node README.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// cDeposit — move HYPE from spot balance into staking account
+// Signing: Pattern A (L1 Agent)
+// Confirmed shape from Go SDK: { type, wei }
+// `wei` is integer, 1 HYPE = 100_000_000 wei (1e8)
+// Success: { status: "ok", response: { type: "default" } }
+export interface HlCDepositAction {
+  type: 'cDeposit';
+  wei:  number;   // integer wei amount
+}
+
+// cWithdraw — initiate 7-day unstake queue
+// Signing: Pattern A (L1 Agent)
+// Confirmed shape from Go SDK: { type, wei }
+// HYPE deducted from staking balance immediately, returned after 7 days.
+// Success: { status: "ok", response: { type: "default" } }
+export interface HlCWithdrawAction {
+  type: 'cWithdraw';
+  wei:  number;   // integer wei amount
+}
+
+// tokenDelegate — delegate or undelegate staked HYPE to/from a validator
+// Signing: Pattern A (L1 Agent)
+// Confirmed shape from Go SDK: { type, validator, wei, isUndelegate }
+// 1-day lockup: cannot undelegate within 1 day of delegating.
+// Success: { status: "ok", response: { type: "default" } }
+export interface HlTokenDelegateAction {
+  type:         'tokenDelegate';
+  validator:    string;    // validator wallet address
+  wei:          number;    // integer wei amount
+  isUndelegate: boolean;   // false = delegate, true = undelegate
+}
+
+// ── /info response types ──────────────────────────────────────────────────────
+
+// delegations response — array of active delegations
+export interface HlDelegation {
+  validator:            string;
+  amount:               string;   // HYPE (not wei)
+  lockedUntilTimestamp: number;   // unix ms
+  nSince:               number;   // unix ms, when delegated
+}
+
+// delegatorSummary response
+export interface HlDelegatorSummary {
+  delegated:              string;   // HYPE currently delegated
+  undelegated:            string;   // HYPE in staking account (not delegated)
+  totalPendingWithdrawal: string;   // HYPE in 7-day unstake queue
+  nPendingWithdrawals:    number;
+}
+
+// delegatorHistory response — array of staking events
+export interface HlDelegatorHistoryEntry {
+  type:      'delegate' | 'undelegate' | 'cDeposit' | 'cWithdraw' | 'withdrawalComplete';
+  validator: string | null;
+  amount:    string;    // HYPE
+  time:      number;    // unix ms
+}
+
+// delegatorRewards response
+export interface HlDelegatorRewards {
+  pendingRewards: string;
+  totalRewards:   string;
+  rewardHistory:  unknown[];
 }

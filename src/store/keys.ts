@@ -4,10 +4,6 @@ export const KEYS = {
   MARKET_CTX: (coin: string) => `market:ctx:${coin}`,
   MARKET_L2: (coin: string) => `market:l2:${coin}`,
   MARKET_META: 'market:meta',
-  // Sub-DEX universe metadata. Main DEX uses MARKET_META; each
-  // builder-deployed perp DEX (xyz, flx, vntl, …) gets its own meta
-  // cache. PERPDEXS holds the JSON list returned by /info perpDexs —
-  // used to decode HL's asset id encoding back to a coin name.
   MARKET_PERPDEXS: 'market:perpdexs',
   MARKET_META_DEX: (dex: string) => `market:meta:${dex}`,
 
@@ -21,27 +17,17 @@ export const KEYS = {
   USER_FILLS: (userId: string) => `user:${userId}:fills`,
   USER_FUNDINGS: (userId: string) => `user:${userId}:fundings`,
 
+  // Spot balances (Task 2)
+  USER_SPOT_BALANCES: (userId: string) => `user:${userId}:spot_balances`,
+
   // Orders
   ORDER: (oid: number) => `order:${oid}`,
   ORDERS_OPEN: 'orders:open',
   ORDERS_TRIGGERS: 'orders:triggers',
-  /** OCO sibling links — populated ONLY on child orders (TP/SL legs). Set
-   *  contains the other child oids in the bracket. Used when a child
-   *  fills: walk this set and cancel the siblings so they don't fire on
-   *  the same position twice. NOT populated on parent orders, because a
-   *  parent fill must leave its children alive (they're the bracketed
-   *  exits on the new position). */
   ORDER_BRACKET: (oid: number) => `order:${oid}:bracket`,
-  /** Parent → children link — populated ONLY on the parent (entry) order.
-   *  Used when the parent is CANCELLED (not filled): walk the children
-   *  and cancel them too, since a bracket without an entry is meaningless. */
   ORDER_CHILDREN: (oid: number) => `order:${oid}:children`,
-  /** Reverse pointer from child → parent. Stored as a single oid string. */
   ORDER_PARENT: (oid: number) => `order:${oid}:parent`,
-  /** Sorted set of `expiresAfter` deadlines: score = expiry-ms,
-   *  member = oid. The matcher sweeps low-scored entries to cancel. */
   ORDERS_EXPIRY: 'orders:expiry',
-  /** Highest nonce seen per wallet. Replay protection. */
   USER_NONCE_MAX: (userId: string) => `user:${userId}:nonce:max`,
 
   // Active users (for funding)
@@ -56,4 +42,44 @@ export const KEYS = {
   TWAPS_ACTIVE: 'twaps:active',
   SEQ_TWAP: 'seq:twapId',
   USER_TWAPS: (userId: string) => `user:${userId}:twaps`,
+
+  // ── Sub-accounts (Task 1) ────────────────────────────────────────────────────
+  USER_SUBACCOUNTS: (masterUserId: string) => `user:${masterUserId}:subaccounts`,
+  SUBACCOUNT_META: (subAddr: string) => `subaccount:${subAddr}:meta`,
+  SUBACCOUNT_MASTER: (subAddr: string) => `subaccount:${subAddr}:master`,
+
+  // ── Vaults (Task 1) ──────────────────────────────────────────────────────────
+  USER_VAULT_EQUITIES: (userId: string) => `user:${userId}:vault_equities`,
+  VAULT_META: (vaultAddress: string) => `vault:${vaultAddress}:meta`,
+
+  // ── API Wallets / Agents (Task 3) ────────────────────────────────────────────
+  USER_AGENTS: (userId: string) => `user:${userId}:agents`,
+
+  // ── Builder Fees (Task 3) ────────────────────────────────────────────────────
+  USER_BUILDER_FEES: (userId: string) => `user:${userId}:builder_fees`,
+
+  // ── Referrals (Task 3) ───────────────────────────────────────────────────────
+  USER_REFERRER: (userId: string) => `user:${userId}:referrer`,
+
+  // ── Staking / Delegation (Task 4) ────────────────────────────────────────────
+  //
+  // HYPE staking balance available in the staking account (not yet delegated).
+  // Stored as wei string (1 HYPE = 1e8 wei = 100000000).
+  USER_STAKING_BALANCE: (userId: string) => `user:${userId}:staking_balance`,
+  //
+  // Active delegations — sorted set:
+  //   score  = lockedUntil (unix ms, 1-day lockup after delegation)
+  //   member = JSON { validator, wei, lockedUntil, delegatedAt }
+  USER_DELEGATIONS: (userId: string) => `user:${userId}:delegations`,
+  //
+  // 7-day unstake queue — sorted set:
+  //   score  = unlockTime (unix ms, 7 days after cWithdraw)
+  //   member = JSON { wei, unlockTime, queuedAt }
+  // The StakingWorker sweeps this every 60s and completes withdrawals.
+  USER_STAKING_QUEUE: (userId: string) => `user:${userId}:staking_queue`,
+  //
+  // Staking event log — Redis list (lpush, newest first):
+  //   each entry = JSON { type, wei, validator?, timestamp, unlockTime? }
+  // Capped at 200 entries per user. Used by /info delegatorHistory.
+  STAKING_EVENTS: (userId: string) => `user:${userId}:staking_events`,
 } as const;

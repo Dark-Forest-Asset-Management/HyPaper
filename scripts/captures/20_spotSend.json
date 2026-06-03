@@ -1,0 +1,23 @@
+{
+  "request": {
+    "action": {
+      "type": "spotSend",
+      "hyperliquidChain": "Testnet",
+      "signatureChainId": "0x3e6",
+      "destination": "0xDF8187008Dd2084b553c9a5985be950c77fd76ed",
+      "token": "PURR:0xc4bf3f870c0e9465323c0b6ed28096c2",
+      "amount": "0.1",
+      "time": 1780148000259
+    },
+    "nonce": 1780148000259,
+    "signature": {
+      "r": "0xca9f52f5466dadca18a97601190712ea5eb7d50e7a17190714d55e241a0bf6da",
+      "s": "0x34883928562987268038e9a8eed43681cd926ca7d69ef48aef125c72ea32ea67",
+      "v": 28
+    }
+  },
+  "response": {
+    "status": "err",
+    "response": "Action disabled when unified account is active"
+  }
+}
