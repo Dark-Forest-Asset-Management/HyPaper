@@ -151,23 +151,21 @@ infoRouter.post('/', async (c) => {
       case 'spotClearinghouseState': {
         if (!user) return c.json({ error: 'Missing user' }, 400);
         const acctRaw    = await redis.hgetall(KEYS.USER_ACCOUNT(user));
-        const usdcBalance = acctRaw.balance ?? '0';
-
-        const perpState  = await getClearinghouseState(user);
-        const holdAmount = (perpState as any)?.marginSummary?.totalMarginUsed ?? '0';
-        const available  = Math.max(0, parseFloat(usdcBalance) - parseFloat(holdAmount)).toFixed(6);
-
+        // Spot now reads from its own balance field — independent of perp.
+        // No hold/maintenance subtraction: spot in HyPaper has no leverage
+        // and no positions, so the full balance is always available.
+        const usdcBalance = acctRaw[KEYS.USER_BAL_SPOT_FIELD] ?? '0';
         return c.json({
           balances: [
             {
               coin:     'USDC',
               token:    0,
               total:    usdcBalance,
-              hold:     holdAmount,
+              hold:     '0',
               entryNtl: '0.0',
             },
           ],
-          tokenToAvailableAfterMaintenance: [[0, available]],
+          tokenToAvailableAfterMaintenance: [[0, usdcBalance]],
         });
       }
 

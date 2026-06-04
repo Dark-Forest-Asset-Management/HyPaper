@@ -16,6 +16,10 @@ export async function ensureAccount(wallet: string): Promise<void> {
     await redis.hset(KEYS.USER_ACCOUNT(wallet),
       'userId', wallet,
       'balance', config.DEFAULT_BALANCE.toString(),
+      // Spot USDC is its own bucket — seed equal to perp so a new wallet can
+      // trade either side without first doing a usdClassTransfer. The two
+      // books then diverge from here as the wallet trades and transfers.
+      KEYS.USER_BAL_SPOT_FIELD, config.DEFAULT_BALANCE.toString(),
       'createdAt', Date.now().toString(),
     );
   }

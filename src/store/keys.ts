@@ -30,6 +30,12 @@ export const KEYS = {
   // The scoped variants are NEVER used for scope==='' so the native account's
   // existing on-disk layout is unchanged.
   USER_BAL_FIELD: (scope: string) => scope ? `balance:${scope}` : 'balance',
+  // Spot USDC balance — kept in a separate hash field on USER_ACCOUNT so
+  // usdClassTransfer / spotSend / sendAsset(sourceDex='spot') move real
+  // funds across perp ↔ spot books instead of being a no-op. Real HL keeps
+  // the books separate; HyPaper now mirrors that. Native perp uses
+  // USER_BAL_FIELD(''); per-dex uses USER_BAL_FIELD(dex); spot uses this.
+  USER_BAL_SPOT_FIELD: 'balance_spot',
   USER_POSITIONS_SCOPED: (userId: string, scope: string) =>
     scope ? `user:${userId}:positions:${scope}` : `user:${userId}:positions`,
   USER_ORDERS_SCOPED: (userId: string, scope: string) =>

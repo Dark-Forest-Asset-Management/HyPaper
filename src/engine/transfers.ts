@@ -132,8 +132,33 @@ export async function usdClassTransfer(
   }
 
   // No sub-account suffix — plain spot↔perp transfer.
-  // HyPaper uses one unified balance bucket, so this is a no-op.
-  logger.info({ userId, amount, toPerp }, 'usdClassTransfer acknowledged (unified balance)');
+  // Perp and spot are SEPARATE hash fields on USER_ACCOUNT. Debit one,
+  // credit the other in the same pipeline.
+  //   toPerp: true  → spot → perp  (debit balance_spot, credit balance)
+  //   toPerp: false → perp → spot  (debit balance,      credit balance_spot)
+  const acctKey = KEYS.USER_ACCOUNT(userId);
+  const acctRaw = await redis.hgetall(acctKey);
+  const perpBal = parseFloat(acctRaw.balance ?? '0');
+  const spotBal = parseFloat(acctRaw[KEYS.USER_BAL_SPOT_FIELD] ?? '0');
+
+  const srcBal = toPerp ? spotBal : perpBal;
+  if (srcBal < amountNum) {
+    return {
+      error: `Insufficient ${toPerp ? 'spot' : 'perp'} balance: have ${srcBal.toFixed(6)}, need ${amountNum.toFixed(6)}`,
+    };
+  }
+
+  const pipeline = redis.pipeline();
+  if (toPerp) {
+    pipeline.hset(acctKey, KEYS.USER_BAL_SPOT_FIELD, (spotBal - amountNum).toFixed(6));
+    pipeline.hset(acctKey, 'balance',                (perpBal + amountNum).toFixed(6));
+  } else {
+    pipeline.hset(acctKey, 'balance',                (perpBal - amountNum).toFixed(6));
+    pipeline.hset(acctKey, KEYS.USER_BAL_SPOT_FIELD, (spotBal + amountNum).toFixed(6));
+  }
+  await pipeline.exec();
+
+  logger.info({ userId, amountNum, toPerp }, 'usdClassTransfer executed');
   return { ok: true };
 }
 
@@ -205,27 +230,28 @@ export async function spotSend(
     return { error: 'Invalid token format — expected NAME:0xTOKENID' };
   }
 
-  // For USDC spot sends: debit/credit the unified balance bucket.
+  // USDC spot sends: debit/credit the SPOT bucket on each user.
+  // (Perp ↔ spot are now separate fields on USER_ACCOUNT.)
   const isUsdc = token.toLowerCase().startsWith('usdc:');
   if (isUsdc) {
     const senderKey = KEYS.USER_ACCOUNT(senderUserId);
     const senderRaw = await redis.hgetall(senderKey);
-    const senderBal = parseFloat(senderRaw.balance ?? '0');
+    const senderBal = parseFloat(senderRaw[KEYS.USER_BAL_SPOT_FIELD] ?? '0');
 
     if (senderBal < amountNum) {
       return {
-        error: `Insufficient USDC balance: have ${senderBal.toFixed(6)}, need ${amountNum.toFixed(6)}`,
+        error: `Insufficient USDC spot balance: have ${senderBal.toFixed(6)}, need ${amountNum.toFixed(6)}`,
       };
     }
 
     const pipeline  = redis.pipeline();
-    pipeline.hset(senderKey, 'balance', (senderBal - amountNum).toFixed(6));
+    pipeline.hset(senderKey, KEYS.USER_BAL_SPOT_FIELD, (senderBal - amountNum).toFixed(6));
 
     const destAddr     = destination.toLowerCase();
     const recipientRaw = await redis.hgetall(KEYS.USER_ACCOUNT(destAddr));
-    if (recipientRaw.balance !== undefined) {
-      const newBal = (parseFloat(recipientRaw.balance) + amountNum).toFixed(6);
-      pipeline.hset(KEYS.USER_ACCOUNT(destAddr), 'balance', newBal);
+    if (recipientRaw[KEYS.USER_BAL_SPOT_FIELD] !== undefined) {
+      const newBal = (parseFloat(recipientRaw[KEYS.USER_BAL_SPOT_FIELD]) + amountNum).toFixed(6);
+      pipeline.hset(KEYS.USER_ACCOUNT(destAddr), KEYS.USER_BAL_SPOT_FIELD, newBal);
       logger.info({ senderUserId, destAddr, amountNum }, 'spotSend USDC — credited known recipient');
     }
     await pipeline.exec();
@@ -277,23 +303,36 @@ export async function sendAsset(
     ? KEYS.USER_ACCOUNT(fromSubAccount.toLowerCase())
     : KEYS.USER_ACCOUNT(senderUserId);
 
+  // sourceDex selects which bucket to debit on the sender:
+  //   ''     → perp (USER_BAL_FIELD(''))
+  //   'spot' → spot (USER_BAL_SPOT_FIELD)
+  //   else   → perp sub-dex bucket (USER_BAL_FIELD(sourceDex))
+  // destinationDex selects the same on the recipient. EVM destinations
+  // debit the source only (no on-chain credit tracked).
+  const srcField = sourceDex === 'spot'
+    ? KEYS.USER_BAL_SPOT_FIELD
+    : KEYS.USER_BAL_FIELD(sourceDex);
+  const dstField = destinationDex === 'spot'
+    ? KEYS.USER_BAL_SPOT_FIELD
+    : KEYS.USER_BAL_FIELD(destinationDex);
+
   const senderRaw = await redis.hgetall(actualSenderKey);
-  const senderBal = parseFloat(senderRaw.balance ?? '0');
+  const senderBal = parseFloat(senderRaw[srcField] ?? '0');
 
   if (senderBal < amountNum) {
     return {
-      error: `Insufficient balance: have ${senderBal.toFixed(6)}, need ${amountNum.toFixed(6)}`,
+      error: `Insufficient ${sourceDex || 'perp'} balance: have ${senderBal.toFixed(6)}, need ${amountNum.toFixed(6)}`,
     };
   }
 
   const pipeline = redis.pipeline();
-  pipeline.hset(actualSenderKey, 'balance', (senderBal - amountNum).toFixed(6));
+  pipeline.hset(actualSenderKey, srcField, (senderBal - amountNum).toFixed(6));
 
   if (destinationDex === 'evm') {
     // EVM destination: funds leave HyperCore — debit sender, no EVM credit tracked.
     await pipeline.exec();
     logger.info(
-      { senderUserId, destAddr, token, amount },
+      { senderUserId, destAddr, token, amount, sourceDex },
       'sendAsset → evm: sender debited, EVM balance not tracked in HyPaper',
     );
     return { ok: true };
@@ -301,12 +340,12 @@ export async function sendAsset(
 
   // Non-EVM: credit recipient if they are a known HyPaper account
   const recipientRaw = await redis.hgetall(KEYS.USER_ACCOUNT(destAddr));
-  if (recipientRaw.balance !== undefined) {
-    const newRecipientBal = (parseFloat(recipientRaw.balance) + amountNum).toFixed(6);
-    pipeline.hset(KEYS.USER_ACCOUNT(destAddr), 'balance', newRecipientBal);
-    logger.info({ senderUserId, destAddr, amountNum }, 'sendAsset — credited known recipient');
+  if (recipientRaw[dstField] !== undefined) {
+    const newRecipientBal = (parseFloat(recipientRaw[dstField]) + amountNum).toFixed(6);
+    pipeline.hset(KEYS.USER_ACCOUNT(destAddr), dstField, newRecipientBal);
+    logger.info({ senderUserId, destAddr, amountNum, sourceDex, destinationDex }, 'sendAsset — credited known recipient');
   } else {
-    logger.info({ senderUserId, destAddr, amountNum }, 'sendAsset — recipient unknown, debit only');
+    logger.info({ senderUserId, destAddr, amountNum, sourceDex, destinationDex }, 'sendAsset — recipient unknown, debit only');
   }
 
   await pipeline.exec();
