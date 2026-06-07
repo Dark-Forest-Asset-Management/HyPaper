@@ -277,6 +277,14 @@ export async function placeSingleOrder(
     );
 
     await saveOrder(order, opts?.expiresAfter);
+    // Mirror the GTC/restOrder pattern: emit an 'open' orderUpdate
+    // BEFORE the fill so pg-sink inserts the order row. Without this,
+    // the only orderUpdate pg-sink saw was the 'filled' one from
+    // executeFill — and any race / startup-ordering miss there meant
+    // the order never landed in Postgres, so it was absent from
+    // /info historicalOrders (and therefore from slushy's Order History
+    // + the autoOverlay's anchor-time lookup).
+    eventBus.emit("orderUpdate", { userId, order, status: "open" });
     const fillPx = await computeFillPrice(order, midPx);
     await matcher.executeFill(order, fillPx);
 

@@ -24,8 +24,52 @@ function enqueueWrite(task: () => Promise<void>): void {
     });
 }
 
+/** Make sure Redis seq:tid and seq:oid are AHEAD of the PG `fills.tid`
+ *  / `orders.oid` maxima. If Redis is flushed (or never seeded) while PG
+ *  retains old rows, the next-generated tid/oid will collide with an
+ *  existing PG row from any prior user — and `ON CONFLICT DO NOTHING`
+ *  in the fill/order sinks below silently drops the new row, so the user
+ *  ends up with a position visible in Redis but invisible in PG-backed
+ *  endpoints (`/info userFills`, `/info historicalOrders`). Bump the
+ *  counters at startup so newly-generated ids are always safe.
+ *  +1000 cushion absorbs any in-flight orders between this sync and the
+ *  first new placement. */
+async function syncSeqCountersToPgMax(): Promise<void> {
+  // Lazy redis import to avoid pulling the store module before main()
+  // calls connectRedis().
+  const { redis } = await import('./redis.js');
+  const { KEYS } = await import('./keys.js');
+  const [maxFillRow] = await db.execute<{ max: number | null }>(
+    // drizzle's typed select on fills works but the bare SQL is
+    // shorter for a max(...) read and avoids re-importing the table.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    { sql: 'SELECT COALESCE(MAX(tid), 0) AS max FROM fills', params: [] } as any,
+  ).catch(() => [{ max: 0 }]);
+  const [maxOrderRow] = await db.execute<{ max: number | null }>(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    { sql: 'SELECT COALESCE(MAX(oid), 0) AS max FROM orders', params: [] } as any,
+  ).catch(() => [{ max: 0 }]);
+  const pgMaxTid = Number(maxFillRow?.max ?? 0);
+  const pgMaxOid = Number(maxOrderRow?.max ?? 0);
+  const safeTid = pgMaxTid + 1000;
+  const safeOid = pgMaxOid + 1000;
+  const redisTid = Number((await redis.get(KEYS.SEQ_TID)) ?? '0');
+  const redisOid = Number((await redis.get(KEYS.SEQ_OID)) ?? '0');
+  if (redisTid < safeTid) {
+    await redis.set(KEYS.SEQ_TID, String(safeTid));
+    logger.warn({ redisTid, pgMaxTid, bumpedTo: safeTid }, 'pg-sink: Redis seq:tid was behind PG max — bumped to avoid id collisions');
+  }
+  if (redisOid < safeOid) {
+    await redis.set(KEYS.SEQ_OID, String(safeOid));
+    logger.warn({ redisOid, pgMaxOid, bumpedTo: safeOid }, 'pg-sink: Redis seq:oid was behind PG max — bumped to avoid id collisions');
+  }
+}
+
 export function startPgSink(eventBus: EventEmitter): void {
   bus = eventBus;
+  void syncSeqCountersToPgMax().catch((err) => {
+    logger.error({ err }, 'pg-sink: syncSeqCountersToPgMax failed (continuing)');
+  });
   eventBus.on('fill', (event: { userId: string; fill: PaperFill }) => {
     enqueueWrite(async () => {
       await db.insert(fills)
