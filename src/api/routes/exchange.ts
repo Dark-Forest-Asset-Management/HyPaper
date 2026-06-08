@@ -151,7 +151,22 @@ exchangeRouter.post('/', async (c) => {
           const err = validateOrderWire(o);
           if (err) return c.json({ status: 'err', response: err }, 400);
         }
-        const statuses = await placeOrders(effectiveWallet, action.orders, action.grouping ?? 'na', { expiresAfter });
+        // HL's optional action-level `{builder:{b,f}}` — same builder applies
+        // to every order in the batch. Validate shape so a malformed entry
+        // doesn't cascade into NaN fees in executeFill.
+        let builder: { b: string; f: number } | undefined;
+        if (action.builder !== undefined) {
+          const b = action.builder as unknown as { b?: unknown; f?: unknown };
+          if (
+            !b || typeof b !== 'object' ||
+            typeof b.b !== 'string' || typeof b.f !== 'number' ||
+            !Number.isFinite(b.f) || b.f < 0
+          ) {
+            return c.json({ status: 'err', response: 'Invalid builder: expected {b: address, f: number (tenths of bps)}' }, 400);
+          }
+          builder = { b: b.b, f: b.f };
+        }
+        const statuses = await placeOrders(effectiveWallet, action.orders, action.grouping ?? 'na', { expiresAfter, builder });
         return c.json({ status: 'ok', response: { type: 'order', data: { statuses } } });
       }
 
@@ -614,6 +629,45 @@ exchangeRouter.post('/', async (c) => {
         if ('error' in result) {
           return c.json({ status: 'err', response: result.error }, 400);
         }
+        return c.json({ status: 'ok', response: { type: 'default' } });
+      }
+
+      // ── topUpIsolatedOnlyMargin ──────────────────────────────────────────
+      // Adds margin to an isolated position with no withdrawal path. Routes
+      // into the same rawUsd field as updateIsolatedMargin — liquidationPx is
+      // recomputed on read (position.ts) so no explicit recompute is needed.
+      // HyPaper doesn't track the "isolated-only" lock separately because
+      // paper mode has no withdrawal action to enforce against.
+
+      case 'topUpIsolatedOnlyMargin': {
+        if (typeof action.asset !== 'number' || typeof action.ntli !== 'number') {
+          return c.json({ status: 'err', response: 'topUpIsolatedOnlyMargin requires asset and ntli' }, 400);
+        }
+        const result = await updateIsolatedMargin(effectiveWallet, action.asset, true, action.ntli);
+        if ('error' in result) {
+          return c.json({ status: 'err', response: result.error }, 400);
+        }
+        return c.json({ status: 'ok', response: { type: 'default' } });
+      }
+
+      // ── reserveRequestWeight ─────────────────────────────────────────────
+      // Real HL pre-deducts request weight from the account's per-second
+      // budget. HyPaper has no rate-limit budget, so we validate shape and
+      // acknowledge. Returns the same { type: 'default' } envelope so clients
+      // that key off success status keep working.
+
+      case 'reserveRequestWeight': {
+        if (typeof action.weight !== 'number' || !Number.isFinite(action.weight) || action.weight < 0) {
+          return c.json({ status: 'err', response: 'reserveRequestWeight requires weight: positive number' }, 400);
+        }
+        return c.json({ status: 'ok', response: { type: 'default' } });
+      }
+
+      // ── noop ─────────────────────────────────────────────────────────────
+      // Explicit do-nothing. Used by some clients as a keepalive or to
+      // advance the nonce window. HyPaper acknowledges.
+
+      case 'noop': {
         return c.json({ status: 'ok', response: { type: 'default' } });
       }
 

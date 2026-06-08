@@ -27,6 +27,11 @@ export interface PaperOrder {
   avgPx: string;
   createdAt: number;
   updatedAt: number;
+  // Optional builder code from HL's order `builder` sub-object — carries the
+  // builder's payout address (`b`) and per-fill fee in tenths of a basis
+  // point (`f`). Persisted on the order so executeFill can charge the taker
+  // the bundled fee (exchange + builder) the same way HL does.
+  builder?: { b: string; f: number };
 }
 
 export interface PaperFill {

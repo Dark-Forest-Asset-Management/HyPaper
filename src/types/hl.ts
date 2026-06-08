@@ -157,6 +157,33 @@ export interface HlVaultTransferAction {
   usd: number;
 }
 
+// topUpIsolatedOnlyMargin — adds margin to an isolated position WITHOUT
+// allowing withdrawal back out. HL uses this for promotional / locked
+// collateral. HyPaper accepts and accounts the deposit on the position's
+// raw USD (same field updateIsolatedMargin uses), but doesn't track the
+// "isolated-only" lock separately — there's no withdrawal path in paper
+// mode to enforce against.
+export interface HlTopUpIsolatedOnlyMarginAction {
+  type: 'topUpIsolatedOnlyMargin';
+  asset: number;
+  ntli: number;   // integer, 1e-6 units; signed (+ = add, - = remove)
+}
+
+// reserveRequestWeight — pre-pay rate-limit weight to avoid hitting the
+// per-second cap on a burst. Real HL counts this against the account's
+// request budget. HyPaper has no request-budget tracking, so this is a
+// noop that returns { type: 'default' } after validating shape.
+export interface HlReserveRequestWeightAction {
+  type: 'reserveRequestWeight';
+  weight: number;   // positive integer; ignored in paper mode
+}
+
+// noop — explicitly does nothing on HL. Used by some clients to advance
+// the rate-limit clock or test connectivity. HyPaper acknowledges.
+export interface HlNoopAction {
+  type: 'noop';
+}
+
 // === HlExchangeAction union ===
 // All action types that the /exchange endpoint accepts.
 // Adding a new action type here is all that's needed for TypeScript to
@@ -188,7 +215,10 @@ export type HlExchangeAction =
   | HlSetReferrerAction
   | HlCDepositAction
   | HlCWithdrawAction
-  | HlTokenDelegateAction; 
+  | HlTokenDelegateAction
+  | HlTopUpIsolatedOnlyMarginAction
+  | HlReserveRequestWeightAction
+  | HlNoopAction; 
 
 // === Info request types ===
 

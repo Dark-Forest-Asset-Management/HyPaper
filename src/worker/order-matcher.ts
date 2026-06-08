@@ -341,11 +341,22 @@ export class OrderMatcher {
     // Determine fill direction string
     const dir = this.getFillDir(currentSzi, signedFillSz);
 
-    // Calculate fee
-    const feeRate = config.FEES_ENABLED
+    // Calculate fee. Builder fees from HL's order `{builder:{b,f}}` sub-
+    // object are bundled into the same `fee` field — `f` is in tenths of a
+    // basis point, so the rate is `f / 1_000_000`. Builder fees only apply
+    // to the taker side, matching HL's behavior; the maker pays the
+    // exchange maker rate alone. When fees are globally disabled
+    // (FEES_ENABLED=false) the builder fee is also skipped — the toggle is
+    // meant to make paper books frictionless during dev.
+    const exchangeFeeRate = config.FEES_ENABLED
       ? (isTaker ? config.FEE_RATE_TAKER : config.FEE_RATE_MAKER)
       : '0';
-    const fee = mul(mul(fillSz, fillPx), feeRate);
+    const notional = mul(fillSz, fillPx);
+    const exchangeFee = mul(notional, exchangeFeeRate);
+    const builderFee = (config.FEES_ENABLED && isTaker && order.builder)
+      ? mul(notional, (order.builder.f / 1_000_000).toString())
+      : '0';
+    const fee = add(exchangeFee, builderFee);
 
     const fill: PaperFill = {
       coin: order.coin,
@@ -558,6 +569,19 @@ export class OrderMatcher {
   }
 
   private parseOrder(data: Record<string, string>): PaperOrder {
+    // Builder code (HL's order `{builder: {b,f}}` sub-object) is persisted
+    // as JSON in `saveOrder`; deserialize back so executeFill can apply the
+    // bundled exchange+builder fee. Malformed entries are ignored — the
+    // worst case is a missed builder fee on this fill.
+    let builder: { b: string; f: number } | undefined;
+    if (data.builder) {
+      try {
+        const parsed = JSON.parse(data.builder);
+        if (parsed && typeof parsed.b === 'string' && typeof parsed.f === 'number') {
+          builder = { b: parsed.b, f: parsed.f };
+        }
+      } catch { /* ignore — treat as no builder */ }
+    }
     return {
       oid: parseInt(data.oid, 10),
       cloid: data.cloid || undefined,
@@ -579,6 +603,7 @@ export class OrderMatcher {
       avgPx: data.avgPx ?? '0',
       createdAt: parseInt(data.createdAt, 10),
       updatedAt: parseInt(data.updatedAt, 10),
+      ...(builder ? { builder } : {}),
     };
   }
 }

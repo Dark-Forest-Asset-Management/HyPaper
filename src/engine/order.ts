@@ -114,7 +114,11 @@ export async function placeOrders(
   userId: string,
   orders: HlOrderWire[],
   grouping: string,
-  opts?: { expiresAfter?: number },
+  // `builder` is an HL ACTION-level field (one per `order` action, applied to
+  // every order in the batch) — not per-`HlOrderWire`. Threaded via opts so
+  // every order in the batch sees the same builder; executeFill applies the
+  // bundled exchange+builder fee on the taker side per HL behavior.
+  opts?: { expiresAfter?: number; builder?: { b: string; f: number } },
 ): Promise<HlOrderResponseStatus[]> {
   const results: HlOrderResponseStatus[] = [];
   const placedOids: number[] = [];
@@ -189,7 +193,7 @@ export async function placeSingleOrder(
   userId: string,
   wire: HlOrderWire,
   grouping: string,
-  opts?: { expiresAfter?: number },
+  opts?: { expiresAfter?: number; builder?: { b: string; f: number } },
 ): Promise<HlOrderResponseStatus> {
   const coin = await resolveAssetCoin(wire.a);
   if (!coin) return { error: `Unknown asset ${wire.a}` };
@@ -225,6 +229,7 @@ export async function placeSingleOrder(
       trigger,
       wire.c,
       grouping,
+      opts?.builder,
     );
   }
   if (!wire.t.limit?.tif) {
@@ -274,6 +279,7 @@ export async function placeSingleOrder(
       grouping,
       wire.c,
       now,
+      opts?.builder,
     );
 
     await saveOrder(order, opts?.expiresAfter);
@@ -328,6 +334,7 @@ export async function placeSingleOrder(
       grouping,
       wire.c,
       now,
+      opts?.builder,
     );
 
     await saveOrder(order, opts?.expiresAfter);
@@ -406,6 +413,7 @@ export async function placeSingleOrder(
     grouping,
     wire.c,
     now,
+    opts?.builder,
   );
 
   await saveOrder(order, opts?.expiresAfter);
@@ -425,6 +433,7 @@ async function placeTriggeredOrder(
   trigger: { isMarket: boolean; triggerPx: string; tpsl: "tp" | "sl" },
   cloid: string | undefined,
   grouping: string,
+  builder?: { b: string; f: number },
 ): Promise<HlOrderResponseStatus> {
   const oid = await nextOid();
   const now = Date.now();
@@ -443,6 +452,7 @@ async function placeTriggeredOrder(
     grouping,
     cloid,
     now,
+    builder,
   );
   order.triggerPx = trigger.triggerPx;
   order.tpsl = trigger.tpsl;
@@ -477,6 +487,7 @@ function buildOrder(
   grouping: string,
   cloid: string | undefined,
   now: number,
+  builder?: { b: string; f: number },
 ): PaperOrder {
   return {
     oid,
@@ -496,6 +507,7 @@ function buildOrder(
     avgPx: "0",
     createdAt: now,
     updatedAt: now,
+    ...(builder ? { builder } : {}),
   };
 }
 
@@ -527,6 +539,9 @@ async function saveOrder(
   if (order.tpsl) data.tpsl = order.tpsl;
   if (order.isMarket !== undefined) data.isMarket = order.isMarket.toString();
   if (expiresAfter !== undefined) data.expiresAfter = expiresAfter.toString();
+  // Persist the builder code as JSON so executeFill can charge the bundled
+  // fee on every partial/full fill. Omit when unset so the hash stays small.
+  if (order.builder) data.builder = JSON.stringify(order.builder);
 
   const pipeline = redis.pipeline();
   pipeline.hset(KEYS.ORDER(order.oid), data);
