@@ -710,19 +710,27 @@ export async function updateIsolatedMargin(
   isBuy: boolean,
   ntli: number,
 ): Promise<{ ok: true } | { error: string }> {
-  // ntli is signed: positive = add margin, negative = remove margin.
-  // Convert from HL's 1e-6 integer units to a decimal string for Redis.
-  const deltaUsd = (ntli / 1_000_000).toFixed(6);
+  // HL action shape: `isBuy=true` ADDS margin to the isolated bucket,
+  // `isBuy=false` REMOVES it. `ntli` is the magnitude (always non-negative
+  // on the wire); apply the sign from isBuy. (Earlier code ignored isBuy
+  // and treated ntli as pre-signed — meant every "remove" call was actually
+  // an add. Verified 2026-06-08 against the slushy modal which always
+  // sends positive ntli and uses isBuy as the direction flag.)
+  const magnitudeUsd = Math.abs(ntli) / 1_000_000;
+  const deltaUsd = (isBuy ? magnitudeUsd : -magnitudeUsd).toFixed(6);
   const posKey = KEYS.USER_POS(userId, asset);
   const posRaw = await redis.hgetall(posKey);
   if (!posRaw.asset) {
     return { error: `No isolated position for asset ${asset}` };
   }
-  // Store the delta — the margin accounting worker will reconcile on next
-  // funding tick. We only update the raw USD field here.
   const current = parseFloat(posRaw.rawUsd ?? "0");
   const updated = current + parseFloat(deltaUsd);
   await redis.hset(posKey, "rawUsd", updated.toFixed(6));
+  // Fire an account-state update so the ws/server.ts subscriber broadcasts
+  // a fresh webData2 frame to this user. Without this, slushy's positions
+  // panel sits on the stale marginUsed value until the next fill / order
+  // update / 30s-ish polled refresh.
+  eventBus.emit("accountUpdate", { userId });
   return { ok: true };
 }
 

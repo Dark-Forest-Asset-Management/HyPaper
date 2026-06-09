@@ -46,7 +46,12 @@ export async function getClearinghouseState(userId: string, scope = ''): Promise
     const marginUsed = await calculatePositionMarginUsed(userId, asset, pos.szi, midPx);
 
     const accountValue = await calculateAccountValue(userId, scope);
-    const liqPx = calculateLiquidationPrice(pos.szi, pos.entryPx, accountValue, leverage, isCross);
+    // Forward the user-added dedicated margin for isolated positions so the
+    // liq line moves when they call updateIsolatedMargin / topUpIsolatedOnly.
+    // Cross positions don't read this (calculateLiquidationPrice ignores it
+    // on the cross branch), so it's safe to always pass.
+    const extraIsolatedMargin = isCross ? '0' : (pos.rawUsd ?? '0');
+    const liqPx = calculateLiquidationPrice(pos.szi, pos.entryPx, accountValue, leverage, isCross, extraIsolatedMargin);
 
     const roe = isZero(marginUsed)
       ? '0'

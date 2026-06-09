@@ -16,6 +16,7 @@ import type {
   L2BookEvent,
   FillEvent,
   OrderUpdateEvent,
+  AccountUpdateEvent,
 } from './types.js';
 
 interface ClientState {
@@ -506,6 +507,12 @@ export class HyPaperWsServer {
     // ── Market feeds relayed verbatim from HL (1.2b) ──
     this.eventBus.on('trades', (e: { coin: string; trades: unknown[] }) => {
       this.broadcast(`trades:${e.coin}`, JSON.stringify({ channel: 'trades', data: e.trades }));
+    });
+    // Engine actions that change account state without a fill/order hook
+    // (updateIsolatedMargin / topUpIsolatedOnlyMargin) fire accountUpdate so
+    // the client sees fresh marginUsed + liqPx without waiting for a poll.
+    this.eventBus.on('accountUpdate', (event: AccountUpdateEvent) => {
+      void this.broadcastWebData2(event.userId);
     });
     this.eventBus.on('bbo', (e: { coin: string; frame: unknown }) => {
       this.broadcast(`bbo:${e.coin}`, JSON.stringify({ channel: 'bbo', data: e.frame }));

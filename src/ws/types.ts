@@ -117,3 +117,12 @@ export interface OrderUpdateEvent {
   order: PaperOrder;
   status: string;
 }
+
+/** Fired by engine actions that change account state WITHOUT a fill/order
+ *  hook to ride — e.g. updateIsolatedMargin, topUpIsolatedOnlyMargin,
+ *  updateLeverage on an existing position. The ws server responds by
+ *  broadcasting a fresh webData2 snapshot so connected clients see the
+ *  new marginUsed / liqPx / accountValue without polling. */
+export interface AccountUpdateEvent {
+  userId: string;
+}

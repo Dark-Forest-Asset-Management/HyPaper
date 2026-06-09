@@ -88,7 +88,19 @@ export async function calculatePositionMarginUsed(
   const lev = await redis.hgetall(KEYS.USER_LEV(userId, asset));
   const leverage = lev.leverage ? parseInt(lev.leverage, 10) : 20;
   const posValue = mul(abs(szi), markPx);
-  return div(posValue, leverage.toString());
+  const baseMargin = div(posValue, leverage.toString());
+  // For ISOLATED positions, surface the user-added dedicated margin from
+  // updateIsolatedMargin / topUpIsolatedOnlyMargin. Those actions bump
+  // `rawUsd` on the position hash (signed delta in USD). Without adding
+  // it here, every isolated-margin adjust action was silently a no-op
+  // from the user's perspective — the action landed but the displayed
+  // marginUsed never moved. Cross positions ignore rawUsd (their
+  // margin is the whole account's cushion, not per-position).
+  const isCross = lev.isCross !== 'false';   // default → cross
+  if (isCross) return baseMargin;
+  const posData = await redis.hgetall(KEYS.USER_POS(userId, asset));
+  const dedicatedDelta = posData.rawUsd ?? '0';
+  return add(baseMargin, dedicatedDelta);
 }
 
 export async function checkMarginForOrder(
@@ -155,6 +167,11 @@ export function calculateLiquidationPrice(
   accountValue: string,
   leverage: number,
   isCross: boolean,
+  /** Extra dedicated margin added to an isolated position via
+   *  updateIsolatedMargin / topUpIsolatedOnlyMargin (signed USD; positive
+   *  pushes liq away). Ignored when `isCross`. Defaults to '0' so existing
+   *  callers that haven't been updated keep their previous behaviour. */
+  extraIsolatedMargin: string = '0',
 ): string | null {
   if (isZero(szi)) return null;
 
@@ -175,10 +192,17 @@ export function calculateLiquidationPrice(
     return isLong ? sub(entryPx, offset) : add(entryPx, offset);
   }
 
-  // Isolated.
+  // Isolated: baseline formula collapses to
+  //   entryPx ∓ (1/leverage − maintMarginRate) × entryPx
+  // which is equivalent to `entryPx ∓ (initialMargin − maintMargin) / size`
+  // when initialMargin = positionNotional / leverage. Adding user-injected
+  // extra margin widens that cushion: pushes long-liq DOWN, short-liq UP.
+  const baseCushionUsd = mul(mul(size, entryPx), sub(div('1', leverage.toString()), maintMarginRate));
+  const cushion = add(baseCushionUsd, extraIsolatedMargin);
+  const offset = div(cushion, size);
   if (isLong) {
-    const liqPx = mul(entryPx, sub('1', sub(div('1', leverage.toString()), maintMarginRate)));
+    const liqPx = sub(entryPx, offset);
     return gt(liqPx, '0') ? liqPx : '0';
   }
-  return mul(entryPx, add('1', sub(div('1', leverage.toString()), maintMarginRate)));
+  return add(entryPx, offset);
 }
