@@ -158,9 +158,72 @@ export async function getOpenOrders(userId: string, scope = '') {
   return orders;
 }
 
+/** Build one frontendOpenOrders row from a Redis order hash. Pure
+ *  shape mapping — no Redis side effects. Reused for both top-level
+ *  entries AND nested child entries inside a parent's `children`
+ *  array (HL embeds the full child order shape inline; verified
+ *  2026-06-15 against live HL webData2 push for wallet 0x1391...19ab,
+ *  parent oid 469824146876 carrying its TP/SL legs as full inline
+ *  rows). */
+function buildFrontendOpenOrderRow(
+  oid: number,
+  data: Record<string, string>,
+): FrontendOpenOrderRow {
+  const isTrigger = data.orderType === 'trigger';
+  const isBuy = data.isBuy === 'true';
+  const triggerPx = data.triggerPx || '0.0';
+  return {
+    coin: data.coin,
+    side: isBuy ? 'B' : 'A',
+    limitPx: data.limitPx,
+    sz: data.sz,
+    oid,
+    timestamp: parseInt(data.createdAt, 10),
+    triggerCondition: isTrigger
+      ? hlTriggerConditionString(data.tpsl, isBuy, triggerPx)
+      : 'N/A',
+    isTrigger,
+    triggerPx,
+    children: [],
+    isPositionTpsl: data.grouping === 'positionTpsl',
+    reduceOnly: data.reduceOnly === 'true',
+    orderType: hlOrderTypeString(isTrigger, data.tpsl, data.isMarket === 'true'),
+    origSz: data.sz,
+    // HL prod emits `tif: null` for trigger orders (verified 2026-05-09);
+    // HyPaper's DB column is notNull, so the stored string ('Gtc' /
+    // 'Ioc' / 'Alo') would leak through `data.tif ?? null`. Gate
+    // explicitly on isTrigger to match HL exactly. Same fix already
+    // applied in getOrderStatus and getHistoricalOrdersPg.
+    tif: isTrigger ? null : (data.tif ?? null),
+    cloid: data.cloid || null,
+  };
+}
+
+/** Recursive shape — the children array carries full FrontendOpenOrderRow
+ *  objects inline (verified against HL webData2). Defined here so the
+ *  helper above can self-reference. */
+type FrontendOpenOrderRow = {
+  coin: string;
+  side: 'A' | 'B';
+  limitPx: string;
+  sz: string;
+  oid: number;
+  timestamp: number;
+  triggerCondition: string;
+  isTrigger: boolean;
+  triggerPx: string;
+  children: FrontendOpenOrderRow[];
+  isPositionTpsl: boolean;
+  reduceOnly: boolean;
+  orderType: string;
+  origSz: string;
+  tif: string | null;
+  cloid: string | null;
+};
+
 export async function getFrontendOpenOrders(userId: string, scope = '') {
   const oids = await redis.zrange(KEYS.USER_ORDERS_SCOPED(userId, scope), 0, -1);
-  const orders = [];
+  const orders: FrontendOpenOrderRow[] = [];
 
   for (const oidStr of oids) {
     const oid = parseInt(oidStr, 10);
@@ -174,34 +237,35 @@ export async function getFrontendOpenOrders(userId: string, scope = '') {
     // (oid 418261286182) entries show this exact field layout, with
     // `tif: null`, `cloid: null`, `children: []`, and a prose
     // `triggerCondition` string ("Price above 1.4379" / "Price below 1.3991").
-    const isTrigger = data.orderType === 'trigger';
-    const isBuy = data.isBuy === 'true';
-    const triggerPx = data.triggerPx || '0.0';
-    orders.push({
-      coin: data.coin,
-      side: isBuy ? 'B' : 'A',
-      limitPx: data.limitPx,
-      sz: data.sz,
-      oid,
-      timestamp: parseInt(data.createdAt, 10),
-      triggerCondition: isTrigger
-        ? hlTriggerConditionString(data.tpsl, isBuy, triggerPx)
-        : 'N/A',
-      isTrigger,
-      triggerPx,
-      children: [] as Array<{ oid: number; triggerPx: string; tpsl: 'tp' | 'sl' }>,
-      isPositionTpsl: data.grouping === 'positionTpsl',
-      reduceOnly: data.reduceOnly === 'true',
-      orderType: hlOrderTypeString(isTrigger, data.tpsl, data.isMarket === 'true'),
-      origSz: data.sz,
-      // HL prod emits `tif: null` for trigger orders (verified 2026-05-09);
-      // HyPaper's DB column is notNull, so the stored string ('Gtc' /
-      // 'Ioc' / 'Alo') would leak through `data.tif ?? null`. Gate
-      // explicitly on isTrigger to match HL exactly. Same fix already
-      // applied in getOrderStatus and getHistoricalOrdersPg.
-      tif: isTrigger ? null : (data.tif ?? null),
-      cloid: data.cloid || null,
-    });
+    const row = buildFrontendOpenOrderRow(oid, data);
+
+    // Populate `children` for any order that has bracket legs attached
+    // (parent entry placed via grouping="normalTpsl" / "positionTpsl").
+    // HL embeds the FULL child order objects — same field shape as a
+    // top-level row — inline on the parent's `children` array, AND ALSO
+    // emits each child as its own top-level entry in the same response
+    // (verified 2026-06-15 against live HL webData2 for wallet
+    // 0x1391...19ab: parent oid 469824146876 [Limit Gtc] carried its
+    // TP+SL children inline, and the same TP+SL also appeared as
+    // top-level rows). slushy.trade's bracket allocator reads the
+    // parent→children oid mapping to pair (TP, SL) deterministically
+    // without falling back to placedMs / size / proximity heuristics.
+    const childrenOids = await redis.smembers(KEYS.ORDER_CHILDREN(oid));
+    if (childrenOids.length > 0) {
+      for (const childOidStr of childrenOids) {
+        const childOid = parseInt(childOidStr, 10);
+        if (!Number.isFinite(childOid)) continue;
+        const childData = await redis.hgetall(KEYS.ORDER(childOid));
+        // Skip if the child has been cancelled/filled — only live
+        // bracket legs belong on the parent's children array. A
+        // half-resolved bracket (one leg fired, sibling auto-canceled,
+        // parent still resting) should show only the surviving child.
+        if (!childData.oid || childData.status !== 'open') continue;
+        row.children.push(buildFrontendOpenOrderRow(childOid, childData));
+      }
+    }
+
+    orders.push(row);
   }
 
   return orders;
