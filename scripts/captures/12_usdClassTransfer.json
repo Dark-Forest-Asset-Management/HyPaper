@@ -1,0 +1,22 @@
+{
+  "request": {
+    "action": {
+      "type": "usdClassTransfer",
+      "hyperliquidChain": "Testnet",
+      "signatureChainId": "0xa4b1",
+      "amount": "1",
+      "toPerp": true,
+      "nonce": 1779600700237
+    },
+    "nonce": 1779600700237,
+    "signature": {
+      "r": "0xfddd14357f5bb39a6232cb95cabfad31befa4f0a8823bf1dfb8410b54e975e9b",
+      "s": "0x27c7aae379311a7cca94c53f971c7fa85d0fe2937e5eb8a9bc1384420a59eb28",
+      "v": 27
+    }
+  },
+  "response": {
+    "status": "err",
+    "response": "Must deposit before performing actions. User: 0x932034054685ab4d46a5b9e59b70a4b7f2c76d4d"
+  }
+}

@@ -2,19 +2,25 @@ import { redis } from '../store/redis.js';
 import { KEYS } from '../store/keys.js';
 import { D, add, sub, mul, div, abs, gt, gte, lt, lte, isZero, neg } from '../utils/math.js';
 
-export async function calculateAccountValue(userId: string): Promise<string> {
-  const balance = await getBalance(userId);
-  const unrealizedPnl = await calculateTotalUnrealizedPnl(userId);
+// ── Per-dex scope ─────────────────────────────────────────────────────────
+// All public margin/account funcs accept an optional `scope` (dex name, or
+// '' for native). Scope=='' keeps the legacy unscoped keys → existing on-disk
+// state untouched. Sub-dex scopes use `balance:${scope}` field + scoped
+// USER_POSITIONS_SCOPED set. HL semantics: each sub-dex is its own subaccount.
+
+export async function calculateAccountValue(userId: string, scope = ''): Promise<string> {
+  const balance = await getBalance(userId, scope);
+  const unrealizedPnl = await calculateTotalUnrealizedPnl(userId, scope);
   return add(balance, unrealizedPnl);
 }
 
-export async function getBalance(userId: string): Promise<string> {
-  const balance = await redis.hget(KEYS.USER_ACCOUNT(userId), 'balance');
+export async function getBalance(userId: string, scope = ''): Promise<string> {
+  const balance = await redis.hget(KEYS.USER_ACCOUNT(userId), KEYS.USER_BAL_FIELD(scope));
   return balance ?? '0';
 }
 
-export async function calculateTotalUnrealizedPnl(userId: string): Promise<string> {
-  const positionAssets = await redis.smembers(KEYS.USER_POSITIONS(userId));
+export async function calculateTotalUnrealizedPnl(userId: string, scope = ''): Promise<string> {
+  const positionAssets = await redis.smembers(KEYS.USER_POSITIONS_SCOPED(userId, scope));
   if (positionAssets.length === 0) return '0';
 
   const mids = await redis.hgetall(KEYS.MARKET_MIDS);
@@ -46,8 +52,8 @@ export function calculatePositionUnrealizedPnl(szi: string, entryPx: string, mar
   }
 }
 
-export async function calculateTotalMarginUsed(userId: string): Promise<string> {
-  const positionAssets = await redis.smembers(KEYS.USER_POSITIONS(userId));
+export async function calculateTotalMarginUsed(userId: string, scope = ''): Promise<string> {
+  const positionAssets = await redis.smembers(KEYS.USER_POSITIONS_SCOPED(userId, scope));
   if (positionAssets.length === 0) return '0';
 
   const mids = await redis.hgetall(KEYS.MARKET_MIDS);
@@ -82,7 +88,19 @@ export async function calculatePositionMarginUsed(
   const lev = await redis.hgetall(KEYS.USER_LEV(userId, asset));
   const leverage = lev.leverage ? parseInt(lev.leverage, 10) : 20;
   const posValue = mul(abs(szi), markPx);
-  return div(posValue, leverage.toString());
+  const baseMargin = div(posValue, leverage.toString());
+  // For ISOLATED positions, surface the user-added dedicated margin from
+  // updateIsolatedMargin / topUpIsolatedOnlyMargin. Those actions bump
+  // `rawUsd` on the position hash (signed delta in USD). Without adding
+  // it here, every isolated-margin adjust action was silently a no-op
+  // from the user's perspective — the action landed but the displayed
+  // marginUsed never moved. Cross positions ignore rawUsd (their
+  // margin is the whole account's cushion, not per-position).
+  const isCross = lev.isCross !== 'false';   // default → cross
+  if (isCross) return baseMargin;
+  const posData = await redis.hgetall(KEYS.USER_POS(userId, asset));
+  const dedicatedDelta = posData.rawUsd ?? '0';
+  return add(baseMargin, dedicatedDelta);
 }
 
 export async function checkMarginForOrder(
@@ -92,8 +110,11 @@ export async function checkMarginForOrder(
   sz: string,
   px: string,
 ): Promise<boolean> {
-  const accountValue = await calculateAccountValue(userId);
-  const currentMarginUsed = await calculateTotalMarginUsed(userId);
+  // Sub-dex orders draw from their dex's subaccount, not native.
+  const { scopeForAsset } = await import('./order.js');
+  const scope = await scopeForAsset(asset);
+  const accountValue = await calculateAccountValue(userId, scope);
+  const currentMarginUsed = await calculateTotalMarginUsed(userId, scope);
   const available = sub(accountValue, currentMarginUsed);
 
   // Calculate margin needed for this order
@@ -146,6 +167,11 @@ export function calculateLiquidationPrice(
   accountValue: string,
   leverage: number,
   isCross: boolean,
+  /** Extra dedicated margin added to an isolated position via
+   *  updateIsolatedMargin / topUpIsolatedOnlyMargin (signed USD; positive
+   *  pushes liq away). Ignored when `isCross`. Defaults to '0' so existing
+   *  callers that haven't been updated keep their previous behaviour. */
+  extraIsolatedMargin: string = '0',
 ): string | null {
   if (isZero(szi)) return null;
 
@@ -166,10 +192,17 @@ export function calculateLiquidationPrice(
     return isLong ? sub(entryPx, offset) : add(entryPx, offset);
   }
 
-  // Isolated.
+  // Isolated: baseline formula collapses to
+  //   entryPx ∓ (1/leverage − maintMarginRate) × entryPx
+  // which is equivalent to `entryPx ∓ (initialMargin − maintMargin) / size`
+  // when initialMargin = positionNotional / leverage. Adding user-injected
+  // extra margin widens that cushion: pushes long-liq DOWN, short-liq UP.
+  const baseCushionUsd = mul(mul(size, entryPx), sub(div('1', leverage.toString()), maintMarginRate));
+  const cushion = add(baseCushionUsd, extraIsolatedMargin);
+  const offset = div(cushion, size);
   if (isLong) {
-    const liqPx = mul(entryPx, sub('1', sub(div('1', leverage.toString()), maintMarginRate)));
+    const liqPx = sub(entryPx, offset);
     return gt(liqPx, '0') ? liqPx : '0';
   }
-  return mul(entryPx, add('1', sub(div('1', leverage.toString()), maintMarginRate)));
+  return add(entryPx, offset);
 }

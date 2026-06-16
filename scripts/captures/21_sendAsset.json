@@ -1,0 +1,26 @@
+{
+  "request": {
+    "action": {
+      "type": "sendAsset",
+      "hyperliquidChain": "Testnet",
+      "signatureChainId": "0x3e6",
+      "destination": "0x4A1AE5A6cFB24390a704b1cc1aB88d0F89eF596B",
+      "sourceDex": "spot",
+      "destinationDex": "spot",
+      "token": "USDC:0xeb62eee3685fc4c43992febcd9e75443",
+      "amount": "0.1",
+      "fromSubAccount": "",
+      "nonce": 1780148001532
+    },
+    "nonce": 1780148001532,
+    "signature": {
+      "r": "0x4e076581d33760a0a12615c6b5b1e5a1a7e89873e13c19292145965e7b20d7ad",
+      "s": "0x386c761aa813bc21691921d496f8b71d2cf17a48508815b292f88362cd85cb25",
+      "v": 28
+    }
+  },
+  "response": {
+    "status": "err",
+    "response": "Invalid send"
+  }
+}

@@ -37,8 +37,8 @@ async function main() {
     logger.info({ port: info.port }, 'HyPaper server running');
   }) as Server;
 
-  // Attach WebSocket server
-  wsServer = new HyPaperWsServer(httpServer, eventBus);
+  // Attach WebSocket server (worker handles on-demand upstream market subs)
+  wsServer = new HyPaperWsServer(httpServer, eventBus, worker);
 }
 
 async function shutdown() {

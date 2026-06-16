@@ -1,0 +1,21 @@
+{
+  "request": {
+    "action": {
+      "type": "subAccountSpotTransfer",
+      "subAccountUser": "0x0000000000000000000000000000000000000001",
+      "isDeposit": true,
+      "token": "PURR:0xc1fb593aeffbeb02f85e0308e9956a90",
+      "amount": "0.1"
+    },
+    "nonce": 1779600709551,
+    "signature": {
+      "r": "0x482c87d2be1c1185a6ec47a49e51c6c3fdfca44f7db3334a57efb0a2e56f95ee",
+      "s": "0x2fbb54a01e522fa438798a660c167eafc72281f9c110772b2ee9892ecd641c54",
+      "v": 27
+    }
+  },
+  "response": {
+    "status": "err",
+    "response": "Action disabled when unified account is active"
+  }
+}

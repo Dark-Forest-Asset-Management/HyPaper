@@ -26,7 +26,35 @@ export class PriceUpdater {
       case 'l2Book':
         await this.handleL2Book(data as HlL2Book);
         break;
+      // Ephemeral market feeds relayed verbatim to /ws subscribers (1.2b).
+      case 'trades':
+        this.handleTrades(data);
+        break;
+      case 'bbo':
+        this.handleBbo(data);
+        break;
+      case 'candle':
+        this.handleCandle(data);
+        break;
     }
+  }
+
+  private handleTrades(data: unknown): void {
+    const arr = data as Array<{ coin?: string }>;
+    if (!Array.isArray(arr) || arr.length === 0 || !arr[0]?.coin) return;
+    this.eventBus.emit('trades', { coin: arr[0].coin, trades: arr });
+  }
+
+  private handleBbo(data: unknown): void {
+    const d = data as { coin?: string };
+    if (!d?.coin) return;
+    this.eventBus.emit('bbo', { coin: d.coin, frame: d });
+  }
+
+  private handleCandle(data: unknown): void {
+    const d = data as { s?: string; i?: string };
+    if (!d?.s || !d?.i) return;
+    this.eventBus.emit('candle', { coin: d.s, interval: d.i, frame: d });
   }
 
   private async handleAllMids(data: HlAllMids): Promise<void> {
@@ -70,6 +98,9 @@ export class PriceUpdater {
     }
 
     await pipeline.exec();
+
+    // Relay the full ctx frame to activeAssetCtx /ws subscribers (1.2b).
+    this.eventBus.emit('activeAssetCtx', { coin: data.coin, ctx: data.ctx });
 
     if (livePx) {
       this.eventBus.emit('mids', { mids: { [data.coin]: livePx } });

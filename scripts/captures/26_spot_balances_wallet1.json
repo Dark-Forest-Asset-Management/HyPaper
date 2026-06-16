@@ -1,0 +1,107 @@
+{
+  "request": {
+    "type": "spotClearinghouseState",
+    "user": "0x4A1AE5A6cFB24390a704b1cc1aB88d0F89eF596B"
+  },
+  "response": {
+    "balances": [
+      {
+        "coin": "USDC",
+        "token": 0,
+        "total": "985.710641",
+        "hold": "25.184884",
+        "entryNtl": "0.0"
+      },
+      {
+        "coin": "TZERO",
+        "token": 1204,
+        "total": "0.0",
+        "hold": "0.0",
+        "entryNtl": "0.0"
+      },
+      {
+        "coin": "USDEEE",
+        "token": 1295,
+        "total": "0.0",
+        "hold": "0.0",
+        "entryNtl": "0.0"
+      },
+      {
+        "coin": "USDZZ",
+        "token": 1328,
+        "total": "0.0",
+        "hold": "0.0",
+        "entryNtl": "0.0"
+      },
+      {
+        "coin": "NQ",
+        "token": 1424,
+        "total": "0.0",
+        "hold": "0.0",
+        "entryNtl": "0.0"
+      },
+      {
+        "coin": "DENIM",
+        "token": 1434,
+        "total": "0.0",
+        "hold": "0.0",
+        "entryNtl": "0.0"
+      },
+      {
+        "coin": "HORSE",
+        "token": 1435,
+        "total": "0.0",
+        "hold": "0.0",
+        "entryNtl": "0.0"
+      },
+      {
+        "coin": "USDH",
+        "token": 1452,
+        "total": "0.0",
+        "hold": "0.0",
+        "entryNtl": "0.0"
+      },
+      {
+        "coin": "TUSDC",
+        "token": 1493,
+        "total": "0.0",
+        "hold": "0.0",
+        "entryNtl": "0.0"
+      },
+      {
+        "coin": "XAG",
+        "token": 1508,
+        "total": "0.0",
+        "hold": "0.0",
+        "entryNtl": "0.0"
+      },
+      {
+        "coin": "TGUSD",
+        "token": 1535,
+        "total": "0.0",
+        "hold": "0.0",
+        "entryNtl": "0.0"
+      },
+      {
+        "coin": "USDYP",
+        "token": 1576,
+        "total": "0.0",
+        "hold": "0.0",
+        "entryNtl": "0.0"
+      },
+      {
+        "coin": "EZSUSD",
+        "token": 1583,
+        "total": "0.0",
+        "hold": "0.0",
+        "entryNtl": "0.0"
+      }
+    ],
+    "tokenToAvailableAfterMaintenance": [
+      [
+        0,
+        "982.506795"
+      ]
+    ]
+  }
+}

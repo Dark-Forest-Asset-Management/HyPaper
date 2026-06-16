@@ -1,0 +1,28 @@
+{
+  "request": {
+    "action": {
+      "type": "sendAsset",
+      "hyperliquidChain": "Testnet",
+      "signatureChainId": "0x3e6",
+      "destination": "0xDF8187008Dd2084b553c9a5985be950c77fd76ed",
+      "sourceDex": "spot",
+      "destinationDex": "spot",
+      "token": "USDC:0xeb62eee3685fc4c43992febcd9e75443",
+      "amount": "0.1",
+      "fromSubAccount": "",
+      "nonce": 1780148002903
+    },
+    "nonce": 1780148002903,
+    "signature": {
+      "r": "0x72042e4bc846cc325de3ce712ea0afc351a34b1d2508749ea7a42fba5dc0299d",
+      "s": "0x2403c41a7adc050d7310689d07599af2c6f3cca04371933773aacbc5494f843a",
+      "v": 27
+    }
+  },
+  "response": {
+    "status": "ok",
+    "response": {
+      "type": "default"
+    }
+  }
+}

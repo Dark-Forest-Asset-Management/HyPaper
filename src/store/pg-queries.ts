@@ -1,8 +1,9 @@
-import { desc, eq, and, gte, lte } from 'drizzle-orm';
+import { desc, asc, eq, and, gte, lte } from 'drizzle-orm';
 import { db } from './db.js';
-import { fills, orders } from './schema.js';
+import { fills, orders, funding, ledgerUpdates } from './schema.js';
 import type { PaperFill } from '../types/order.js';
 import { hlTriggerConditionString, hlOrderTypeString } from '../engine/position.js';
+import { D, mul } from '../utils/math.js';
 
 /** Order in the shape HL's /info historicalOrders returns.
  *  Field order, types, and explicit-null semantics verified 2026-05-09
@@ -110,6 +111,64 @@ export async function getUserFillsByTimePg(
     .orderBy(desc(fills.time));
 
   return rows.map(rowToFill);
+}
+
+/** /info userFunding — `{ time, hash, delta: { type, coin, usdc, szi, fundingRate, nSamples } }`,
+ *  ascending by time (matches HL). */
+export async function getUserFundingPg(
+  userId: string, startTime: number, endTime?: number,
+): Promise<Array<{ time: number; hash: string; delta: {
+  type: 'funding'; coin: string; usdc: string; szi: string; fundingRate: string; nSamples: number;
+} }>> {
+  const conds = [eq(funding.userId, userId), gte(funding.time, startTime)];
+  if (endTime !== undefined) conds.push(lte(funding.time, endTime));
+  const rows = await db.select().from(funding).where(and(...conds)).orderBy(asc(funding.time));
+  return rows.map((r) => ({
+    time: r.time,
+    hash: r.hash,
+    delta: {
+      type: 'funding' as const,
+      coin: r.coin,
+      usdc: r.usdc,
+      szi: r.szi,
+      fundingRate: r.fundingRate,
+      nSamples: r.nSamples ?? 1,
+    },
+  }));
+}
+
+/** /info userNonFundingLedgerUpdates — `{ time, hash, delta: { type, usdc } }`,
+ *  ascending by time. */
+export async function getLedgerUpdatesPg(
+  userId: string, startTime: number, endTime?: number,
+): Promise<Array<{ time: number; hash: string; delta: { type: string; usdc: string } }>> {
+  const conds = [eq(ledgerUpdates.userId, userId), gte(ledgerUpdates.time, startTime)];
+  if (endTime !== undefined) conds.push(lte(ledgerUpdates.time, endTime));
+  const rows = await db.select().from(ledgerUpdates).where(and(...conds)).orderBy(asc(ledgerUpdates.time));
+  return rows.map((r) => ({
+    time: r.time,
+    hash: r.hash,
+    delta: { type: r.deltaType, usdc: r.usdc },
+  }));
+}
+
+/** Net deposits minus withdrawals (for portfolio PnL = accountValue − netDeposits). */
+export async function getNetDepositsPg(userId: string): Promise<string> {
+  const rows = await db.select().from(ledgerUpdates).where(eq(ledgerUpdates.userId, userId));
+  let net = D('0');
+  for (const r of rows) {
+    net = r.deltaType === 'withdraw' ? net.minus(D(r.usdc)) : net.plus(D(r.usdc));
+  }
+  return net.toString();
+}
+
+/** Sum of fill notional (px×sz) at/after `since`, for portfolio vlm + userFees. */
+export async function getVolumeSincePg(userId: string, since: number): Promise<string> {
+  const rows = await db.select().from(fills)
+    .where(and(eq(fills.userId, userId), gte(fills.time, since)));
+  let vlm = D('0');
+  for (const r of rows) vlm = vlm.plus(D(mul(r.px, r.sz)));
+  return vlm.toString();
 }
 
 function rowToFill(row: typeof fills.$inferSelect): PaperFill {

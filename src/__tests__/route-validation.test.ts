@@ -23,6 +23,8 @@ vi.mock('../engine/order.js', () => ({
 vi.mock('../store/pg-sink.js', () => ({
   upsertUser: vi.fn(async () => {}),
   updateUserBalance: vi.fn(async () => {}),
+  recordLedgerUpdate: vi.fn(() => {}),
+  recordFunding: vi.fn(() => {}),
 }));
 
 vi.mock('../config.js', () => ({

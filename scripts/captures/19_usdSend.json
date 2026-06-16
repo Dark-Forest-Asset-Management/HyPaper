@@ -1,0 +1,22 @@
+{
+  "request": {
+    "action": {
+      "type": "usdSend",
+      "hyperliquidChain": "Testnet",
+      "signatureChainId": "0x3e6",
+      "destination": "0xDF8187008Dd2084b553c9a5985be950c77fd76ed",
+      "amount": "1",
+      "time": 1780147997813
+    },
+    "nonce": 1780147997813,
+    "signature": {
+      "r": "0x8ef2277e0f3e3c31461f819ba62fc69ead5476462084323fe1597a83a4f42fc6",
+      "s": "0x0cd92bac128c060080167754267f65b1ee86c1f91fdab478ec6d925e2b8a646f",
+      "v": 28
+    }
+  },
+  "response": {
+    "status": "err",
+    "response": "Action disabled when unified account is active"
+  }
+}

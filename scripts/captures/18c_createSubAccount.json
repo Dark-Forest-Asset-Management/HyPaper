@@ -1,0 +1,18 @@
+{
+  "request": {
+    "action": {
+      "type": "createSubAccount",
+      "name": "hypaper-probe"
+    },
+    "nonce": 1780147996299,
+    "signature": {
+      "r": "0xd9705cd52b84e53e84ad53e747c04853edae03b2066d4c08a5c280ca11f85a14",
+      "s": "0x6b791ccc266006c931100322e137e36e5f532bb25cc1eed8949f1d2535443f74",
+      "v": 27
+    }
+  },
+  "response": {
+    "status": "err",
+    "response": "Cannot create sub-accounts until enough volume traded. Required: $100000. Traded: $250.35."
+  }
+}

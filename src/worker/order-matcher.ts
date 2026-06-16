@@ -61,6 +61,16 @@ export class OrderMatcher {
       const filledSize = parseFloat(data.filledSize || '0');
       const lastSubmittedAt = parseInt(data.lastSubmittedAt || '0', 10);
 
+      // Guard a malformed/legacy record: missing numeric fields parse to NaN.
+      // Without this the NaN flows into the slice size and corrupts the
+      // position. Finish + drop it rather than spin on it every tick.
+      if (!Number.isFinite(totalSize) || !Number.isFinite(startTime) || !Number.isFinite(endTime)) {
+        logger.warn({ twapId: id }, 'TWAP record has non-finite fields — finishing');
+        await redis.hset(KEYS.TWAP(id), 'status', 'finished');
+        await redis.srem(KEYS.TWAPS_ACTIVE, idStr);
+        continue;
+      }
+
       // Mark finished if past the end and (mostly) filled.
       if (now >= endTime || filledSize >= totalSize) {
         await redis.hset(KEYS.TWAP(id), 'status', 'finished', 'lastSubmittedAt', String(now));
@@ -76,7 +86,7 @@ export class OrderMatcher {
       const totalMs = endTime - startTime;
       const targetFilled = totalSize * (elapsedMs / totalMs);
       const sliceSize = Math.max(0, targetFilled - filledSize);
-      if (sliceSize <= 0) continue;
+      if (!Number.isFinite(sliceSize) || sliceSize <= 0) continue;
 
       const midPx = await redis.hget(KEYS.MARKET_MIDS, data.coin);
       if (!midPx) continue;
@@ -211,6 +221,24 @@ export class OrderMatcher {
       const midPx = mids[order.coin];
       if (!midPx || !order.triggerPx || !order.tpsl) continue;
 
+      // normalTpsl semantics: TP/SL is DORMANT while its parent entry is
+      // still resting. The bracket exists to close the position the
+      // parent will create on fill — letting it fire early would either
+      // (a) reduce some unrelated live position on the same coin, or
+      // (b) be a no-op via the reduceOnly+no-position guard but consume
+      // OCO sibling state. Real HL only activates the bracket when the
+      // parent transitions out of `open`. Witnessed 2026-06-15: a
+      // pending bracket placed below a live long had its TP fire
+      // against the existing long the instant mids ticked past the TP
+      // price, leaving the new entry alone with no bracket. We require
+      // the parent to be filled (or absent — e.g. positionTpsl never had
+      // one) before this leg becomes eligible to trigger.
+      const parentOidStr = await redis.get(KEYS.ORDER_PARENT(oid));
+      if (parentOidStr) {
+        const parentStatus = await redis.hget(KEYS.ORDER(parseInt(parentOidStr, 10)), 'status');
+        if (parentStatus === 'open') continue;  // parent still resting → trigger stays dormant
+      }
+
       const triggered = this.checkTrigger(order, midPx);
       if (triggered) {
         // Fill at mid price for market trigger orders, or at limit price for limit
@@ -331,11 +359,22 @@ export class OrderMatcher {
     // Determine fill direction string
     const dir = this.getFillDir(currentSzi, signedFillSz);
 
-    // Calculate fee
-    const feeRate = config.FEES_ENABLED
+    // Calculate fee. Builder fees from HL's order `{builder:{b,f}}` sub-
+    // object are bundled into the same `fee` field — `f` is in tenths of a
+    // basis point, so the rate is `f / 1_000_000`. Builder fees only apply
+    // to the taker side, matching HL's behavior; the maker pays the
+    // exchange maker rate alone. When fees are globally disabled
+    // (FEES_ENABLED=false) the builder fee is also skipped — the toggle is
+    // meant to make paper books frictionless during dev.
+    const exchangeFeeRate = config.FEES_ENABLED
       ? (isTaker ? config.FEE_RATE_TAKER : config.FEE_RATE_MAKER)
       : '0';
-    const fee = mul(mul(fillSz, fillPx), feeRate);
+    const notional = mul(fillSz, fillPx);
+    const exchangeFee = mul(notional, exchangeFeeRate);
+    const builderFee = (config.FEES_ENABLED && isTaker && order.builder)
+      ? mul(notional, (order.builder.f / 1_000_000).toString())
+      : '0';
+    const fee = add(exchangeFee, builderFee);
 
     const fill: PaperFill = {
       coin: order.coin,
@@ -369,6 +408,12 @@ export class OrderMatcher {
       }
     }
 
+    // Sub-dex scope for this fill (xyz, flx, …) or '' for native. Determines
+    // which USER_POSITIONS set the asset belongs to and which balance field
+    // PnL + fees write to. Each sub-dex is its own subaccount on HL.
+    const { scopeForAsset } = await import('../engine/order.js');
+    const scope = await scopeForAsset(asset);
+
     // Atomic pipeline
     const pipeline = redis.pipeline();
 
@@ -376,7 +421,7 @@ export class OrderMatcher {
     if (isZero(newSzi)) {
       // Position fully closed
       pipeline.del(KEYS.USER_POS(userId, asset));
-      pipeline.srem(KEYS.USER_POSITIONS(userId), asset.toString());
+      pipeline.srem(KEYS.USER_POSITIONS_SCOPED(userId, scope), asset.toString());
     } else {
       pipeline.hset(KEYS.USER_POS(userId, asset),
         'userId', userId,
@@ -388,20 +433,22 @@ export class OrderMatcher {
         'cumFundingSinceOpen', cumFundingSinceOpen,
         'cumFundingSinceChange', '0',
       );
-      pipeline.sadd(KEYS.USER_POSITIONS(userId), asset.toString());
+      pipeline.sadd(KEYS.USER_POSITIONS_SCOPED(userId, scope), asset.toString());
     }
 
     // Track active user for funding
     pipeline.sadd(KEYS.USERS_ACTIVE, userId);
 
-    // Credit closed PnL to balance
+    // Credit closed PnL to scoped balance field. Native: 'balance'. Sub-dex:
+    // 'balance:xyz' / 'balance:flx' / etc. — each subaccount is independent.
+    const balField = KEYS.USER_BAL_FIELD(scope);
     if (!isZero(closedPnl)) {
-      pipeline.hincrbyfloat(KEYS.USER_ACCOUNT(userId), 'balance', closedPnl);
+      pipeline.hincrbyfloat(KEYS.USER_ACCOUNT(userId), balField, closedPnl);
     }
 
-    // Deduct fee from balance
+    // Deduct fee from scoped balance field.
     if (!isZero(fee)) {
-      pipeline.hincrbyfloat(KEYS.USER_ACCOUNT(userId), 'balance', neg(fee));
+      pipeline.hincrbyfloat(KEYS.USER_ACCOUNT(userId), balField, neg(fee));
     }
 
     // Mark order as filled
@@ -540,6 +587,19 @@ export class OrderMatcher {
   }
 
   private parseOrder(data: Record<string, string>): PaperOrder {
+    // Builder code (HL's order `{builder: {b,f}}` sub-object) is persisted
+    // as JSON in `saveOrder`; deserialize back so executeFill can apply the
+    // bundled exchange+builder fee. Malformed entries are ignored — the
+    // worst case is a missed builder fee on this fill.
+    let builder: { b: string; f: number } | undefined;
+    if (data.builder) {
+      try {
+        const parsed = JSON.parse(data.builder);
+        if (parsed && typeof parsed.b === 'string' && typeof parsed.f === 'number') {
+          builder = { b: parsed.b, f: parsed.f };
+        }
+      } catch { /* ignore — treat as no builder */ }
+    }
     return {
       oid: parseInt(data.oid, 10),
       cloid: data.cloid || undefined,
@@ -561,6 +621,7 @@ export class OrderMatcher {
       avgPx: data.avgPx ?? '0',
       createdAt: parseInt(data.createdAt, 10),
       updatedAt: parseInt(data.updatedAt, 10),
+      ...(builder ? { builder } : {}),
     };
   }
 }
