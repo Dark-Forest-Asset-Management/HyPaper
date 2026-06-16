@@ -221,6 +221,24 @@ export class OrderMatcher {
       const midPx = mids[order.coin];
       if (!midPx || !order.triggerPx || !order.tpsl) continue;
 
+      // normalTpsl semantics: TP/SL is DORMANT while its parent entry is
+      // still resting. The bracket exists to close the position the
+      // parent will create on fill — letting it fire early would either
+      // (a) reduce some unrelated live position on the same coin, or
+      // (b) be a no-op via the reduceOnly+no-position guard but consume
+      // OCO sibling state. Real HL only activates the bracket when the
+      // parent transitions out of `open`. Witnessed 2026-06-15: a
+      // pending bracket placed below a live long had its TP fire
+      // against the existing long the instant mids ticked past the TP
+      // price, leaving the new entry alone with no bracket. We require
+      // the parent to be filled (or absent — e.g. positionTpsl never had
+      // one) before this leg becomes eligible to trigger.
+      const parentOidStr = await redis.get(KEYS.ORDER_PARENT(oid));
+      if (parentOidStr) {
+        const parentStatus = await redis.hget(KEYS.ORDER(parseInt(parentOidStr, 10)), 'status');
+        if (parentStatus === 'open') continue;  // parent still resting → trigger stays dormant
+      }
+
       const triggered = this.checkTrigger(order, midPx);
       if (triggered) {
         // Fill at mid price for market trigger orders, or at limit price for limit
