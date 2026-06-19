@@ -7,7 +7,9 @@ import { HlWebSocketClient } from './ws-client.js';
 import { PriceUpdater } from './price-updater.js';
 import { OrderMatcher } from './order-matcher.js';
 import { FundingWorker } from './funding-worker.js';
+import { LiquidationWorker } from './liquidation-worker.js';
 import { snapshotPortfolios } from '../engine/account.js';
+import { initVault } from '../engine/liquidator-vault.js';
 import type { HlMeta, HlAssetCtx } from '../types/hl.js';
 import { sweepStakingQueue } from '../engine/staking.js';
 
@@ -229,12 +231,14 @@ export class Worker {
   private fundingWorker: FundingWorker;
   private scheduleCancelWorker: ScheduleCancelWorker;
   private stakingWorker: StakingWorker;
+  private liquidationWorker: LiquidationWorker;
 
   constructor() {
     this.orderMatcher = new OrderMatcher(eventBus);
     this.fundingWorker = new FundingWorker();
     this.scheduleCancelWorker = new ScheduleCancelWorker();
     this.stakingWorker = new StakingWorker();
+    this.liquidationWorker = new LiquidationWorker(eventBus);
     this.priceUpdater = new PriceUpdater(() => {
       // Fire-and-forget match on every price update
       this.orderMatcher.matchAll();
@@ -274,6 +278,12 @@ export class Worker {
     this.fundingWorker.start();
     this.scheduleCancelWorker.start();
     this.stakingWorker.start();
+
+    // Liquidation engine: ensure the vault row exists, then start the
+    // continuous equity watcher (subscribes to the same 'mids' event the
+    // order matcher already listens on, plus its own fallback poll).
+    await initVault();
+    this.liquidationWorker.start();
 
     // Subscribe l2Book over WS for coins with open/trigger orders so the
     // matcher reads fresh book depth from Redis (via price-updater's l2Book
@@ -629,6 +639,7 @@ export class Worker {
     this.fundingWorker.stop();
     this.scheduleCancelWorker.stop();
     this.stakingWorker.stop();
+    this.liquidationWorker.stop();
     this.wsClient?.close();
     logger.info("Worker stopped");
   }

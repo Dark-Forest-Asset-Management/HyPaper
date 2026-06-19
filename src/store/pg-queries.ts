@@ -1,7 +1,8 @@
-import { desc, asc, eq, and, gte, lte } from 'drizzle-orm';
+import { desc, asc, eq, and, gte, lte, sql } from 'drizzle-orm';
 import { db } from './db.js';
-import { fills, orders, funding, ledgerUpdates } from './schema.js';
+import { fills, orders, funding, ledgerUpdates, liquidationEvents, liquidatorVault } from './schema.js';
 import type { PaperFill } from '../types/order.js';
+import type { LiquidationEvent } from '../types/liquidation.js';
 import { hlTriggerConditionString, hlOrderTypeString } from '../engine/position.js';
 import { D, mul } from '../utils/math.js';
 
@@ -169,6 +170,83 @@ export async function getVolumeSincePg(userId: string, since: number): Promise<s
   let vlm = D('0');
   for (const r of rows) vlm = vlm.plus(D(mul(r.px, r.sz)));
   return vlm.toString();
+}
+
+// ── Liquidation events ───────────────────────────────────────────────────
+
+/** Insert one liquidation event row (full or partial close). */
+export async function insertLiquidationEventPg(event: LiquidationEvent): Promise<void> {
+  await db.insert(liquidationEvents).values({
+    userId: event.userId,
+    asset: event.asset,
+    coin: event.coin,
+    szi: event.szi,
+    markPx: event.markPx,
+    entryPx: event.entryPx,
+    leverage: event.leverage,
+    marginType: event.marginType,
+    amountRecovered: event.amountRecovered,
+    marginLost: event.marginLost,
+    liquidationType: event.liquidationType,
+    time: event.time,
+    hash: event.hash,
+  });
+}
+
+/** Fetch liquidation history for one user, most recent first. */
+export async function getLiquidationEventsPg(userId: string, limit = 100): Promise<LiquidationEvent[]> {
+  const rows = await db
+    .select()
+    .from(liquidationEvents)
+    .where(eq(liquidationEvents.userId, userId))
+    .orderBy(desc(liquidationEvents.time))
+    .limit(limit);
+
+  return rows.map((r) => ({
+    id: r.id,
+    userId: r.userId,
+    asset: r.asset,
+    coin: r.coin,
+    szi: r.szi,
+    markPx: r.markPx,
+    entryPx: r.entryPx,
+    leverage: r.leverage,
+    marginType: r.marginType as 'cross' | 'isolated',
+    amountRecovered: r.amountRecovered,
+    marginLost: r.marginLost,
+    liquidationType: r.liquidationType as 'full' | 'partial',
+    time: r.time,
+    hash: r.hash,
+  }));
+}
+
+// ── Liquidator vault (Postgres mirror) ────────────────────────────────────
+// Redis (liquidator-vault.ts) is the fast-path source of truth; this is a
+// durable mirror so vault totals survive a Redis flush. Single row, id=1.
+
+/** Seed the vault row if it doesn't exist yet. Safe to call on every startup. */
+export async function ensureVaultRowPg(vaultAddress: string): Promise<void> {
+  await db.insert(liquidatorVault)
+    .values({ id: 1, vaultAddress, totalCollected: '0', lastUpdated: Date.now() })
+    .onConflictDoNothing();
+}
+
+/** Add `amount` to the vault's running total and persist. */
+export async function creditVaultPg(amount: string): Promise<void> {
+  await db.update(liquidatorVault)
+    .set({
+      totalCollected: sql`${liquidatorVault.totalCollected}::numeric + ${amount}::numeric`,
+      lastUpdated: Date.now(),
+    })
+    .where(eq(liquidatorVault.id, 1));
+}
+
+/** Read the current vault totals from Postgres. */
+export async function getVaultStatePg(): Promise<{ vaultAddress: string; totalCollected: string; lastUpdated: number } | null> {
+  const rows = await db.select().from(liquidatorVault).where(eq(liquidatorVault.id, 1)).limit(1);
+  if (rows.length === 0) return null;
+  const r = rows[0];
+  return { vaultAddress: r.vaultAddress, totalCollected: r.totalCollected, lastUpdated: r.lastUpdated };
 }
 
 function rowToFill(row: typeof fills.$inferSelect): PaperFill {
