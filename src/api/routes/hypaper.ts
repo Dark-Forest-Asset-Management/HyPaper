@@ -6,6 +6,8 @@ import { logger } from '../../utils/logger.js';
 import { ensureAccount } from '../middleware/auth.js';
 import { upsertUser, updateUserBalance, recordLedgerUpdate } from '../../store/pg-sink.js';
 import { sub, isZero, gt, abs } from '../../utils/math.js';
+import { getLiquidationEventsPg } from '../../store/pg-queries.js';
+import { getVaultState } from '../../engine/liquidator-vault.js';
 
 export const hypaperRouter = new Hono();
 
@@ -94,6 +96,22 @@ hypaperRouter.post('/', async (c) => {
           balance: account.balance,
           createdAt: parseInt(account.createdAt, 10),
         });
+      }
+
+      case 'liquidationHistory': {
+        const limit = typeof body.limit === 'number' && Number.isFinite(body.limit)
+          ? Math.min(Math.max(1, body.limit), 500)
+          : 100;
+        const events = await getLiquidationEventsPg(normalizedUser, limit);
+        return c.json({ status: 'ok', events });
+      }
+
+      case 'liquidatorVault': {
+        // Not user-scoped data, but kept under /hypaper for consistency with
+        // the rest of the paper-mode admin/info surface. `user` is still
+        // required by the outer handler but ignored here.
+        const vault = await getVaultState();
+        return c.json({ status: 'ok', vault });
       }
 
       default: {

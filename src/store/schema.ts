@@ -144,6 +144,39 @@ export const ledgerUpdates = pgTable('ledger_updates', {
   index('ledger_user_time_idx').on(t.userId, t.time),
 ]);
 
+// ── Liquidation events ───────────────────────────────────────────────────
+// One row per liquidation close (full or partial 20 %/80 % slice).
+// Mirrors the LiquidationEvent type in types/liquidation.ts.
+export const liquidationEvents = pgTable('liquidation_events', {
+  id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+  userId: text('user_id').notNull().references(() => users.userId),
+  asset: integer('asset').notNull(),
+  coin: text('coin').notNull(),
+  szi: text('szi').notNull(),
+  markPx: text('mark_px').notNull(),
+  entryPx: text('entry_px').notNull(),
+  leverage: integer('leverage').notNull(),
+  marginType: text('margin_type').notNull(),      // 'cross' | 'isolated'
+  amountRecovered: text('amount_recovered').notNull(),
+  marginLost: text('margin_lost').notNull(),
+  liquidationType: text('liquidation_type').notNull(), // 'full' | 'partial'
+  time: bigint('time', { mode: 'number' }).notNull(),
+  hash: text('hash').notNull(),
+}, (t) => [
+  index('liq_events_user_time_idx').on(t.userId, t.time),
+  index('liq_events_coin_idx').on(t.coin),
+]);
+
+// ── Liquidator vault ─────────────────────────────────────────────────────
+// Single-row table (id always = 1) tracking vault proceeds.
+// Seeded on first startup via INSERT ... ON CONFLICT DO NOTHING.
+export const liquidatorVault = pgTable('liquidator_vault', {
+  id: integer('id').primaryKey(),           // always 1
+  vaultAddress: text('vault_address').notNull(),
+  totalCollected: text('total_collected').notNull().default('0'),
+  lastUpdated: bigint('last_updated', { mode: 'number' }).notNull().default(0),
+});
+
 export const fills = pgTable('fills', {
   tid: integer('tid').primaryKey(),
   userId: text('user_id').notNull().references(() => users.userId),

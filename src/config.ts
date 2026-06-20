@@ -49,6 +49,12 @@ const envSchema = z.object({
   // Chain id reported by eth_chainId. 999 matches HyperEVM mainnet
   // so wallet typed-data signatures are interchangeable across modes.
   EVM_CHAIN_ID: z.coerce.number().default(999),
+  // ── Liquidation engine ───────────────────────────────────────
+  // Vault address/key generated once via scripts/generate-liquidator-vault.ts.
+  // Paper-mode only — this never touches real funds, it's just an identity
+  // label for the vault's Redis/Postgres accounting (engine/liquidator-vault.ts).
+  LIQUIDATOR_VAULT_ADDRESS: z.string().default(''),
+  LIQUIDATOR_VAULT_PRIVATE_KEY: z.string().default(''),
 });
 
 export const config = envSchema.parse(process.env);
