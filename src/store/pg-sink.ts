@@ -1,5 +1,5 @@
 import type { EventEmitter } from 'node:events';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { id as keccakId } from 'ethers';
 import { db } from './db.js';
 import { users, orders, fills, consentRecords, funding, ledgerUpdates } from './schema.js';
@@ -39,16 +39,14 @@ async function syncSeqCountersToPgMax(): Promise<void> {
   // calls connectRedis().
   const { redis } = await import('./redis.js');
   const { KEYS } = await import('./keys.js');
-  const [maxFillRow] = await db.execute<{ max: number | null }>(
-    // drizzle's typed select on fills works but the bare SQL is
-    // shorter for a max(...) read and avoids re-importing the table.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    { sql: 'SELECT COALESCE(MAX(tid), 0) AS max FROM fills', params: [] } as any,
-  ).catch(() => [{ max: 0 }]);
-  const [maxOrderRow] = await db.execute<{ max: number | null }>(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    { sql: 'SELECT COALESCE(MAX(oid), 0) AS max FROM orders', params: [] } as any,
-  ).catch(() => [{ max: 0 }]);
+  // db.execute needs a drizzle `sql` tagged query (it calls query.getSQL());
+  // a plain { sql, params } object throws "query.getSQL is not a function".
+  const [maxFillRow] = await db
+    .execute<{ max: number | null }>(sql`SELECT COALESCE(MAX(tid), 0) AS max FROM fills`)
+    .catch(() => [{ max: 0 }]);
+  const [maxOrderRow] = await db
+    .execute<{ max: number | null }>(sql`SELECT COALESCE(MAX(oid), 0) AS max FROM orders`)
+    .catch(() => [{ max: 0 }]);
   const pgMaxTid = Number(maxFillRow?.max ?? 0);
   const pgMaxOid = Number(maxOrderRow?.max ?? 0);
   const safeTid = pgMaxTid + 1000;

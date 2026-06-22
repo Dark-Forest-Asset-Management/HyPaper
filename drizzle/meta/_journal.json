@@ -29,6 +29,13 @@
       "when": 1778515431894,
       "tag": "0003_yummy_professor_monster",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1782130821418,
+      "tag": "0004_solid_gabe_jones",
+      "breakpoints": true
     }
   ]
 }
