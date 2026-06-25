@@ -23,9 +23,19 @@ interface ClientState {
   ws: WebSocket;
   subscriptions: Set<string>;
   isAlive: boolean;
+  /** Consecutive heartbeat cycles with no pong. Reset on pong receipt.
+   *  Terminate only after MAX_MISSED_HEARTBEATS in a row — gives event-loop
+   *  blockage (heavy fill batches, GC pause, big REST response) tolerance. */
+  missedHeartbeats: number;
 }
 
 const HEARTBEAT_INTERVAL = 30_000;
+/** Tolerate 3 missed cycles (~90s) before declaring the client dead. Hard-
+ *  observed 2026-06-24: long-lived hl-strat clients were silently dropped
+ *  from `subscriptionIndex` because a 30s window was too tight under heavy
+ *  fill activity. Result: ghost positions accumulated because the strategy
+ *  never received the broadcast for its own fills. */
+const MAX_MISSED_HEARTBEATS = 3;
 
 export class HyPaperWsServer {
   private wss: WebSocketServer;
@@ -72,11 +82,13 @@ export class HyPaperWsServer {
       ws,
       subscriptions: new Set(),
       isAlive: true,
+      missedHeartbeats: 0,
     };
     this.clients.set(ws, state);
 
     ws.on('pong', () => {
       state.isAlive = true;
+      state.missedHeartbeats = 0;
     });
 
     ws.on('message', (raw: Buffer) => {
@@ -572,8 +584,18 @@ export class HyPaperWsServer {
     this.heartbeatTimer = setInterval(() => {
       for (const [ws, state] of this.clients) {
         if (!state.isAlive) {
-          ws.terminate();
-          this.handleDisconnect(state);
+          state.missedHeartbeats += 1;
+          if (state.missedHeartbeats >= MAX_MISSED_HEARTBEATS) {
+            logger.warn(
+              { missed: state.missedHeartbeats, subs: state.subscriptions.size },
+              'heartbeat timeout — terminating client (was missing pongs)',
+            );
+            ws.terminate();
+            this.handleDisconnect(state);
+            continue;
+          }
+          // Don't ping again — wait for the prior ping's pong to arrive.
+          // Just bump the counter and try again next cycle.
           continue;
         }
         state.isAlive = false;
