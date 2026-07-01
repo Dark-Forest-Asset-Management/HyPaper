@@ -7,6 +7,7 @@ import { checkMarginForOrder } from "./margin.js";
 import { OrderMatcher } from "../worker/order-matcher.js";
 import { computeFillPrice } from "../utils/slippage.js";
 import { eventBus } from "../worker/index.js";
+import { recordTwapActivated, recordTwapHistory } from "../store/pg-sink.js";
 import type {
   HlOrderWire,
   HlCancelRequest,
@@ -118,7 +119,10 @@ export async function placeOrders(
   // every order in the batch) — not per-`HlOrderWire`. Threaded via opts so
   // every order in the batch sees the same builder; executeFill applies the
   // bundled exchange+builder fee on the taker side per HL behavior.
-  opts?: { expiresAfter?: number; builder?: { b: string; f: number } },
+  // `twapId` is set only by OrderMatcher.matchTwaps() for the synthetic IOC
+  // suborder it submits per slice, so the resulting fill carries it
+  // (→ /info userTwapSliceFills). Absent for every regular order placement.
+  opts?: { expiresAfter?: number; builder?: { b: string; f: number }; twapId?: string },
 ): Promise<HlOrderResponseStatus[]> {
   const results: HlOrderResponseStatus[] = [];
   const placedOids: number[] = [];
@@ -193,7 +197,7 @@ export async function placeSingleOrder(
   userId: string,
   wire: HlOrderWire,
   grouping: string,
-  opts?: { expiresAfter?: number; builder?: { b: string; f: number } },
+  opts?: { expiresAfter?: number; builder?: { b: string; f: number }; twapId?: string },
 ): Promise<HlOrderResponseStatus> {
   const coin = await resolveAssetCoin(wire.a);
   if (!coin) return { error: `Unknown asset ${wire.a}` };
@@ -280,6 +284,7 @@ export async function placeSingleOrder(
       wire.c,
       now,
       opts?.builder,
+      opts?.twapId,
     );
 
     await saveOrder(order, opts?.expiresAfter);
@@ -488,6 +493,7 @@ function buildOrder(
   cloid: string | undefined,
   now: number,
   builder?: { b: string; f: number },
+  twapId?: string,
 ): PaperOrder {
   return {
     oid,
@@ -508,6 +514,7 @@ function buildOrder(
     createdAt: now,
     updatedAt: now,
     ...(builder ? { builder } : {}),
+    ...(twapId ? { twapId } : {}),
   };
 }
 
@@ -947,6 +954,22 @@ export async function createTwapOrder(
   await redis.sadd(KEYS.TWAPS_ACTIVE, twapId.toString());
   await redis.zadd(KEYS.USER_TWAPS(userId), Date.now(), twapId.toString());
 
+  // Write the 'activated' twapHistory row immediately (→ /info twapHistory).
+  // The paired 'terminated' row is written by OrderMatcher.matchTwaps on
+  // natural completion or by cancelTwapOrder on user cancellation.
+  recordTwapActivated({
+    twapId,
+    userId,
+    asset,
+    coin,
+    isBuy,
+    reduceOnly,
+    totalSize: totalSz,
+    minutes,
+    startTime: now,
+    endTime: now + minutes * 60_000,
+  });
+
   return { twapId };
 }
 
@@ -963,10 +986,37 @@ export async function cancelTwapOrder(
   if (twapData.status !== "running")
     return { error: `TWAP ${twapId} is not running` };
 
-  // Setting status to 'cancelled' in Redis is picked up by the setInterval
-  // callback on its next tick, which then calls clearInterval on itself.
+  const now = Date.now();
+
+  // Setting status to 'cancelled' in Redis is picked up by
+  // OrderMatcher.matchTwaps on its next tick (price tick, or at worst the
+  // 5s HTTP mid-trueup fallback in worker/index.ts) — that's a defensive
+  // backstop only, since we already remove the twapId from TWAPS_ACTIVE
+  // below, so the next tick's `smembers` scan won't see this TWAP at all
+  // in the normal case.
   await redis.hset(KEYS.TWAP(twapId), "status", "cancelled");
   await redis.srem(KEYS.TWAPS_ACTIVE, twapId.toString());
+
+  // Persist the run to twapHistory (→ /info twapHistory) so a cancelled
+  // TWAP shows up there the same way a naturally-finished one does (which
+  // OrderMatcher.matchTwaps records itself). onConflictDoNothing on twapId
+  // means this is safe even if matchTwaps' defensive branch also fires for
+  // this same TWAP on a race.
+  recordTwapHistory({
+    twapId,
+    userId,
+    asset: parseInt(twapData.asset, 10),
+    coin: twapData.coin,
+    isBuy: twapData.isBuy === "true",
+    reduceOnly: twapData.reduceOnly === "true",
+    totalSize: twapData.totalSize,
+    executedSize: twapData.filledSize || "0",
+    minutes: parseInt(twapData.minutes, 10),
+    status: "cancelled",
+    startTime: parseInt(twapData.startTime, 10),
+    endTime: parseInt(twapData.endTime, 10),
+    finishedAt: now,
+  });
 
   return { ok: true };
 }

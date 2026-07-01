@@ -1,6 +1,6 @@
-import { desc, asc, eq, and, gte, lte, sql } from 'drizzle-orm';
+import { desc, asc, eq, and, gte, lte, sql, isNotNull } from 'drizzle-orm';
 import { db } from './db.js';
-import { fills, orders, funding, ledgerUpdates, liquidationEvents, liquidatorVault } from './schema.js';
+import { fills, orders, funding, ledgerUpdates, liquidationEvents, liquidatorVault, twapHistory } from './schema.js';
 import type { PaperFill } from '../types/order.js';
 import type { LiquidationEvent } from '../types/liquidation.js';
 import { hlTriggerConditionString, hlOrderTypeString } from '../engine/position.js';
@@ -112,6 +112,95 @@ export async function getUserFillsByTimePg(
     .orderBy(desc(fills.time));
 
   return rows.map(rowToFill);
+}
+
+/** /info userTwapSliceFills — `[{ fill: <userFills-shaped fill>, twapId }]`,
+ *  most recent first. Confirmed against HL prod capture (capture 28): the
+ *  wrapper carries the real twapId, but the inner fill object ALWAYS has
+ *  `twapId: null` — HL never propagates the id into the nested fill.
+ *  Capped at 2000 to match HL's documented "at most 2000 most recent" limit. */
+export async function getUserTwapSliceFillsPg(
+  userId: string,
+  limit = 2000,
+): Promise<Array<{ fill: PaperFill; twapId: number }>> {
+  const rows = await db
+    .select()
+    .from(fills)
+    .where(and(eq(fills.userId, userId), isNotNull(fills.twapId)))
+    .orderBy(desc(fills.time))
+    .limit(limit);
+
+  // Force inner fill.twapId to null regardless of the DB value — the wrapper
+  // object is where the real id lives. Verified against capture 28: every
+  // entry has fill.twapId = null and the outer twapId = the real value.
+  return rows.map((r) => ({ fill: { ...rowToFill(r), twapId: null }, twapId: r.twapId as number }));
+}
+
+/** /info twapHistory — two entries per TWAP (one 'activated' at placement,
+ *  one 'terminated' at completion/cancellation), most recent first.
+ *  Wire shape confirmed against prod capture (capture 29):
+ *
+ *  {
+ *    time: <seconds>,                 ← eventAt / 1000 (integer seconds)
+ *    state: {
+ *      coin, user, side, sz,
+ *      executedSz, executedNtl,
+ *      minutes, reduceOnly, randomize,
+ *      timestamp,                     ← placementTimestamp (ms, NOT seconds)
+ *    },
+ *    status: { status: 'activated' | 'terminated' },
+ *    twapId,
+ *  }
+ *
+ *  Note: HL's `time` (outer) is in SECONDS while `state.timestamp` is in
+ *  MILLISECONDS — both confirmed by comparing numeric magnitude against
+ *  the capture values. */
+export async function getTwapHistoryPg(
+  userId: string,
+  limit = 2000,
+): Promise<Array<{
+  time: number;
+  state: {
+    coin: string;
+    user: string;
+    side: 'B' | 'A';
+    sz: string;
+    executedSz: string;
+    executedNtl: string;
+    minutes: number;
+    reduceOnly: boolean;
+    randomize: boolean;
+    timestamp: number;
+  };
+  status: { status: string };
+  twapId: number;
+}>> {
+  const rows = await db
+    .select()
+    .from(twapHistory)
+    .where(eq(twapHistory.userId, userId))
+    .orderBy(desc(twapHistory.eventAt))
+    .limit(limit);
+
+  return rows.map((r) => ({
+    // HL outer `time` is in seconds (integer division, not rounded).
+    time: Math.floor(r.eventAt / 1000),
+    state: {
+      coin: r.coin,
+      user: r.userId,
+      side: (r.isBuy ? 'B' : 'A') as 'B' | 'A',
+      sz: r.totalSize,
+      executedSz: r.executedSize,
+      executedNtl: r.executedNtl,
+      minutes: r.minutes,
+      reduceOnly: r.reduceOnly,
+      randomize: r.randomize,
+      // state.timestamp is in milliseconds (confirmed by magnitude vs time).
+      timestamp: r.placementTimestamp,
+    },
+    status: { status: r.state },
+    twapId: r.twapId,
+  }));
 }
 
 /** /info userFunding — `{ time, hash, delta: { type, coin, usdc, szi, fundingRate, nSamples } }`,
@@ -266,8 +355,13 @@ function rowToFill(row: typeof fills.$inferSelect): PaperFill {
     tid: row.tid,
     cloid: row.cloid ?? undefined,
     feeToken: row.feeToken,
-    // HL prod always emits twapId (null for non-TWAP fills, which is
-    // every paper fill since HyPaper has no TWAP path).
+    // HL always emits `twapId: null` inside the fill object on every endpoint
+    // (userFills, userFillsByTime, userTwapSliceFills) — confirmed from
+    // capture 28 where all six entries have fill.twapId = null regardless of
+    // whether the fill was part of a TWAP. The real id is only exposed at
+    // the wrapper level in userTwapSliceFills ({ fill, twapId }). Hardcoding
+    // null here means getUserFillsPg and getUserFillsByTimePg are also correct
+    // without any per-callsite override.
     twapId: null,
   };
 }

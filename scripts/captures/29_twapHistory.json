@@ -1,0 +1,198 @@
+{
+  "request": {
+    "type": "twapHistory",
+    "user": "0x4A1AE5A6cFB24390a704b1cc1aB88d0F89eF596B"
+  },
+  "response": [
+    {
+      "time": 1782836856,
+      "state": {
+        "coin": "BTC",
+        "user": "0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b",
+        "side": "B",
+        "sz": "0.00258",
+        "executedSz": "0.00046",
+        "executedNtl": "26.83433",
+        "minutes": 5,
+        "reduceOnly": false,
+        "randomize": false,
+        "timestamp": 1782836814500
+      },
+      "status": {
+        "status": "terminated"
+      },
+      "twapId": 16179
+    },
+    {
+      "time": 1782836814,
+      "state": {
+        "coin": "BTC",
+        "user": "0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b",
+        "side": "B",
+        "sz": "0.00258",
+        "executedSz": "0.0",
+        "executedNtl": "0.0",
+        "minutes": 5,
+        "reduceOnly": false,
+        "randomize": false,
+        "timestamp": 1782836814500
+      },
+      "status": {
+        "status": "activated"
+      },
+      "twapId": 16179
+    },
+    {
+      "time": 1779044359,
+      "state": {
+        "coin": "BTC",
+        "user": "0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b",
+        "side": "B",
+        "sz": "0.00192",
+        "executedSz": "0.00017",
+        "executedNtl": "13.3467",
+        "minutes": 5,
+        "reduceOnly": false,
+        "randomize": false,
+        "timestamp": 1779044357073
+      },
+      "status": {
+        "status": "terminated"
+      },
+      "twapId": 15503
+    },
+    {
+      "time": 1779044357,
+      "state": {
+        "coin": "BTC",
+        "user": "0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b",
+        "side": "B",
+        "sz": "0.00192",
+        "executedSz": "0.0",
+        "executedNtl": "0.0",
+        "minutes": 5,
+        "reduceOnly": false,
+        "randomize": false,
+        "timestamp": 1779044357073
+      },
+      "status": {
+        "status": "activated"
+      },
+      "twapId": 15503
+    },
+    {
+      "time": 1779044156,
+      "state": {
+        "coin": "BTC",
+        "user": "0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b",
+        "side": "B",
+        "sz": "0.00192",
+        "executedSz": "0.00017",
+        "executedNtl": "13.33973",
+        "minutes": 5,
+        "reduceOnly": false,
+        "randomize": false,
+        "timestamp": 1779044154611
+      },
+      "status": {
+        "status": "terminated"
+      },
+      "twapId": 15502
+    },
+    {
+      "time": 1779044154,
+      "state": {
+        "coin": "BTC",
+        "user": "0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b",
+        "side": "B",
+        "sz": "0.00192",
+        "executedSz": "0.0",
+        "executedNtl": "0.0",
+        "minutes": 5,
+        "reduceOnly": false,
+        "randomize": false,
+        "timestamp": 1779044154611
+      },
+      "status": {
+        "status": "activated"
+      },
+      "twapId": 15502
+    },
+    {
+      "time": 1779043908,
+      "state": {
+        "coin": "BTC",
+        "user": "0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b",
+        "side": "B",
+        "sz": "0.00192",
+        "executedSz": "0.00017",
+        "executedNtl": "13.33021",
+        "minutes": 5,
+        "reduceOnly": false,
+        "randomize": false,
+        "timestamp": 1779043907005
+      },
+      "status": {
+        "status": "terminated"
+      },
+      "twapId": 15501
+    },
+    {
+      "time": 1779043907,
+      "state": {
+        "coin": "BTC",
+        "user": "0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b",
+        "side": "B",
+        "sz": "0.00192",
+        "executedSz": "0.0",
+        "executedNtl": "0.0",
+        "minutes": 5,
+        "reduceOnly": false,
+        "randomize": false,
+        "timestamp": 1779043907005
+      },
+      "status": {
+        "status": "activated"
+      },
+      "twapId": 15501
+    },
+    {
+      "time": 1779043509,
+      "state": {
+        "coin": "SOL",
+        "user": "0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b",
+        "side": "B",
+        "sz": "1.16",
+        "executedSz": "0.13",
+        "executedNtl": "11.24916",
+        "minutes": 5,
+        "reduceOnly": false,
+        "randomize": false,
+        "timestamp": 1779043505867
+      },
+      "status": {
+        "status": "terminated"
+      },
+      "twapId": 15500
+    },
+    {
+      "time": 1779043505,
+      "state": {
+        "coin": "SOL",
+        "user": "0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b",
+        "side": "B",
+        "sz": "1.16",
+        "executedSz": "0.0",
+        "executedNtl": "0.0",
+        "minutes": 5,
+        "reduceOnly": false,
+        "randomize": false,
+        "timestamp": 1779043505867
+      },
+      "status": {
+        "status": "activated"
+      },
+      "twapId": 15500
+    }
+  ]
+}

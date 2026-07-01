@@ -1,4 +1,4 @@
-import { pgTable, text, integer, bigint, boolean, index, primaryKey } from 'drizzle-orm/pg-core';
+import { pgTable, text, integer, bigint, boolean, index, primaryKey, uniqueIndex } from 'drizzle-orm/pg-core';
 
 // ---------- Enums as text (matching TS union types) ----------
 
@@ -194,7 +194,63 @@ export const fills = pgTable('fills', {
   fee: text('fee').notNull(),
   cloid: text('cloid'),
   feeToken: text('fee_token').notNull(),
+  // TWAP slice fills carry the parent TWAP's id (→ /info
+  // userTwapSliceFills, which is just this same fills table filtered to
+  // twap_id IS NOT NULL — see getUserTwapSliceFillsPg). Null for every
+  // regular, non-TWAP fill.
+  twapId: integer('twap_id'),
 }, (table) => [
   index('fills_user_id_time_idx').on(table.userId, table.time),
   index('fills_oid_idx').on(table.oid),
+  index('fills_twap_id_idx').on(table.twapId),
+]);
+
+// ── TWAP run history ─────────────────────────────────────────────────────
+// TWO rows per TWAP (→ /info twapHistory), matching real HL's captured wire
+// shape: one 'activated' row written at placement (createTwapOrder), one
+// 'terminated' row written at completion/cancellation (OrderMatcher.matchTwaps
+// or cancelTwapOrder). Confirmed against a prod capture — entries always come
+// in (activated, terminated) pairs sharing one twapId, each wrapping a nested
+// `state` + `status` object (see getTwapHistoryPg in pg-queries.ts for the
+// exact wire serialization). Unique on (twapId, state) so each half of the
+// pair can only be written once — the two writers race safely via
+// onConflictDoNothing, same pattern as the old single-row design.
+export const twapHistory = pgTable('twap_history', {
+  id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+  twapId: integer('twap_id').notNull(),
+  userId: text('user_id').notNull().references(() => users.userId),
+  asset: integer('asset').notNull(),
+  coin: text('coin').notNull(),
+  isBuy: boolean('is_buy').notNull(),
+  reduceOnly: boolean('reduce_only').notNull(),
+  totalSize: text('total_size').notNull(),
+  executedSize: text('executed_size').notNull(),
+  // Executed notional (sum of px×sz over this TWAP's slice fills), distinct
+  // from executedSize. Always '0.0' on the 'activated' row since nothing has
+  // executed yet; computed from the fills table at finalize time for
+  // 'terminated' — see recordTwapHistory in pg-sink.ts.
+  executedNtl: text('executed_ntl').notNull(),
+  minutes: integer('minutes').notNull(),
+  // HyPaper has no randomized-TWAP option; always false. Stored as a real
+  // column (not hardcoded at serialization) so it's trivial to wire up if
+  // that ever changes.
+  randomize: boolean('randomize').notNull().default(false),
+  // HL wire status string for *this row*: 'activated' | 'terminated'.
+  // Distinct from `terminalReason` below, which is HyPaper's own internal
+  // bookkeeping and never appears in the wire response.
+  state: text('state').notNull(),
+  // Only set (non-null) on 'terminated' rows: 'finished' | 'cancelled'.
+  // Not part of the HL wire shape — kept for internal debugging/analytics.
+  terminalReason: text('terminal_reason'),
+  // ms timestamp of THIS event (placement time for 'activated', completion/
+  // cancellation time for 'terminated'). Serialized as wire `time` (seconds).
+  eventAt: bigint('event_at', { mode: 'number' }).notNull(),
+  // ms timestamp of the TWAP's original placement. Identical across both
+  // rows of the same twapId. Serialized as wire `state.timestamp`.
+  placementTimestamp: bigint('placement_timestamp', { mode: 'number' }).notNull(),
+  startTime: bigint('start_time', { mode: 'number' }).notNull(),
+  endTime: bigint('end_time', { mode: 'number' }).notNull(),
+}, (t) => [
+  index('twap_history_user_id_idx').on(t.userId, t.eventAt),
+  uniqueIndex('twap_history_twap_id_state_idx').on(t.twapId, t.state),
 ]);
