@@ -4,7 +4,13 @@ import { KEYS } from '../../store/keys.js';
 import { config } from '../../config.js';
 import { getClearinghouseState, getOpenOrders, getFrontendOpenOrders, getOrderStatus } from '../../engine/position.js';
 import { getUserFills, getUserFillsByTime } from '../../engine/fill.js';
-import { getHistoricalOrdersPg, getUserFundingPg, getLedgerUpdatesPg } from '../../store/pg-queries.js';
+import {
+  getHistoricalOrdersPg,
+  getUserFundingPg,
+  getLedgerUpdatesPg,
+  getUserTwapSliceFillsPg,
+  getTwapHistoryPg,
+} from '../../store/pg-queries.js';
 import { getPortfolio, getUserFees, getUserRateLimit, getActiveAssetData } from '../../engine/account.js';
 import { logger } from '../../utils/logger.js';
 import { ensureAccount } from '../middleware/auth.js';
@@ -92,8 +98,7 @@ const PROXY_ANYWAY_USER_TYPES = new Set<string>([
 // implemented yet. Until then they fail safe to a typed empty so the paper
 // account is never polluted with real on-chain history. Object-shaped
 // responses are listed here; everything else defaults to an empty array
-// (most HL user history endpoints are arrays). Phase 3 will add
-// userTwapSliceFills / twapHistory handlers and drop them from the fail-safe.
+// (most HL user history endpoints are arrays).
 const USER_EMPTY_OBJECT_TYPES = new Set<string>([]);
 
 function userEmptyFor(type: string): unknown {
@@ -215,8 +220,14 @@ infoRouter.post('/', async (c) => {
 
       case 'historicalOrders': {
         if (!user) return c.json({ error: 'Missing user' }, 400);
+        // body.dex filters to the dex's coin-prefix ("xyz:") rows. Native
+        // (no dex) returns rows whose coin does NOT contain ':'.
+        const dex = typeof body.dex === 'string' ? body.dex : '';
         const rows = await getHistoricalOrdersPg(user, body.limit ?? 200);
-        return c.json(rows);
+        const filtered = !dex
+          ? rows.filter((r) => !r.order.coin.includes(':'))
+          : rows.filter((r) => r.order.coin.startsWith(`${dex}:`));
+        return c.json(filtered);
       }
 
       // ── Fills ────────────────────────────────────────────────────────────
@@ -240,19 +251,31 @@ infoRouter.post('/', async (c) => {
         return c.json(fills);
       }
 
-      // ── Orders history / portfolio / user state ──────────────────
-
-      case 'historicalOrders': {
+      // ── TWAP slice fills ─────────────────────────────────────────────────
+      // Returns fills that were part of a TWAP suborder — same shape as
+      // userFills entries, wrapped in `{ fill, twapId }` per HL wire format.
+      // Backed by the fills.twap_id column written by matchTwaps via
+      // placeOrders(opts.twapId). Capped at 2000 (HL documented limit).
+      case 'userTwapSliceFills': {
         if (!user) return c.json({ error: 'Missing user' }, 400);
-        // body.dex filters to the dex's coin-prefix ("xyz:") rows. Native
-        // (no dex) returns rows whose coin does NOT contain ':'.
-        const dex = typeof body.dex === 'string' ? body.dex : '';
-        const rows = await getHistoricalOrdersPg(user, body.limit ?? 200);
-        const filtered = !dex
-          ? rows.filter((r) => !r.order.coin.includes(':'))
-          : rows.filter((r) => r.order.coin.startsWith(`${dex}:`));
-        return c.json(filtered);
+        const rows = await getUserTwapSliceFillsPg(user, body.limit ?? 2000);
+        return c.json(rows);
       }
+
+      // ── TWAP run history ─────────────────────────────────────────────────
+      // One entry per finished or cancelled TWAP — written by
+      // matchTwaps (natural completion) or cancelTwapOrder (user cancel).
+      // NOTE: exact HL wire field names for this endpoint are not confirmed
+      // against a prod capture (no twapHistory entry in scripts/captures/).
+      // Field names here mirror what HyPaper tracks; flag for re-verification
+      // if slushy ever queries this endpoint and sees a shape mismatch.
+      case 'twapHistory': {
+        if (!user) return c.json({ error: 'Missing user' }, 400);
+        const rows = await getTwapHistoryPg(user, body.limit ?? 2000);
+        return c.json(rows);
+      }
+
+      // ── Orders history / portfolio / user state ──────────────────
 
       case 'userFunding': {
         if (!user) return c.json({ error: 'Missing user' }, 400);

@@ -1,9 +1,10 @@
 import type { EventEmitter } from 'node:events';
-import { eq } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { id as keccakId } from 'ethers';
 import { db } from './db.js';
-import { users, orders, fills, consentRecords, funding, ledgerUpdates } from './schema.js';
+import { users, orders, fills, consentRecords, funding, ledgerUpdates, twapHistory } from './schema.js';
 import { logger } from '../utils/logger.js';
+import { D, mul } from '../utils/math.js';
 import type { PaperOrder, PaperFill } from '../types/order.js';
 
 // HL emits an all-zero hash for funding rows.
@@ -40,15 +41,11 @@ async function syncSeqCountersToPgMax(): Promise<void> {
   const { redis } = await import('./redis.js');
   const { KEYS } = await import('./keys.js');
   const [maxFillRow] = await db.execute<{ max: number | null }>(
-    // drizzle's typed select on fills works but the bare SQL is
-    // shorter for a max(...) read and avoids re-importing the table.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    { sql: 'SELECT COALESCE(MAX(tid), 0) AS max FROM fills', params: [] } as any,
-  ).catch(() => [{ max: 0 }]);
-  const [maxOrderRow] = await db.execute<{ max: number | null }>(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    { sql: 'SELECT COALESCE(MAX(oid), 0) AS max FROM orders', params: [] } as any,
-  ).catch(() => [{ max: 0 }]);
+  sql`SELECT COALESCE(MAX(tid), 0) AS max FROM fills`,
+).catch(() => [{ max: 0 }]);
+const [maxOrderRow] = await db.execute<{ max: number | null }>(
+  sql`SELECT COALESCE(MAX(oid), 0) AS max FROM orders`,
+).catch(() => [{ max: 0 }]);
   const pgMaxTid = Number(maxFillRow?.max ?? 0);
   const pgMaxOid = Number(maxOrderRow?.max ?? 0);
   const safeTid = pgMaxTid + 1000;
@@ -90,6 +87,9 @@ export function startPgSink(eventBus: EventEmitter): void {
           fee: event.fill.fee,
           cloid: event.fill.cloid ?? null,
           feeToken: event.fill.feeToken,
+          // event.fill.twapId is the string form (PaperFill type); store
+          // the numeric Redis-generated id, or null for non-TWAP fills.
+          twapId: event.fill.twapId ? parseInt(event.fill.twapId, 10) : null,
         })
         .onConflictDoNothing({ target: fills.tid });
     });
@@ -166,6 +166,112 @@ export function recordLedgerUpdate(userId: string, r: {
   });
   // WS userNonFundingLedgerUpdates streams the /info-shaped element.
   bus?.emit('ledger', { userId, update: { time: r.time, hash, delta: { type: r.deltaType, usdc: r.usdc } } });
+}
+
+/** Persist the 'activated' twapHistory row (→ /info twapHistory) at TWAP
+ *  placement. Called once from createTwapOrder (engine/order.ts). Paired
+ *  with the 'terminated' row recordTwapHistory writes on completion/
+ *  cancellation — together they reproduce HL's captured two-row-per-TWAP
+ *  shape. executedSize/executedNtl are always zero here since nothing has
+ *  run yet. onConflictDoNothing on (twapId, state) makes a duplicate call
+ *  (e.g. a retry) a safe no-op rather than a second row. */
+export function recordTwapActivated(record: {
+  twapId: number;
+  userId: string;
+  asset: number;
+  coin: string;
+  isBuy: boolean;
+  reduceOnly: boolean;
+  totalSize: string;
+  minutes: number;
+  startTime: number;
+  endTime: number;
+}): void {
+  enqueueWrite(async () => {
+    await db.insert(twapHistory)
+      .values({
+        twapId: record.twapId,
+        userId: record.userId,
+        asset: record.asset,
+        coin: record.coin,
+        isBuy: record.isBuy,
+        reduceOnly: record.reduceOnly,
+        totalSize: record.totalSize,
+        executedSize: '0.0',
+        executedNtl: '0.0',
+        minutes: record.minutes,
+        randomize: false,
+        state: 'activated',
+        terminalReason: null,
+        eventAt: record.startTime,
+        placementTimestamp: record.startTime,
+        startTime: record.startTime,
+        endTime: record.endTime,
+      })
+      .onConflictDoNothing({ target: [twapHistory.twapId, twapHistory.state] });
+  });
+}
+
+/** Persist the 'terminated' twapHistory row (→ /info twapHistory) for a TWAP
+ *  that just finished or got cancelled. Called once per TWAP — either by
+ *  OrderMatcher.matchTwaps on natural completion (now >= endTime) or by
+ *  cancelTwapOrder on user cancellation. Whichever path runs first wins;
+ *  onConflictDoNothing on (twapId, state) makes the other path's call a
+ *  safe no-op rather than a duplicate row.
+ *
+ *  executedNtl is NOT a running total carried from the caller — it's
+ *  recomputed here as sum(px×sz) over this TWAP's slice fills (fills.twap_id
+ *  = twapId), matching how HL prod reports it (verified against the
+ *  twapHistory capture: TWAP 16179's executedNtl of 26.83433 is exactly the
+ *  sum of its two slice fills' notional). */
+export function recordTwapHistory(record: {
+  twapId: number;
+  userId: string;
+  asset: number;
+  coin: string;
+  isBuy: boolean;
+  reduceOnly: boolean;
+  totalSize: string;
+  executedSize: string;
+  minutes: number;
+  status: 'finished' | 'cancelled';
+  startTime: number;
+  endTime: number;
+  finishedAt: number;
+}): void {
+  enqueueWrite(async () => {
+    const sliceFills = await db
+      .select({ px: fills.px, sz: fills.sz })
+      .from(fills)
+      .where(and(eq(fills.userId, record.userId), eq(fills.twapId, record.twapId)));
+
+    let executedNtl = D('0');
+    for (const f of sliceFills) {
+      executedNtl = executedNtl.plus(D(mul(f.px, f.sz)));
+    }
+
+    await db.insert(twapHistory)
+      .values({
+        twapId: record.twapId,
+        userId: record.userId,
+        asset: record.asset,
+        coin: record.coin,
+        isBuy: record.isBuy,
+        reduceOnly: record.reduceOnly,
+        totalSize: record.totalSize,
+        executedSize: record.executedSize,
+        executedNtl: executedNtl.toString(),
+        minutes: record.minutes,
+        randomize: false,
+        state: 'terminated',
+        terminalReason: record.status,
+        eventAt: record.finishedAt,
+        placementTimestamp: record.startTime,
+        startTime: record.startTime,
+        endTime: record.endTime,
+      })
+      .onConflictDoNothing({ target: [twapHistory.twapId, twapHistory.state] });
+  });
 }
 
 export function upsertUser(userId: string, balance: string): void {

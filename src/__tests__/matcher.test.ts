@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { RedisMock } from './helpers/redis-mock.js';
 import { KEYS } from '../store/keys.js';
-
+import { getL2Book } from '../utils/l2-cache.js';
 // --- Mock redis before importing OrderMatcher ---
 const redisMock = new RedisMock();
 
@@ -31,7 +31,19 @@ vi.mock('../utils/id.js', () => ({
   nextOid: vi.fn(async () => ++tidCounter),
   nextTid: vi.fn(async () => ++tidCounter),
 }));
-
+// Mock the live worker eventBus singleton with a fresh EventEmitter we
+// control. engine/order.ts statically imports `eventBus` from this module
+// and uses it (via its own internal OrderMatcher instance) to emit fills
+// for every order placed through placeOrders/placeSingleOrder — including
+// every TWAP slice (matchTwaps dynamically imports engine/order.js and
+// calls placeOrders). Without this mock, that import pulls in the REAL
+// worker/index.js, whose eventBus is a different EventEmitter instance
+// from this test's own — so TWAP-slice fills emit on an emitter nothing
+// here is listening to, and fillEvents stays silently empty.
+const sharedEventBus = new EventEmitter();
+vi.mock('../worker/index.js', () => ({
+  eventBus: sharedEventBus,
+}));
 // Now import after mocks are set up
 const { OrderMatcher } = await import('../worker/order-matcher.js');
 
@@ -45,11 +57,16 @@ describe('OrderMatcher', () => {
   const COIN = 'BTC';
   const ASSET = 0;
 
-  beforeEach(() => {
+beforeEach(() => {
     redisMock.flushall();
     tidCounter = 100;
 
-    eventBus = new EventEmitter();
+    // Reuse the SAME bus engine/order.ts's internal matcher emits on
+    // (mocked above) instead of a fresh, disconnected EventEmitter —
+    // otherwise TWAP-slice fills (routed through engine/order.ts, not
+    // this test's own `matcher`) emit on a bus this test never hears.
+    eventBus = sharedEventBus;
+    eventBus.removeAllListeners();
     matcher = new OrderMatcher(eventBus);
 
     fillEvents = [];
@@ -64,6 +81,19 @@ describe('OrderMatcher', () => {
 
   async function seedMidPrice(coin: string, price: string) {
     await redisMock.hset(KEYS.MARKET_MIDS, coin, price);
+  }
+
+  // matchTwaps routes its synthetic IOC suborder through the REAL
+  // engine/order.ts placeOrders() (see the matchTwaps describe block below),
+  // which calls resolveAssetCoin(wire.a) before anything else. That reads
+  // KEYS.MARKET_META to decode asset index -> coin name; without it every
+  // TWAP slice order is rejected as "Unknown asset" before it ever reaches
+  // the fill/slippage logic, and fillEvents silently stays empty.
+  async function seedMarketMeta() {
+    await redisMock.set(
+      KEYS.MARKET_META,
+      JSON.stringify({ universe: [{ name: COIN, szDecimals: 5 }] }),
+    );
   }
 
   async function createOpenOrder(opts: {
@@ -159,6 +189,54 @@ describe('OrderMatcher', () => {
       'cumFundingSinceChange', '0',
     );
     await redisMock.sadd(KEYS.USER_POSITIONS(USER), ASSET.toString());
+  }
+
+async function createTwap(opts: {
+    twapId: number;
+    isBuy: boolean;
+    totalSize: string;
+    startTime: number;
+    endTime: number;
+    minutes: number;
+    reduceOnly?: boolean;
+    filledSize?: string;
+    lastSubmittedAt?: number;
+    status?: string;
+  }) {
+    const {
+      twapId,
+      isBuy,
+      totalSize,
+      startTime,
+      endTime,
+      minutes,
+      reduceOnly = true,
+      filledSize = '0',
+      lastSubmittedAt,
+      status = 'running',
+    } = opts;
+
+    const fields: string[] = [
+      'twapId', twapId.toString(),
+      'userId', USER,
+      'asset', ASSET.toString(),
+      'coin', COIN,
+      'isBuy', isBuy.toString(),
+      'reduceOnly', reduceOnly.toString(),
+      'totalSize', totalSize,
+      'filledSize', filledSize,
+      'startTime', startTime.toString(),
+      'endTime', endTime.toString(),
+      'minutes', minutes.toString(),
+      'status', status,
+      'createdAt', startTime.toString(),
+    ];
+    if (lastSubmittedAt !== undefined) {
+      fields.push('lastSubmittedAt', lastSubmittedAt.toString());
+    }
+
+    await redisMock.hset(KEYS.TWAP(twapId), ...fields);
+    await redisMock.sadd(KEYS.TWAPS_ACTIVE, twapId.toString());
   }
 
   // =================================================================
@@ -693,4 +771,195 @@ describe('OrderMatcher', () => {
       expect(orderEvents[0].userId).toBe(USER);
     });
   });
+
+  // =================================================================
+  // TWAP Slicing (matchTwaps)
+  // =================================================================
+  // All TWAPs here are reduceOnly closes against a pre-seeded opposing
+  // position. This sidesteps checkMarginForOrder entirely (skipped for
+  // reduceOnly orders) without needing to know margin.ts's internals, while
+  // still exercising the real placeOrders -> placeSingleOrder -> executeFill
+  // path matchTwaps drives in production.
+
+  describe('matchTwaps', () => {
+    beforeEach(async () => {
+      await seedMarketMeta();
+      await seedMidPrice(COIN, '50000');
+      // Short 10 BTC @ 50000 — large enough that every slice in these tests
+      // (≤0.3 BTC) closes a small fraction of it, so the reduceOnly clamp
+      // in executeFill never kicks in and PnL math stays simple.
+      await setPosition('-10', '50000');
+    });
+
+    it('submits a slice sized to the elapsed-time target on the first tick', async () => {
+      const now = Date.now();
+      // 5-minute TWAP (10 slices @ 30s, base slice = 1/10 = 0.1 BTC).
+      // 30s already elapsed, nothing filled yet -> target = 0.1, gap = 0.1,
+      // well under the 3x catchup cap (0.3) -> slice = 0.1, uncapped.
+      await createTwap({
+        twapId: 1,
+        isBuy: true,
+        totalSize: '1',
+        startTime: now - 30_000,
+        endTime: now + 270_000,
+        minutes: 5,
+      });
+
+      await matcher.matchAll();
+
+      expect(fillEvents.length).toBe(1);
+      expect(Number(fillEvents[0].fill.sz)).toBeCloseTo(0.1, 5);
+      // Threaded through from placeOrders' opts.twapId (engine/order.ts) so
+      // the fill is tagged for /info userTwapSliceFills.
+      expect(fillEvents[0].fill.twapId).toBe('1');
+
+      const filledSize = await redisMock.hget(KEYS.TWAP(1), 'filledSize');
+      expect(Number(filledSize)).toBeCloseTo(0.1, 5);
+    });
+
+    it('does not submit a slice before any time has elapsed', async () => {
+      const now = Date.now();
+      await createTwap({
+        twapId: 2,
+        isBuy: true,
+        totalSize: '1',
+        startTime: now,
+        endTime: now + 300_000,
+        minutes: 5,
+      });
+
+      await matcher.matchAll();
+
+      expect(fillEvents.length).toBe(0);
+      expect(await redisMock.hget(KEYS.TWAP(2), 'filledSize')).toBe('0');
+    });
+
+    it('respects the 30s minimum gap between slices even when a fill gap exists', async () => {
+      const now = Date.now();
+      // Plenty of gap to fill (60s elapsed of a 300s run), but the last
+      // slice landed only 10s ago — must wait out the remaining ~20s.
+      await createTwap({
+        twapId: 3,
+        isBuy: true,
+        totalSize: '1',
+        startTime: now - 60_000,
+        endTime: now + 240_000,
+        minutes: 5,
+        lastSubmittedAt: now - 10_000,
+      });
+
+      await matcher.matchAll();
+
+      expect(fillEvents.length).toBe(0);
+    });
+
+    it('caps a catchup slice at 3x the base slice size instead of dumping the whole backlog', async () => {
+      const now = Date.now();
+      // 90% of the 5-minute window has elapsed with zero fills (e.g. a long
+      // price-feed gap) -> naive target gap = 0.9 BTC. Base slice = 0.1, so
+      // the catchup cap should clamp this to 0.3, not 0.9.
+      await createTwap({
+        twapId: 4,
+        isBuy: true,
+        totalSize: '1',
+        startTime: now - 270_000,
+        endTime: now + 30_000,
+        minutes: 5,
+      });
+
+      await matcher.matchAll();
+
+      expect(fillEvents.length).toBe(1);
+      expect(Number(fillEvents[0].fill.sz)).toBeCloseTo(0.3, 5);
+      expect(Number(fillEvents[0].fill.sz)).toBeLessThan(0.9);
+
+      const filledSize = await redisMock.hget(KEYS.TWAP(4), 'filledSize');
+      expect(Number(filledSize)).toBeCloseTo(0.3, 5);
+    });
+
+    it('bounds the suborder to a 3% slippage cap, not the old 5%', async () => {
+      const now = Date.now();
+      // Same 0.1 BTC slice as the first test, but this time give the book
+      // two ask levels: one inside the 3% band (50500, 2% above mid) sized
+      // smaller than the slice, and one outside it (52000, 4% above mid)
+      // that's only reachable under the old buggy 5% cap (mid*1.05=52500).
+      //   - Fixed (3%, limit=51500): walks level 1 (0.05@50500), breaks on
+      //     level 2 (52000 > 51500), prices the remaining 0.05 at the
+      //     clamped worst level (51500) -> VWAP = (0.05*50500 + 0.05*51500)
+      //     / 0.1 = 51000.
+      //   - Old buggy (5%, limit=52500): both levels are within the limit,
+      //     so the full 0.1 fills across both -> VWAP = (0.05*50500 +
+      //     0.05*52000) / 0.1 = 51250.
+      // 51000 != 51250, so this fails loudly if the cap regresses to 5%.
+      vi.mocked(getL2Book).mockResolvedValueOnce({
+        levels: [
+          [],
+          [
+            { px: '50500', sz: '0.05', n: 1 },
+            { px: '52000', sz: '10', n: 1 },
+          ],
+        ],
+      } as any);
+
+      await createTwap({
+        twapId: 5,
+        isBuy: true,
+        totalSize: '1',
+        startTime: now - 30_000,
+        endTime: now + 270_000,
+        minutes: 5,
+      });
+
+      await matcher.matchAll();
+
+      expect(fillEvents.length).toBe(1);
+      expect(Number(fillEvents[0].fill.px)).toBeCloseTo(51000, 1);
+      expect(Number(fillEvents[0].fill.px)).toBeLessThanOrEqual(50000 * 1.03 + 1);
+      // Real HL emits an all-zero hash for TWAP slice fills specifically.
+      expect(fillEvents[0].fill.hash).toBe('0x' + '0'.repeat(64));
+    });
+
+    it('marks the TWAP finished once endTime passes and emits a twapUpdate event', async () => {
+      const now = Date.now();
+      const twapEvents: Array<{ twapId: number; status: string }> = [];
+      eventBus.on('twapUpdate', (e) => twapEvents.push(e));
+
+      await createTwap({
+        twapId: 6,
+        isBuy: true,
+        totalSize: '1',
+        filledSize: '0.5',
+        startTime: now - 310_000,
+        endTime: now - 10_000,
+        minutes: 5,
+      });
+
+      await matcher.matchAll();
+
+      const activeIds = await redisMock.smembers(KEYS.TWAPS_ACTIVE);
+      expect(activeIds).not.toContain('6');
+      expect(await redisMock.hget(KEYS.TWAP(6), 'status')).toBe('finished');
+      expect(twapEvents).toEqual([{ userId: USER, twapId: 6, status: 'finished' }]);
+    });
+
+    it('drops a malformed TWAP record instead of looping on it forever', async () => {
+      const now = Date.now();
+      await createTwap({
+        twapId: 7,
+        isBuy: true,
+        totalSize: 'not-a-number',
+        startTime: now - 30_000,
+        endTime: now + 270_000,
+        minutes: 5,
+      });
+
+      await expect(matcher.matchAll()).resolves.not.toThrow();
+
+      const activeIds = await redisMock.smembers(KEYS.TWAPS_ACTIVE);
+      expect(activeIds).not.toContain('7');
+      expect(await redisMock.hget(KEYS.TWAP(7), 'status')).toBe('finished');
+      expect(fillEvents.length).toBe(0);
+    });
+  });
+
 });

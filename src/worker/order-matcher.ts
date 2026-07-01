@@ -8,6 +8,17 @@ import { nextTid } from '../utils/id.js';
 import { computeFillPrice } from '../utils/slippage.js';
 import type { PaperOrder, PaperFill } from '../types/order.js';
 
+// ── TWAP execution constants (real HL behavior) ──────────────────────────
+// ~30s suborders, max 3% slippage per suborder, catchup suborders capped at
+// 3x the "base" (evenly-spread) suborder size so a price-feed gap or a run
+// of thin-book under-fills doesn't dump the whole backlog into one slice.
+const TWAP_SLICE_INTERVAL_MS = 30_000;
+const TWAP_MAX_SLIPPAGE_PCT = 0.03;
+const TWAP_MAX_CATCHUP_MULTIPLIER = 3;
+// Real HL emits an all-zero hash for TWAP slice fills (paper has no chain
+// either way, but this keeps the synthetic value parity-correct).
+const TWAP_FILL_HASH = '0x' + '0'.repeat(64);
+
 export class OrderMatcher {
   private isRunning = false;
   private eventBus: EventEmitter;
@@ -32,14 +43,16 @@ export class OrderMatcher {
   }
 
   /** Process active TWAPs by submitting an IOC market suborder for the
-   *  amount of progress that's elapsed since the last slice. HL spec is
-   *  ~30s suborders (max 3% slippage, up-to-3× catchup). v1 implements:
-   *    - 30s minimum gap between slices
-   *    - linear filling: target_filled = totalSize * (elapsed / duration)
-   *    - submit IOC market for (target_filled - current_filled)
-   *    - 3% slippage cap, 3× catchup are NOT modelled — flagged
-   *      approximation; revisit once HL testnet captures show real
-   *      suborder shapes. */
+   *  amount of progress that's elapsed since the last slice. Matches real
+   *  HL behavior:
+   *    - ~30s minimum gap between slices
+   *    - linear target: target_filled = totalSize * (elapsed / duration)
+   *    - submit IOC for (target_filled - current_filled), capped at 3x the
+   *      "base" (evenly-spread) slice size so a long price-feed gap or a
+   *      run of under-fills doesn't dump the whole backlog into one slice
+   *    - IOC limit price bounds the suborder to a max 3% slippage from mid
+   *  On natural completion (now >= endTime) or user cancellation, a
+   *  twapHistory row is written once per TWAP (→ /info twapHistory). */
   private async matchTwaps(): Promise<void> {
     const ids = await redis.smembers(KEYS.TWAPS_ACTIVE);
     if (ids.length === 0) return;
@@ -53,6 +66,15 @@ export class OrderMatcher {
       }
       if (data.status !== 'running') {
         await redis.srem(KEYS.TWAPS_ACTIVE, idStr);
+        // Defensive: cancelTwapOrder() (engine/order.ts) is the primary
+        // writer for the 'cancelled' case and already records history
+        // itself. This only catches the race where this tick's `ids`
+        // snapshot was taken just before a cancel landed —
+        // finalizeTwapHistory's onConflictDoNothing makes a duplicate
+        // call here harmless.
+        if (data.status === 'cancelled') {
+          await this.finalizeTwapHistory(id, data, 'cancelled', now);
+        }
         continue;
       }
       const startTime = parseInt(data.startTime, 10);
@@ -76,16 +98,25 @@ export class OrderMatcher {
         await redis.hset(KEYS.TWAP(id), 'status', 'finished', 'lastSubmittedAt', String(now));
         await redis.srem(KEYS.TWAPS_ACTIVE, idStr);
         this.eventBus.emit('twapUpdate', { userId: data.userId, twapId: id, status: 'finished' });
+        await this.finalizeTwapHistory(id, data, 'finished', now, filledSize);
         continue;
       }
 
       // 30s minimum gap between slices.
-      if (lastSubmittedAt && now - lastSubmittedAt < 30_000) continue;
+      if (lastSubmittedAt && now - lastSubmittedAt < TWAP_SLICE_INTERVAL_MS) continue;
 
       const elapsedMs = now - startTime;
       const totalMs = endTime - startTime;
       const targetFilled = totalSize * (elapsedMs / totalMs);
-      const sliceSize = Math.max(0, targetFilled - filledSize);
+      const gap = Math.max(0, targetFilled - filledSize);
+
+      // Cap at 3x the base (evenly-spread) slice size — real HL behavior.
+      // In the steady-state case (no missed slices) gap ≈ baseSliceSize
+      // already, so this only kicks in when catching up after a gap.
+      const numSlices = Math.max(1, Math.round(totalMs / TWAP_SLICE_INTERVAL_MS));
+      const baseSliceSize = totalSize / numSlices;
+      const remaining = Math.max(0, totalSize - filledSize);
+      const sliceSize = Math.min(gap, baseSliceSize * TWAP_MAX_CATCHUP_MULTIPLIER, remaining);
       if (!Number.isFinite(sliceSize) || sliceSize <= 0) continue;
 
       const midPx = await redis.hget(KEYS.MARKET_MIDS, data.coin);
@@ -94,7 +125,14 @@ export class OrderMatcher {
       // Submit IOC market via the engine. We import lazily to avoid a
       // circular import (engine -> matcher -> engine).
       const { placeOrders } = await import('../engine/order.js');
-      const slipPx = data.isBuy === 'true' ? parseFloat(midPx) * 1.05 : parseFloat(midPx) * 0.95;
+      const midNum = parseFloat(midPx);
+      // 3% max slippage cap per suborder (real HL behavior). This bounds
+      // how far the IOC suborder is allowed to walk the book — computeFillPrice
+      // clamps its VWAP to this limit, so a thin book degrades the average
+      // execution price up to this bound rather than ignoring it.
+      const slipPx = data.isBuy === 'true'
+        ? midNum * (1 + TWAP_MAX_SLIPPAGE_PCT)
+        : midNum * (1 - TWAP_MAX_SLIPPAGE_PCT);
       const wire = {
         a: parseInt(data.asset, 10),
         b: data.isBuy === 'true',
@@ -104,7 +142,7 @@ export class OrderMatcher {
         t: { limit: { tif: 'Ioc' as const } },
       };
       try {
-        const [result] = await placeOrders(data.userId, [wire], 'na');
+        const [result] = await placeOrders(data.userId, [wire], 'na', { twapId: idStr });
         // Update progress only if something actually filled.
         if (typeof result === 'object' && result !== null && 'filled' in result && result.filled?.totalSz) {
           const newFilled = filledSize + parseFloat(result.filled.totalSz);
@@ -119,6 +157,42 @@ export class OrderMatcher {
         logger.warn({ err, twapId: id }, 'TWAP slice submit failed');
         await redis.hset(KEYS.TWAP(id), 'lastSubmittedAt', String(now));
       }
+    }
+  }
+
+  /** Persist one twapHistory row (→ /info twapHistory) for a TWAP that just
+   *  finished or got cancelled. Called from here on natural completion, and
+   *  from cancelTwapOrder (engine/order.ts) on user cancellation — either
+   *  path can run first, so the insert uses onConflictDoNothing on twapId.
+   *  Lazily imported for the same reason engine/order.js is above: avoids
+   *  pulling pg-sink (and its db import) into every OrderMatcher consumer
+   *  that never touches a TWAP. */
+  private async finalizeTwapHistory(
+    id: number,
+    data: Record<string, string>,
+    status: 'finished' | 'cancelled',
+    now: number,
+    filledOverride?: number,
+  ): Promise<void> {
+    try {
+      const { recordTwapHistory } = await import('../store/pg-sink.js');
+      recordTwapHistory({
+        twapId: id,
+        userId: data.userId,
+        asset: parseInt(data.asset, 10),
+        coin: data.coin,
+        isBuy: data.isBuy === 'true',
+        reduceOnly: data.reduceOnly === 'true',
+        totalSize: data.totalSize,
+        executedSize: String(filledOverride ?? parseFloat(data.filledSize || '0')),
+        minutes: parseInt(data.minutes, 10),
+        status,
+        startTime: parseInt(data.startTime, 10),
+        endTime: parseInt(data.endTime, 10),
+        finishedAt: now,
+      });
+    } catch (err) {
+      logger.warn({ err, twapId: id }, 'Failed to queue twapHistory record');
     }
   }
 
@@ -385,16 +459,20 @@ export class OrderMatcher {
       startPosition: currentSzi,
       dir,
       closedPnl,
-      hash: `0x${tid.toString(16).padStart(64, '0')}`,
+      // Real HL emits an all-zero hash for TWAP slice fills specifically;
+      // regular fills keep the synthetic tid-derived hash.
+      hash: order.twapId ? TWAP_FILL_HASH : `0x${tid.toString(16).padStart(64, '0')}`,
       oid: order.oid,
       crossed: isTaker,
       fee,
       tid,
       cloid: order.cloid,
       feeToken: 'USDC',
-      // HL prod always emits twapId on userFills entries; null for non-TWAP
-      // fills (every fill HyPaper produces, since HyPaper has no TWAP path).
-      twapId: null,
+      // HL prod always emits twapId on userFills entries; set when this
+      // fill came from a TWAP slice (threaded through from the synthetic
+      // IOC order matchTwaps builds via placeOrders' opts.twapId), null
+      // for every regular, non-TWAP fill.
+      twapId: order.twapId ?? null,
     };
 
     // Pre-read funding fields before pipeline
