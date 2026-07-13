@@ -184,6 +184,7 @@ export function recordTwapActivated(record: {
   reduceOnly: boolean;
   totalSize: string;
   minutes: number;
+  randomize: boolean;
   startTime: number;
   endTime: number;
 }): void {
@@ -200,7 +201,7 @@ export function recordTwapActivated(record: {
         executedSize: '0.0',
         executedNtl: '0.0',
         minutes: record.minutes,
-        randomize: false,
+        randomize: record.randomize,
         state: 'activated',
         terminalReason: null,
         eventAt: record.startTime,
@@ -234,6 +235,7 @@ export function recordTwapHistory(record: {
   totalSize: string;
   executedSize: string;
   minutes: number;
+  randomize: boolean;
   status: 'finished' | 'cancelled';
   startTime: number;
   endTime: number;
@@ -262,7 +264,7 @@ export function recordTwapHistory(record: {
         executedSize: record.executedSize,
         executedNtl: executedNtl.toString(),
         minutes: record.minutes,
-        randomize: false,
+        randomize: record.randomize,
         state: 'terminated',
         terminalReason: record.status,
         eventAt: record.finishedAt,

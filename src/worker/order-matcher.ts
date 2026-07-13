@@ -19,6 +19,14 @@ const TWAP_MAX_CATCHUP_MULTIPLIER = 3;
 // either way, but this keeps the synthetic value parity-correct).
 const TWAP_FILL_HASH = '0x' + '0'.repeat(64);
 
+/** 5-significant-figure price string, no scientific notation — the same
+ *  bound HL applies to wire prices. */
+function fmtPx5(px: number): string {
+  const p = Number(px.toPrecision(5));
+  // toString() flips to scientific below 1e-6; toFixed(8) covers that tail.
+  return Math.abs(p) < 1e-6 ? p.toFixed(8) : String(p);
+}
+
 export class OrderMatcher {
   private isRunning = false;
   private eventBus: EventEmitter;
@@ -102,21 +110,58 @@ export class OrderMatcher {
         continue;
       }
 
-      // 30s minimum gap between slices.
-      if (lastSubmittedAt && now - lastSubmittedAt < TWAP_SLICE_INTERVAL_MS) continue;
+      // Gate between slices. Base cadence is 30s; when the TWAP was placed
+      // with randomize=true, each submitted slice schedules the next one at
+      // a jittered interval (0.5×–1.5× the base — HL randomizes suborder
+      // timing to defeat pattern detection; exact distribution isn't
+      // published, uniform jitter around the same mean preserves the
+      // schedule). nextSliceAt is persisted so restarts keep the cadence.
+      const nextSliceAt = parseInt(data.nextSliceAt || '0', 10);
+      if (nextSliceAt && now < nextSliceAt) continue;
+      if (!nextSliceAt && lastSubmittedAt && now - lastSubmittedAt < TWAP_SLICE_INTERVAL_MS) continue;
 
       const elapsedMs = now - startTime;
       const totalMs = endTime - startTime;
       const targetFilled = totalSize * (elapsedMs / totalMs);
       const gap = Math.max(0, targetFilled - filledSize);
 
-      // Cap at 3x the base (evenly-spread) slice size — real HL behavior.
-      // In the steady-state case (no missed slices) gap ≈ baseSliceSize
-      // already, so this only kicks in when catching up after a gap.
+      // Suborder sizing — matches real HL:
+      //   - every suborder is at least the base (evenly-spread) size; HL
+      //     fires the FIRST full-size suborder ~immediately at activation
+      //     (capture 28: activation → first slice fill in 1.6s), not a
+      //     time-proportional dust slice
+      //   - when behind schedule (missed slices / partial fills), catch up
+      //     via the linear-target gap, capped at 3x base
+      //   - never exceed what's left
       const numSlices = Math.max(1, Math.round(totalMs / TWAP_SLICE_INTERVAL_MS));
       const baseSliceSize = totalSize / numSlices;
       const remaining = Math.max(0, totalSize - filledSize);
-      const sliceSize = Math.min(gap, baseSliceSize * TWAP_MAX_CATCHUP_MULTIPLIER, remaining);
+      let sliceSize = Math.min(
+        Math.max(gap, baseSliceSize),
+        baseSliceSize * TWAP_MAX_CATCHUP_MULTIPLIER,
+        remaining,
+      );
+
+      // Conform to the asset's szDecimals (HL sizes never carry more
+      // precision). Floor — rounding up could overshoot totalSize.
+      // Records created before v2.1 (and test fixtures) lack szDecimals —
+      // default to 8 (max HL precision) rather than 0, which would floor
+      // every fractional slice to zero.
+      const szDecimals = data.szDecimals != null && data.szDecimals !== ''
+        ? parseInt(data.szDecimals, 10)
+        : 8;
+      const step = 10 ** -szDecimals;
+      sliceSize = Math.floor((sliceSize + step * 1e-6) / step) * step;
+      // Dust guard: if what's left can't form a representable slice, the
+      // TWAP is done for all practical purposes — finish instead of
+      // spinning on sub-step remainders forever.
+      if (remaining < step) {
+        await redis.hset(KEYS.TWAP(id), 'status', 'finished', 'lastSubmittedAt', String(now));
+        await redis.srem(KEYS.TWAPS_ACTIVE, idStr);
+        this.eventBus.emit('twapUpdate', { userId: data.userId, twapId: id, status: 'finished' });
+        await this.finalizeTwapHistory(id, data, 'finished', now, filledSize);
+        continue;
+      }
       if (!Number.isFinite(sliceSize) || sliceSize <= 0) continue;
 
       const midPx = await redis.hget(KEYS.MARKET_MIDS, data.coin);
@@ -136,26 +181,37 @@ export class OrderMatcher {
       const wire = {
         a: parseInt(data.asset, 10),
         b: data.isBuy === 'true',
-        p: slipPx.toFixed(8),
-        s: sliceSize.toFixed(8),
+        // HL prices carry at most 5 significant figures; sizes conform to
+        // szDecimals (floored above) — keep the paper wire byte-shaped
+        // like live fills so downstream diffs don't see 8-decimal
+        // artifacts.
+        p: fmtPx5(slipPx),
+        s: sliceSize.toFixed(szDecimals),
         r: data.reduceOnly === 'true',
         t: { limit: { tif: 'Ioc' as const } },
       };
+      // Schedule the next slice — jittered when randomize was requested.
+      const interval = data.randomize === 'true'
+        ? Math.round(TWAP_SLICE_INTERVAL_MS * (0.5 + Math.random()))
+        : TWAP_SLICE_INTERVAL_MS;
+      const nextAt = String(now + interval);
       try {
         const [result] = await placeOrders(data.userId, [wire], 'na', { twapId: idStr });
         // Update progress only if something actually filled.
         if (typeof result === 'object' && result !== null && 'filled' in result && result.filled?.totalSz) {
-          const newFilled = filledSize + parseFloat(result.filled.totalSz);
-          await redis.hset(KEYS.TWAP(id), 'filledSize', String(newFilled), 'lastSubmittedAt', String(now));
+          // Round the accumulator to kill float dust — HL reports clean
+          // decimal strings (executedSz "0.002", never 0.0020000000000000005).
+          const newFilled = Number((filledSize + parseFloat(result.filled.totalSz)).toFixed(9));
+          await redis.hset(KEYS.TWAP(id), 'filledSize', String(newFilled), 'lastSubmittedAt', String(now), 'nextSliceAt', nextAt);
           this.eventBus.emit('twapUpdate', { userId: data.userId, twapId: id, status: 'running', filledSize: newFilled });
         } else {
-          // Bump lastSubmittedAt so we don't hammer the matcher with the
+          // Bump the schedule so we don't hammer the matcher with the
           // same failing slice every tick.
-          await redis.hset(KEYS.TWAP(id), 'lastSubmittedAt', String(now));
+          await redis.hset(KEYS.TWAP(id), 'lastSubmittedAt', String(now), 'nextSliceAt', nextAt);
         }
       } catch (err) {
         logger.warn({ err, twapId: id }, 'TWAP slice submit failed');
-        await redis.hset(KEYS.TWAP(id), 'lastSubmittedAt', String(now));
+        await redis.hset(KEYS.TWAP(id), 'lastSubmittedAt', String(now), 'nextSliceAt', nextAt);
       }
     }
   }
@@ -186,6 +242,7 @@ export class OrderMatcher {
         totalSize: data.totalSize,
         executedSize: String(filledOverride ?? parseFloat(data.filledSize || '0')),
         minutes: parseInt(data.minutes, 10),
+        randomize: data.randomize === 'true',
         status,
         startTime: parseInt(data.startTime, 10),
         endTime: parseInt(data.endTime, 10),

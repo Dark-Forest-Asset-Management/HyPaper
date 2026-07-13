@@ -198,7 +198,15 @@ export async function getTwapHistoryPg(
       // state.timestamp is in milliseconds (confirmed by magnitude vs time).
       timestamp: r.placementTimestamp,
     },
-    status: { status: r.state },
+    // HL status enum (SDK-confirmed): 'activated' | 'finished' |
+    // 'terminated' | 'error'. Natural completion is 'finished';
+    // 'terminated' means user-cancelled. We store both terminal cases as
+    // state='terminated' rows with the distinction in terminalReason.
+    status: {
+      status: r.state === 'activated'
+        ? 'activated'
+        : r.terminalReason === 'finished' ? 'finished' : 'terminated',
+    },
     twapId: r.twapId,
   }));
 }

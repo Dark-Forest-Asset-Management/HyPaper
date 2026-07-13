@@ -263,12 +263,11 @@ infoRouter.post('/', async (c) => {
       }
 
       // ── TWAP run history ─────────────────────────────────────────────────
-      // One entry per finished or cancelled TWAP — written by
-      // matchTwaps (natural completion) or cancelTwapOrder (user cancel).
-      // NOTE: exact HL wire field names for this endpoint are not confirmed
-      // against a prod capture (no twapHistory entry in scripts/captures/).
-      // Field names here mirror what HyPaper tracks; flag for re-verification
-      // if slushy ever queries this endpoint and sees a shape mismatch.
+      // Two entries per TWAP ('activated' at placement + a terminal row).
+      // Wire shape verified against capture 29; status enum
+      // ('activated'|'finished'|'terminated'|'error') confirmed against the
+      // hyperliquid SDK types — natural completion = 'finished',
+      // user-cancel = 'terminated'.
       case 'twapHistory': {
         if (!user) return c.json({ error: 'Missing user' }, 400);
         const rows = await getTwapHistoryPg(user, body.limit ?? 2000);

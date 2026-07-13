@@ -202,6 +202,8 @@ async function createTwap(opts: {
     filledSize?: string;
     lastSubmittedAt?: number;
     status?: string;
+    szDecimals?: number;
+    randomize?: boolean;
   }) {
     const {
       twapId,
@@ -231,6 +233,12 @@ async function createTwap(opts: {
       'status', status,
       'createdAt', startTime.toString(),
     ];
+    if (opts.szDecimals !== undefined) {
+      fields.push('szDecimals', opts.szDecimals.toString());
+    }
+    if (opts.randomize !== undefined) {
+      fields.push('randomize', opts.randomize.toString());
+    }
     if (lastSubmittedAt !== undefined) {
       fields.push('lastSubmittedAt', lastSubmittedAt.toString());
     }
@@ -817,21 +825,24 @@ async function createTwap(opts: {
       expect(Number(filledSize)).toBeCloseTo(0.1, 5);
     });
 
-    it('does not submit a slice before any time has elapsed', async () => {
+    it('fires the FIRST full base-size suborder immediately at activation (HL capture 28: 1.6s)', async () => {
       const now = Date.now();
       await createTwap({
         twapId: 2,
         isBuy: true,
         totalSize: '1',
-        startTime: now,
+        startTime: now,          // just activated — no elapsed time
         endTime: now + 300_000,
         minutes: 5,
       });
 
       await matcher.matchAll();
 
-      expect(fillEvents.length).toBe(0);
-      expect(await redisMock.hget(KEYS.TWAP(2), 'filledSize')).toBe('0');
+      // Real HL sends the first evenly-divided suborder right away, not a
+      // time-proportional dust slice. Base = 1/10 = 0.1.
+      expect(fillEvents.length).toBe(1);
+      expect(Number(fillEvents[0].fill.sz)).toBeCloseTo(0.1, 5);
+      expect(Number(await redisMock.hget(KEYS.TWAP(2), 'filledSize'))).toBeCloseTo(0.1, 5);
     });
 
     it('respects the 30s minimum gap between slices even when a fill gap exists', async () => {
@@ -875,6 +886,88 @@ async function createTwap(opts: {
 
       const filledSize = await redisMock.hget(KEYS.TWAP(4), 'filledSize');
       expect(Number(filledSize)).toBeCloseTo(0.3, 5);
+    });
+
+    it('floors slice sizes to the asset szDecimals (HL sizes never exceed asset precision)', async () => {
+      const now = Date.now();
+      // base slice = 1/10 = 0.1; szDecimals 0 floors any fractional slice
+      // to a whole unit → 0.1 floors to 0 → remaining(1) >= step(1)? no:
+      // remaining 1 >= 1, slice floors to 0 → no event. Use szDecimals 1:
+      // base 0.15 floors to 0.1.
+      await createTwap({
+        twapId: 41,
+        isBuy: true,
+        totalSize: '1.5',
+        startTime: now - 30_000,
+        endTime: now + 270_000,
+        minutes: 5,
+        szDecimals: 1,
+      });
+
+      await matcher.matchAll();
+
+      expect(fillEvents.length).toBe(1);
+      // gap = 1.5 × (30/300) = 0.15 → floor to 1 decimal = 0.1
+      expect(fillEvents[0].fill.sz).toBe('0.1');
+    });
+
+    it('finishes a TWAP whose remainder is smaller than one szDecimals step (dust guard)', async () => {
+      const now = Date.now();
+      await createTwap({
+        twapId: 42,
+        isBuy: true,
+        totalSize: '1',
+        filledSize: '0.96',       // remaining 0.04 < step 0.1
+        startTime: now - 150_000,
+        endTime: now + 150_000,
+        minutes: 5,
+        szDecimals: 1,
+      });
+
+      await matcher.matchAll();
+
+      expect(fillEvents.length).toBe(0);
+      expect(await redisMock.hget(KEYS.TWAP(42), 'status')).toBe('finished');
+    });
+
+    it('randomize=true schedules the next slice at a jittered 0.5x-1.5x interval', async () => {
+      const now = Date.now();
+      await createTwap({
+        twapId: 43,
+        isBuy: true,
+        totalSize: '1',
+        startTime: now - 30_000,
+        endTime: now + 270_000,
+        minutes: 5,
+        randomize: true,
+      });
+
+      await matcher.matchAll();
+
+      expect(fillEvents.length).toBe(1);
+      const nextAt = Number(await redisMock.hget(KEYS.TWAP(43), 'nextSliceAt'));
+      expect(nextAt).toBeGreaterThanOrEqual(now + 15_000);
+      expect(nextAt).toBeLessThanOrEqual(now + 45_000 + 5_000 /* matchAll runtime slack */);
+    });
+
+    it('randomize=false schedules the next slice at exactly the 30s interval', async () => {
+      const now = Date.now();
+      await createTwap({
+        twapId: 44,
+        isBuy: true,
+        totalSize: '1',
+        startTime: now - 30_000,
+        endTime: now + 270_000,
+        minutes: 5,
+        randomize: false,
+      });
+
+      await matcher.matchAll();
+
+      expect(fillEvents.length).toBe(1);
+      const nextAt = Number(await redisMock.hget(KEYS.TWAP(44), 'nextSliceAt'));
+      expect(nextAt - now).toBeGreaterThanOrEqual(30_000);
+      expect(nextAt - now).toBeLessThanOrEqual(30_000 + 5_000);
     });
 
     it('bounds the suborder to a 3% slippage cap, not the old 5%', async () => {

@@ -925,12 +925,31 @@ export async function createTwapOrder(
   totalSz: string,
   reduceOnly: boolean,
   minutes: number,
+  randomize = false,
 ): Promise<{ twapId: number } | { error: string }> {
   const coin = await resolveAssetCoin(asset);
   if (!coin) return { error: `Unknown asset ${asset}` };
 
   const totalNum = parseFloat(totalSz);
   if (!Number.isFinite(totalNum) || totalNum <= 0) return { error: `Invalid TWAP size: ${totalSz}` };
+
+  // HL requires each suborder to be worth at least $10 (docs: Order types —
+  // "sub-orders must have a minimum value of $10"). Suborders fire every
+  // 30s, so numSlices = minutes × 2. Checked against the current mid; if
+  // no mid is cached yet (brand-new market) the check is skipped rather
+  // than false-rejecting.
+  const numSlices = Math.max(1, minutes * 2);
+  const midStr = await redis.hget(KEYS.MARKET_MIDS, coin);
+  if (midStr) {
+    const childNotional = (totalNum / numSlices) * parseFloat(midStr);
+    if (Number.isFinite(childNotional) && childNotional < 10) {
+      return { error: 'TWAP suborder value must be at least $10' };
+    }
+  }
+
+  // Suborder sizes conform to the asset's szDecimals (matcher floors each
+  // slice to this) — cached on the record so the hot loop doesn't re-resolve.
+  const szDecimals = await getAssetDecimals(asset);
 
   const twapId = await redis.incr(KEYS.SEQ_TWAP);
   const now = Date.now();
@@ -948,6 +967,8 @@ export async function createTwapOrder(
     startTime:  now.toString(),
     endTime:    (now + minutes * 60_000).toString(),
     minutes:    minutes.toString(),
+    randomize:  randomize.toString(),
+    szDecimals: szDecimals.toString(),
     status:     'running',
     createdAt:  now.toString(),
   });
@@ -966,6 +987,7 @@ export async function createTwapOrder(
     reduceOnly,
     totalSize: totalSz,
     minutes,
+    randomize,
     startTime: now,
     endTime: now + minutes * 60_000,
   });
@@ -1012,6 +1034,7 @@ export async function cancelTwapOrder(
     totalSize: twapData.totalSize,
     executedSize: twapData.filledSize || "0",
     minutes: parseInt(twapData.minutes, 10),
+    randomize: twapData.randomize === "true",
     status: "cancelled",
     startTime: parseInt(twapData.startTime, 10),
     endTime: parseInt(twapData.endTime, 10),
