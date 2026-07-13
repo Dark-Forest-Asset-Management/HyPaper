@@ -1,0 +1,128 @@
+{
+  "request": {
+    "type": "userTwapSliceFills",
+    "user": "0x4A1AE5A6cFB24390a704b1cc1aB88d0F89eF596B"
+  },
+  "response": [
+    {
+      "fill": {
+        "coin": "BTC",
+        "px": "58328.0",
+        "sz": "0.00023",
+        "side": "B",
+        "time": 1782836846124,
+        "startPosition": "0.00398",
+        "dir": "Open Long",
+        "closedPnl": "0.0",
+        "hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "oid": 55780254346,
+        "crossed": true,
+        "fee": "0.006036",
+        "tid": 392644505815515,
+        "feeToken": "USDC",
+        "twapId": null
+      },
+      "twapId": 16179
+    },
+    {
+      "fill": {
+        "coin": "BTC",
+        "px": "58343.0",
+        "sz": "0.00023",
+        "side": "B",
+        "time": 1782836816108,
+        "startPosition": "0.00375",
+        "dir": "Open Long",
+        "closedPnl": "0.0",
+        "hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "oid": 55780243638,
+        "crossed": true,
+        "fee": "0.006038",
+        "tid": 911648787923912,
+        "feeToken": "USDC",
+        "twapId": null
+      },
+      "twapId": 16179
+    },
+    {
+      "fill": {
+        "coin": "BTC",
+        "px": "78510.0",
+        "sz": "0.00017",
+        "side": "B",
+        "time": 1779044359130,
+        "startPosition": "0.0028",
+        "dir": "Open Long",
+        "closedPnl": "0.0",
+        "hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "oid": 53244222583,
+        "crossed": true,
+        "fee": "0.006006",
+        "tid": 203302630683450,
+        "feeToken": "USDC",
+        "twapId": null
+      },
+      "twapId": 15503
+    },
+    {
+      "fill": {
+        "coin": "BTC",
+        "px": "78469.0",
+        "sz": "0.00017",
+        "side": "B",
+        "time": 1779044156015,
+        "startPosition": "0.00263",
+        "dir": "Open Long",
+        "closedPnl": "0.0",
+        "hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "oid": 53244109526,
+        "crossed": true,
+        "fee": "0.006002",
+        "tid": 251449961490409,
+        "feeToken": "USDC",
+        "twapId": null
+      },
+      "twapId": 15502
+    },
+    {
+      "fill": {
+        "coin": "BTC",
+        "px": "78413.0",
+        "sz": "0.00017",
+        "side": "B",
+        "time": 1779043908071,
+        "startPosition": "0.00246",
+        "dir": "Open Long",
+        "closedPnl": "0.0",
+        "hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "oid": 53243977514,
+        "crossed": true,
+        "fee": "0.005998",
+        "tid": 317511846708864,
+        "feeToken": "USDC",
+        "twapId": null
+      },
+      "twapId": 15501
+    },
+    {
+      "fill": {
+        "coin": "SOL",
+        "px": "86.532",
+        "sz": "0.13",
+        "side": "B",
+        "time": 1779043507035,
+        "startPosition": "0.0",
+        "dir": "Open Long",
+        "closedPnl": "0.0",
+        "hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "oid": 53243763923,
+        "crossed": true,
+        "fee": "0.005062",
+        "tid": 325136121113370,
+        "feeToken": "USDC",
+        "twapId": null
+      },
+      "twapId": 15500
+    }
+  ]
+}

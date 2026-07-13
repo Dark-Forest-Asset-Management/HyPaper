@@ -280,7 +280,11 @@ exchangeRouter.post('/', async (c) => {
         if (t.m < 5) {
           return c.json({ status: 'err', response: 'TWAP duration minimum is 5 minutes' }, 400);
         }
-        const twapResult = await createTwapOrder(effectiveWallet, t.a, t.b, t.s, t.r, t.m);
+        // HL caps TWAP duration at 24 hours.
+        if (t.m > 1440) {
+          return c.json({ status: 'err', response: 'TWAP duration maximum is 1440 minutes' }, 400);
+        }
+        const twapResult = await createTwapOrder(effectiveWallet, t.a, t.b, t.s, t.r, t.m, t.t);
         if ('error' in twapResult) {
           return c.json({ status: 'ok', response: { type: 'twapOrder', data: { status: { error: twapResult.error } } } });
         }

@@ -32,6 +32,11 @@ export interface PaperOrder {
   // point (`f`). Persisted on the order so executeFill can charge the taker
   // the bundled fee (exchange + builder) the same way HL does.
   builder?: { b: string; f: number };
+  // Set only on the synthetic IOC orders OrderMatcher.matchTwaps() submits
+  // for a TWAP slice. Threaded through buildOrder() → executeFill() so the
+  // resulting PaperFill carries twapId (→ /info userTwapSliceFills).
+  // Absent on every regular order.
+  twapId?: string;
 }
 
 export interface PaperFill {
