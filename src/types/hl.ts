@@ -241,6 +241,30 @@ export interface HlInfoRequest {
 
 export interface HlMeta {
   universe: HlAssetInfo[];
+  /** [marginTableId, table] pairs — real HL's `meta` response only lists
+   *  TIERED tables here. An asset whose `marginTableId` isn't present in
+   *  this list (or has no marginTableId at all) uses a flat single tier at
+   *  its listed `maxLeverage` instead — see engine/marginTiers.ts. Verified
+   *  against real testnet `meta` responses (Cross Margin Updates task,
+   *  2026-07): SOL uses table id 10 which is flat (not in this list); BTC
+   *  uses id 54 which IS tiered (40x/25x/10x breakpoints). */
+  marginTables?: Array<[number, HlMarginTable]>;
+}
+
+/** One tiered maintenance-margin schedule. Real HL only emits tables that
+ *  actually have breakpoints (>1 tier is common but not guaranteed — some
+ *  ids like 50 in the captured data are still single-tier). */
+export interface HlMarginTable {
+  description: string;
+  marginTiers: HlMarginTier[];
+}
+
+/** One breakpoint in a margin table. `lowerBound` is the position notional
+ *  (USD) at which this tier's `maxLeverage` starts applying; tiers are
+ *  always ascending by `lowerBound` in HL's wire format. */
+export interface HlMarginTier {
+  lowerBound: string;
+  maxLeverage: number;
 }
 
 export interface HlAssetInfo {
@@ -248,6 +272,12 @@ export interface HlAssetInfo {
   szDecimals: number;
   maxLeverage: number;
   onlyIsolated?: boolean;
+  /** Which entry in `HlMeta.marginTables` describes this asset's tiered
+   *  maintenance-margin schedule. Absent, or present but not found in
+   *  `marginTables`, means: use a flat single tier at `maxLeverage`. */
+  marginTableId?: number;
+  isDelisted?: boolean;
+  marginMode?: string;
 }
 
 export interface HlAssetCtx {

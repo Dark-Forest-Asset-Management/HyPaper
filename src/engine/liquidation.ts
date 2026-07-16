@@ -17,8 +17,11 @@
  *   • Backstop vault disbursements are a no-op; vault only collects proceeds.
  *   • Positions > $100 k USDC: close 20 % first, 30 s sim-time cooldown,
  *     then close remaining 80 %.
- *   • Maintenance margin rate approximation: 1 / (2 × leverage).
- *     Same as margin.ts calculateLiquidationPrice — keeps the two consistent.
+ *   • Maintenance margin rate: uses HL's real per-tier schedule
+ *     (engine/marginTiers.ts) when market meta is available in Redis,
+ *     falling back to the `1 / (2 × leverage)` approximation otherwise —
+ *     same fallback margin.ts's calculateLiquidationPrice uses, so the two
+ *     stay consistent in every case (Cross Margin Updates task, 2026-07).
  */
 
 import { redis } from '../store/redis.js';
@@ -30,6 +33,7 @@ import {
   calculatePositionUnrealizedPnl,
   calculatePositionMarginUsed,
 } from './margin.js';
+import { getMarginTiersForCoin, maintenanceMarginForNotional, maintenanceMarginRateForNotional } from './marginTiers.js';
 import { creditVault } from './liquidator-vault.js';
 import { insertLiquidationEventPg } from '../store/pg-queries.js';
 import {
@@ -44,13 +48,19 @@ import {
   isZero,
 } from '../utils/math.js';
 import type { LiquidationEvent, MaintenanceMarginResult, LiquidationCheckResult } from '../types/liquidation.js';
+import type { HlMeta, HlMarginTier } from '../types/hl.js';
 
 // ── Maintenance margin rate lookup ────────────────────────────────────────
 //
-// Real HL uses per-asset tier tables. HyPaper approximates with
+// Fallback approximation, used only when real per-tier data (HlMeta from
+// Redis) isn't available:
 //   maintRate = 1 / (2 × maxLeverage)
 // which gives the same values documented:
 //   40× → 1.25 %,  20× → 2.5 %,  10× → 5 %,  3× → 16.7 %
+// When tiers ARE available, computeMaintenanceMargin uses the real HL
+// tiered formula from engine/marginTiers.ts instead (Cross Margin Updates
+// task) — verified against real testnet data in
+// hl-cross-maintenance-margin.md.
 
 function maintenanceMarginRate(leverage: number): string {
   // Clamp leverage to at least 1 to avoid divide-by-zero on malformed data.
@@ -62,14 +72,27 @@ function maintenanceMarginRate(leverage: number): string {
 
 /**
  * Compute the maintenance margin for a single position.
+ *
+ * When `marginTiers` is supplied, uses HL's real per-tier formula. When
+ * omitted (e.g. no market meta cached yet), falls back to the old
+ * `1 / (2 × leverage)` approximation — every existing call site/test that
+ * doesn't pass tiers keeps its previous exact behaviour.
  */
 export function computeMaintenanceMargin(
   szi: string,
   markPx: string,
   leverage: number,
+  marginTiers?: HlMarginTier[],
 ): MaintenanceMarginResult {
   const size = abs(szi);
   const positionNotional = mul(size, markPx);
+
+  if (marginTiers && marginTiers.length > 0) {
+    const maintenanceMargin = maintenanceMarginForNotional(marginTiers, positionNotional);
+    const rate = maintenanceMarginRateForNotional(marginTiers, positionNotional);
+    return { maintenanceMargin, maintenanceMarginRate: rate, positionNotional };
+  }
+
   const rate = maintenanceMarginRate(leverage);
   const maintenanceMargin = mul(positionNotional, rate);
   return { maintenanceMargin, maintenanceMarginRate: rate, positionNotional };
@@ -105,6 +128,14 @@ export function computeMaintenanceMargin(
  * correctly computed as $1.0955, price forced below it, but
  * shouldLiquidate stayed false because accountEquity was $97,093 (whole
  * account) instead of ~$50 (this position's own margin + its PnL).
+ *
+ * MAINTENANCE MARGIN FIX (Cross Margin Updates, 2026-07): now reads market
+ * meta from Redis to get the asset's real tier schedule, instead of always
+ * using the `1/(2×leverage)` approximation. If meta or the coin isn't
+ * found (e.g. in tests that don't seed MARKET_META), falls back to a
+ * synthetic flat tier at this position's own leverage — numerically
+ * IDENTICAL to the old approximation, so every existing test keeps
+ * passing unchanged.
  */
 export async function checkLiquidation(
   userId: string,
@@ -136,7 +167,17 @@ export async function checkLiquidation(
   const leverage = lev.leverage ? parseInt(lev.leverage, 10) : 20;
   const isCross = lev.isCross !== 'false';
 
-  const { maintenanceMargin } = computeMaintenanceMargin(pos.szi, markPx, leverage);
+  // Real per-tier margin schedule for this coin (Cross Margin Updates).
+  // Falls back to a synthetic flat tier at this position's own leverage
+  // when meta/coin isn't found — numerically identical to the old
+  // 1/(2×leverage) approximation, so tests without seeded MARKET_META are
+  // unaffected.
+  const metaKey = scope ? KEYS.MARKET_META_DEX(scope) : KEYS.MARKET_META;
+  const metaRaw = await redis.get(metaKey);
+  const meta: HlMeta | null = metaRaw ? JSON.parse(metaRaw) : null;
+  const tiers = getMarginTiersForCoin(meta, pos.coin) ?? [{ lowerBound: '0.0', maxLeverage: leverage }];
+
+  const { maintenanceMargin } = computeMaintenanceMargin(pos.szi, markPx, leverage, tiers);
 
   if (!isCross) {
     // ── Isolated: this position's own margin + its own PnL, nothing else ──

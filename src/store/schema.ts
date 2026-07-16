@@ -254,3 +254,30 @@ export const twapHistory = pgTable('twap_history', {
   index('twap_history_user_id_idx').on(t.userId, t.eventAt),
   uniqueIndex('twap_history_twap_id_state_idx').on(t.twapId, t.state),
 ]);
+// ── Margin tables (Cross Margin Updates) ──────────────────────────────────
+// Durable Postgres mirror of HL's real per-tier maintenance-margin schedule
+// (Decision: Dynamic — synced daily by MarginTableSyncWorker, since HL
+// rarely changes tiers; Redis/MARKET_META stays the fast-path source the
+// engine actually reads from during liquidation math, same pattern as the
+// liquidator vault's Redis-fast/Postgres-durable split). Survives a Redis
+// flush the same way liquidator_vault does.
+//
+// One row per HL marginTableId. Tiers stored as JSON text (array of
+// { lowerBound, maxLeverage }) rather than a separate child table — the
+// list is small (typically 1-3 tiers) and always read/written as a whole.
+export const marginTables = pgTable('margin_tables', {
+  marginTableId: integer('margin_table_id').primaryKey(),
+  description: text('description').notNull().default(''),
+  tiersJson: text('tiers_json').notNull(),
+  updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
+});
+
+// Per-asset mapping to its marginTableId + flat maxLeverage (mirrors
+// HlMeta.universe). marginTableId is nullable — some assets have no tiered
+// table at all and use maxLeverage as a flat single tier.
+export const assetMarginTable = pgTable('asset_margin_table', {
+  coin: text('coin').primaryKey(),
+  marginTableId: integer('margin_table_id'),
+  maxLeverage: integer('max_leverage').notNull(),
+  updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
+});
