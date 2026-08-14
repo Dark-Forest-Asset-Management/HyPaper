@@ -13,6 +13,7 @@ import {
 } from '../../engine/order.js';
 import {
   createSubAccount,
+  subAccountModify,
   subAccountTransfer,
   subAccountSpotTransfer,
   vaultTransfer,
@@ -495,6 +496,18 @@ exchangeRouter.post('/', async (c) => {
           return c.json({ status: 'err', response: 'subAccountSpotTransfer requires subAccountUser, isDeposit, token, amount' }, 400);
         }
         const result = await subAccountSpotTransfer(wallet, action.subAccountUser, action.isDeposit, action.token, action.amount);
+        if ('error' in result) {
+          return c.json({ status: 'err', response: result.error }, 400);
+        }
+        return c.json({ status: 'ok', response: { type: 'default' } });
+      }
+
+      // ── subAccountModify (rename) ────────────────────────────────────────
+      case 'subAccountModify': {
+        if (typeof action.subAccountUser !== 'string' || typeof action.name !== 'string') {
+          return c.json({ status: 'err', response: 'subAccountModify requires subAccountUser and name' }, 400);
+        }
+        const result = await subAccountModify(wallet, action.subAccountUser, action.name);
         if ('error' in result) {
           return c.json({ status: 'err', response: result.error }, 400);
         }
