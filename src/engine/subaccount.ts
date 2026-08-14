@@ -66,7 +66,9 @@ export async function createSubAccount(
 ): Promise<{ subAccountUser: string } | { error: string }> {
   const trimmedName = name.trim();
   if (!trimmedName) return { error: 'Sub-account name cannot be empty' };
-  if (trimmedName.length > 32) return { error: 'Sub-account name too long (max 32 chars)' };
+  // Live-HL parity: HL's frontend rejects names over 16 chars ("too many
+  // characters" — verified against app.hyperliquid.xyz bundle 2026-08-14).
+  if (trimmedName.length > 16) return { error: 'Sub-account name too long (max 16 chars)' };
 
   // Check duplicate name under this master
   const existingRaw = await redis.zrange(KEYS.USER_SUBACCOUNTS(masterUserId), 0, -1);

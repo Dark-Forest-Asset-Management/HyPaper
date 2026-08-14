@@ -12,14 +12,21 @@ import { upsertUser, recordLedgerUpdate } from '../../store/pg-sink.js';
  */
 export async function ensureAccount(wallet: string): Promise<void> {
   const exists = await redis.exists(KEYS.USER_ACCOUNT(wallet));
+  // Sub-accounts start EMPTY — live-HL parity: a freshly created sub has
+  // $0 everywhere and is funded exclusively via subAccountTransfer from
+  // the master. The faucet below is for new USER wallets only. The
+  // reverse pointer is written by createSubAccount BEFORE it calls
+  // ensureAccount, so it's always visible here.
+  const isSub = !exists && !!(await redis.get(KEYS.SUBACCOUNT_MASTER(wallet)));
   if (!exists) {
+    const seed = isSub ? '0' : config.DEFAULT_BALANCE.toString();
     await redis.hset(KEYS.USER_ACCOUNT(wallet),
       'userId', wallet,
-      'balance', config.DEFAULT_BALANCE.toString(),
+      'balance', seed,
       // Spot USDC is its own bucket — seed equal to perp so a new wallet can
       // trade either side without first doing a usdClassTransfer. The two
       // books then diverge from here as the wallet trades and transfers.
-      KEYS.USER_BAL_SPOT_FIELD, config.DEFAULT_BALANCE.toString(),
+      KEYS.USER_BAL_SPOT_FIELD, seed,
       'createdAt', Date.now().toString(),
     );
   }
@@ -34,7 +41,7 @@ export async function ensureAccount(wallet: string): Promise<void> {
   // First-touch funding shows up as a deposit in /info
   // userNonFundingLedgerUpdates. Enqueued AFTER upsertUser so the users-row
   // FK is satisfied (the write queue is FIFO).
-  if (!exists) {
+  if (!exists && !isSub) {
     recordLedgerUpdate(wallet, {
       time: Date.now(),
       deltaType: 'deposit',
@@ -61,8 +68,11 @@ export async function ensureAccount(wallet: string): Promise<void> {
       const seededField = `seeded:${d.name}`;
       const wasSeeded = await redis.hget(KEYS.USER_ACCOUNT(wallet), seededField);
       if (wasSeeded === '1') continue;
+      // Sub-accounts get ZERO on every sub-dex too (live parity) — the
+      // seeded marker still gets written so nothing re-seeds them later.
+      const subIsSub = await redis.get(KEYS.SUBACCOUNT_MASTER(wallet));
       await redis.hset(KEYS.USER_ACCOUNT(wallet),
-        KEYS.USER_BAL_FIELD(d.name), config.DEFAULT_BALANCE.toString(),
+        KEYS.USER_BAL_FIELD(d.name), subIsSub ? '0' : config.DEFAULT_BALANCE.toString(),
         seededField, '1',
       );
     }
