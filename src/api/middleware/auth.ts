@@ -12,14 +12,22 @@ import { upsertUser, recordLedgerUpdate } from '../../store/pg-sink.js';
  */
 export async function ensureAccount(wallet: string): Promise<void> {
   const exists = await redis.exists(KEYS.USER_ACCOUNT(wallet));
+  // Sub-accounts start EMPTY — live-HL parity: a freshly created sub has
+  // $0 everywhere and is funded exclusively via subAccountTransfer from
+  // the master. The faucet below is for new USER wallets only. The
+  // reverse pointer is written by createSubAccount BEFORE it calls
+  // ensureAccount, so it's always visible here.
+  const isSub = !exists && !!(await redis.get(KEYS.SUBACCOUNT_MASTER(wallet)));
   if (!exists) {
+    // Live-parity seeding: new USER wallets get DEFAULT_BALANCE on the HL
+    // perp balance ONLY. Spot and every sub-dex start at $0 — reaching
+    // them takes a usdClassTransfer / sendAsset, exactly like live
+    // operations. Sub-accounts get $0 everywhere.
+    const seed = isSub ? '0' : config.DEFAULT_BALANCE.toString();
     await redis.hset(KEYS.USER_ACCOUNT(wallet),
       'userId', wallet,
-      'balance', config.DEFAULT_BALANCE.toString(),
-      // Spot USDC is its own bucket — seed equal to perp so a new wallet can
-      // trade either side without first doing a usdClassTransfer. The two
-      // books then diverge from here as the wallet trades and transfers.
-      KEYS.USER_BAL_SPOT_FIELD, config.DEFAULT_BALANCE.toString(),
+      'balance', seed,
+      KEYS.USER_BAL_SPOT_FIELD, '0',
       'createdAt', Date.now().toString(),
     );
   }
@@ -34,7 +42,7 @@ export async function ensureAccount(wallet: string): Promise<void> {
   // First-touch funding shows up as a deposit in /info
   // userNonFundingLedgerUpdates. Enqueued AFTER upsertUser so the users-row
   // FK is satisfied (the write queue is FIFO).
-  if (!exists) {
+  if (!exists && !isSub) {
     recordLedgerUpdate(wallet, {
       time: Date.now(),
       deltaType: 'deposit',
@@ -42,16 +50,15 @@ export async function ensureAccount(wallet: string): Promise<void> {
     });
   }
 
-  // ── Sub-dex subaccount seeding ──────────────────────────────────────────
+  // ── Sub-dex balance-field initialization ────────────────────────────────
   // HL semantics: each builder-deployed sub-dex (xyz, flx, …) is its own
-  // subaccount with independent equity. Live HL requires the user to call
-  // perpDexClassTransfer to fund the sub-dex from native. In paper we trade
-  // UX over strict parity here: on first touch, seed each known sub-dex
-  // with DEFAULT_BALANCE so the user can place xyz: brackets immediately
-  // without a separate transfer step.
+  // subaccount with independent equity, funded from native via an explicit
+  // transfer. Full live parity (2026-08-15): every sub-dex field starts at
+  // $0 — the earlier trade-UX-over-parity DEFAULT_BALANCE seeding is gone,
+  // so placing xyz: orders requires funding the dex first, same as live.
   //
-  // Idempotent: per-dex marker field `seeded:${dex}` blocks re-seeding after
-  // the first balance has been spent.
+  // Idempotent: per-dex marker field `seeded:${dex}` blocks re-initializing
+  // after the field exists (a later balance would otherwise be clobbered).
   try {
     const perpDexsRaw = await redis.get(KEYS.MARKET_PERPDEXS);
     if (!perpDexsRaw) return;
@@ -61,8 +68,11 @@ export async function ensureAccount(wallet: string): Promise<void> {
       const seededField = `seeded:${d.name}`;
       const wasSeeded = await redis.hget(KEYS.USER_ACCOUNT(wallet), seededField);
       if (wasSeeded === '1') continue;
+      // Live parity: EVERY account (user or sub) starts a sub-dex at $0 —
+      // funding a builder dex takes an explicit transfer from native, same
+      // as live. The seeded marker still gets written so nothing re-seeds.
       await redis.hset(KEYS.USER_ACCOUNT(wallet),
-        KEYS.USER_BAL_FIELD(d.name), config.DEFAULT_BALANCE.toString(),
+        KEYS.USER_BAL_FIELD(d.name), '0',
         seededField, '1',
       );
     }

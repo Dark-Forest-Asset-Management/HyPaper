@@ -132,6 +132,13 @@ export interface HlCreateSubAccountAction {
   name: string;
 }
 
+// subAccountModify — rename a sub-account (live parity, 16-char limit).
+export interface HlSubAccountModifyAction {
+  type: 'subAccountModify';
+  subAccountUser: string;
+  name: string;
+}
+
 // subAccountTransfer — transfer between master and sub-account.
 export interface HlSubAccountTransferAction {
   type: 'subAccountTransfer';
@@ -202,6 +209,7 @@ export type HlExchangeAction =
   | HlUpdateIsolatedMarginAction
   | HlUsdClassTransferAction
   | HlCreateSubAccountAction
+  | HlSubAccountModifyAction
   | HlSubAccountTransferAction
   | HlSubAccountSpotTransferAction
   | HlVaultTransferAction
