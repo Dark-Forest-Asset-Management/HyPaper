@@ -129,6 +129,10 @@ SQL
   # treats them as local command substitution even on lines that
   # start with #, since # is not a comment marker inside a string.
   npm run db:migrate 2>&1 | tail -10
+  if [ \"\${PIPESTATUS[0]}\" -ne 0 ]; then
+    echo 'MIGRATE FAILED — aborting before restart (service keeps running the old build)' >&2
+    exit 1
+  fi
   echo
   echo 'Restart…'
   sudo systemctl restart ${DEPLOY_SERVICE}
