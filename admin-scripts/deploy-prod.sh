@@ -95,6 +95,31 @@ ssh "$DEPLOY_SSH" "
   fi
   echo
   echo 'DB migrations…'
+  # ── One-time journal baseline ─────────────────────────────────────────
+  # Migrations 0004/0005 reached this DB via db:push (TWAP deploy,
+  # 2026-08-08), which applies DDL but does NOT record journal rows —
+  # so db:migrate would re-apply them onto existing tables and fail.
+  # Baseline them as applied, but ONLY when their schema is verifiably
+  # already live (liquidation_events for 0004, twap_history + the
+  # fills.twap_id column for 0005). Idempotent via WHERE NOT EXISTS;
+  # a fresh database skips the baseline and migrates normally.
+  DB_URL=\$(grep '^DATABASE_URL=' .env | cut -d= -f2-)
+  H4=\$(sha256sum drizzle/0004_funny_william_stryker.sql | cut -d' ' -f1)
+  H5=\$(sha256sum drizzle/0005_sticky_human_robot.sql | cut -d' ' -f1)
+  # `|| echo` on the SAME command line: under set -e a bare psql failure
+  # would abort the deploy — on a FRESH database the journal table doesn't
+  # exist until the first migrate, and the baseline is unnecessary there.
+  psql \"\$DB_URL\" -q <<SQL || echo 'baseline skipped (no journal table yet — fresh DB)'
+  INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
+  SELECT '\$H4', 1782817097168
+  WHERE EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'liquidation_events')
+    AND NOT EXISTS (SELECT 1 FROM drizzle.__drizzle_migrations WHERE created_at >= 1782817097168);
+  INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
+  SELECT '\$H5', 1782818036773
+  WHERE EXISTS (SELECT 1 FROM information_schema.tables  WHERE table_name = 'twap_history')
+    AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'fills' AND column_name = 'twap_id')
+    AND NOT EXISTS (SELECT 1 FROM drizzle.__drizzle_migrations WHERE created_at >= 1782818036773);
+SQL
   # Apply any pending drizzle migrations BEFORE restarting the service
   # so the running process never sees a schema older than its code.
   # db:migrate is idempotent — drizzle tracks applied migrations in

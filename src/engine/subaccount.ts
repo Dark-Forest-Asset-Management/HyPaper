@@ -66,7 +66,9 @@ export async function createSubAccount(
 ): Promise<{ subAccountUser: string } | { error: string }> {
   const trimmedName = name.trim();
   if (!trimmedName) return { error: 'Sub-account name cannot be empty' };
-  if (trimmedName.length > 32) return { error: 'Sub-account name too long (max 32 chars)' };
+  // Live-HL parity: HL's frontend rejects names over 16 chars ("too many
+  // characters" — verified against app.hyperliquid.xyz bundle 2026-08-14).
+  if (trimmedName.length > 16) return { error: 'Sub-account name too long (max 16 chars)' };
 
   // Check duplicate name under this master
   const existingRaw = await redis.zrange(KEYS.USER_SUBACCOUNTS(masterUserId), 0, -1);
@@ -112,6 +114,39 @@ export async function createSubAccount(
 
   logger.info({ masterUserId, subAccountUser, name: trimmedName }, 'Sub-account created');
   return { subAccountUser };
+}
+
+// ─── subAccountModify (rename) ────────────────────────────────────────────
+// Live-HL parity: { type: 'subAccountModify', subAccountUser, name } —
+// verified against app.hyperliquid.xyz's bundled call (2026-08-14). Same
+// 16-char limit and sibling-uniqueness rule as creation. Note the paper
+// caveat: sub ADDRESSES are derived from master+original name at creation,
+// so a rename here changes the label only — the address keeps its original
+// derivation (same as live, where addresses are immutable on-chain).
+export async function subAccountModify(
+  masterUserId: string,
+  subAccountUser: string,
+  name: string,
+): Promise<{ ok: true } | { error: string }> {
+  const trimmedName = name.trim();
+  if (!trimmedName) return { error: 'Sub-account name cannot be empty' };
+  if (trimmedName.length > 16) return { error: 'Sub-account name too long (max 16 chars)' };
+
+  const subAddr = subAccountUser.toLowerCase();
+  const masterRaw = await redis.get(KEYS.SUBACCOUNT_MASTER(subAddr));
+  if (!masterRaw || masterRaw.toLowerCase() !== masterUserId.toLowerCase()) {
+    return { error: `Sub-account ${subAccountUser} not found or does not belong to this account` };
+  }
+  const siblings = await redis.zrange(KEYS.USER_SUBACCOUNTS(masterUserId), 0, -1);
+  for (const sib of siblings) {
+    if (sib.toLowerCase() === subAddr) continue;
+    const meta = await redis.hgetall(KEYS.SUBACCOUNT_META(sib));
+    if (meta.name?.toLowerCase() === trimmedName.toLowerCase()) {
+      return { error: `Sub-account name '${trimmedName}' already exists` };
+    }
+  }
+  await redis.hset(KEYS.SUBACCOUNT_META(subAddr), 'name', trimmedName);
+  return { ok: true };
 }
 
 // ─── subAccountTransfer ───────────────────────────────────────────────────────
