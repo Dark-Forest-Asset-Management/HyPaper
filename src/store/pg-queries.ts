@@ -1,8 +1,9 @@
 import { desc, asc, eq, and, gte, lte, sql, isNotNull } from 'drizzle-orm';
 import { db } from './db.js';
-import { fills, orders, funding, ledgerUpdates, liquidationEvents, liquidatorVault, twapHistory } from './schema.js';
+import { fills, orders, funding, ledgerUpdates, liquidationEvents, liquidatorVault, twapHistory, marginTables, assetMarginTable } from './schema.js';
 import type { PaperFill } from '../types/order.js';
 import type { LiquidationEvent } from '../types/liquidation.js';
+import type { HlMeta, HlMarginTier } from '../types/hl.js';
 import { hlTriggerConditionString, hlOrderTypeString } from '../engine/position.js';
 import { D, mul } from '../utils/math.js';
 
@@ -372,4 +373,63 @@ function rowToFill(row: typeof fills.$inferSelect): PaperFill {
     // without any per-callsite override.
     twapId: null,
   };
+}
+// ── Margin tables (Cross Margin Updates — Decision: Dynamic) ──────────────
+// Durable Postgres mirror of HL's real per-tier maintenance-margin data,
+// synced daily by MarginTableSyncWorker (worker/index.ts). The engine
+// (position.ts, margin.ts, liquidation.ts) reads the FAST path from Redis
+// (MARKET_META, already seeded at startup) — this table exists so the
+// tiered schedule survives a Redis flush, same as liquidator_vault mirrors
+// the vault's Redis state.
+
+/** Upsert every marginTable + universe→marginTableId mapping from a fresh
+ *  HL `meta` response. Safe to call repeatedly (e.g. daily) — each row is
+ *  keyed on marginTableId / coin so re-syncing just refreshes updatedAt and
+ *  any changed values. */
+export async function upsertMarginTablesPg(meta: HlMeta): Promise<void> {
+  const now = Date.now();
+
+  if (meta.marginTables) {
+    for (const [id, table] of meta.marginTables) {
+      const tiersJson = JSON.stringify(table.marginTiers);
+      await db.insert(marginTables)
+        .values({ marginTableId: id, description: table.description ?? '', tiersJson, updatedAt: now })
+        .onConflictDoUpdate({
+          target: marginTables.marginTableId,
+          set: { description: table.description ?? '', tiersJson, updatedAt: now },
+        });
+    }
+  }
+
+  for (const asset of meta.universe) {
+    await db.insert(assetMarginTable)
+      .values({
+        coin: asset.name,
+        marginTableId: asset.marginTableId ?? null,
+        maxLeverage: asset.maxLeverage,
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: assetMarginTable.coin,
+        set: {
+          marginTableId: asset.marginTableId ?? null,
+          maxLeverage: asset.maxLeverage,
+          updatedAt: now,
+        },
+      });
+  }
+}
+
+/** Read the durable margin-table mirror back out, in the same
+ *  `[marginTableId, table]` shape as HlMeta.marginTables — useful for
+ *  restoring Redis after a flush, or for a one-off consistency check
+ *  against what's currently cached. */
+export async function getMarginTablesPg(): Promise<Array<[number, { description: string; marginTiers: HlMarginTier[] }]>> {
+  const rows = await db.select().from(marginTables);
+  return rows.map((r) => [r.marginTableId, { description: r.description, marginTiers: JSON.parse(r.tiersJson) as HlMarginTier[] }]);
+}
+
+/** Read the durable coin → marginTableId/maxLeverage mapping. */
+export async function getAssetMarginMapPg(): Promise<Array<{ coin: string; marginTableId: number | null; maxLeverage: number }>> {
+  return db.select().from(assetMarginTable);
 }

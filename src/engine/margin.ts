@@ -1,6 +1,8 @@
 import { redis } from '../store/redis.js';
 import { KEYS } from '../store/keys.js';
 import { D, add, sub, mul, div, abs, gt, gte, lt, lte, isZero, neg } from '../utils/math.js';
+import { maintenanceMarginForNotional } from './marginTiers.js';
+import type { HlMarginTier } from '../types/hl.js';
 
 // ── Per-dex scope ─────────────────────────────────────────────────────────
 // All public margin/account funcs accept an optional `scope` (dex name, or
@@ -158,9 +160,15 @@ export async function checkMarginForOrder(
  *    for longs, mirrored for shorts. The `accountValue` arg is ignored
  *    in this branch, matching how isolated positions don't share equity.
  *
- *  Maintenance margin rate is approximated as `1 / (2 × leverage)` — same
- *  approximation HyPaper has always used. The real HL rate is per-asset
- *  tier-based; this is close enough for paper trading. */
+ *  Maintenance margin rate: for CROSS positions, uses HL's real per-tier
+ *  schedule when `marginTiers` is supplied (see engine/marginTiers.ts) —
+ *  verified against real testnet data (Cross Margin Updates task, 2026-07).
+ *  When `marginTiers` is omitted (e.g. meta wasn't available), falls back
+ *  to the old `1 / (2 × leverage)` approximation HyPaper used previously,
+ *  so existing callers are unaffected. ISOLATED positions still use the
+ *  `1 / (2 × leverage)` approximation unconditionally — this task's scope
+ *  (crossMaintenanceMarginUsed + cross liquidation price) doesn't touch
+ *  isolated math. */
 export function calculateLiquidationPrice(
   szi: string,
   entryPx: string,
@@ -172,6 +180,11 @@ export function calculateLiquidationPrice(
    *  pushes liq away). Ignored when `isCross`. Defaults to '0' so existing
    *  callers that haven't been updated keep their previous behaviour. */
   extraIsolatedMargin: string = '0',
+  /** Real per-tier margin schedule for this asset (from HlMeta.marginTables,
+   *  resolved via getMarginTiersForCoin). Only used on the cross branch.
+   *  Optional and defaults to undefined so every existing caller/test that
+   *  doesn't pass it keeps getting the old approximate behaviour exactly. */
+  marginTiers?: HlMarginTier[],
 ): string | null {
   if (isZero(szi)) return null;
 
@@ -181,7 +194,9 @@ export function calculateLiquidationPrice(
 
   if (isCross) {
     const positionNotional = mul(size, entryPx);
-    const maintMargin = mul(positionNotional, maintMarginRate);
+    const maintMargin = marginTiers && marginTiers.length > 0
+      ? maintenanceMarginForNotional(marginTiers, positionNotional)
+      : mul(positionNotional, maintMarginRate); // fallback: old approximation
     const cushion = sub(accountValue, maintMargin);
     // If cushion ≥ positionNotional, the account can absorb the position
     // going to zero (long) or doubling (short) without liquidating.

@@ -12,6 +12,7 @@ import { snapshotPortfolios } from '../engine/account.js';
 import { initVault } from '../engine/liquidator-vault.js';
 import type { HlMeta, HlAssetCtx } from '../types/hl.js';
 import { sweepStakingQueue } from '../engine/staking.js';
+import { upsertMarginTablesPg } from '../store/pg-queries.js';
 
 export const eventBus = new EventEmitter();
 
@@ -193,6 +194,57 @@ class ScheduleCancelWorker {
 // Uses sweepStakingQueue() from engine/staking.ts which handles the Redis
 // SCAN + zrangebyscore logic internally.
 
+// ─── MarginTableSyncWorker ────────────────────────────────────────────────
+//
+// Cross Margin Updates task — Decision: Dynamic. Keeps the Postgres mirror
+// of HL's real per-tier maintenance-margin schedule (margin_tables +
+// asset_margin_table) in sync with HL. Runs once at startup (so a fresh DB
+// is populated immediately) and then once every 24h — margin tiers change
+// rarely, so a daily cadence is plenty and keeps this cheap.
+//
+// This does NOT replace the existing MARKET_META Redis seeding in
+// seedMarketData() below (that's still the fast path the engine reads from
+// during liquidation math). This worker's job is purely the durable
+// Postgres side, so tier data survives a Redis flush the same way the
+// liquidator vault's Postgres mirror does.
+
+class MarginTableSyncWorker {
+  private timer: NodeJS.Timeout | null = null;
+  private readonly SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24h
+
+  start(): void {
+    logger.info({ intervalMs: this.SYNC_INTERVAL_MS }, 'MarginTable sync worker started');
+    this.timer = setInterval(() => void this.tick(), this.SYNC_INTERVAL_MS);
+    // Fire immediately so a fresh DB gets populated without waiting 24h.
+    void this.tick();
+  }
+
+  stop(): void {
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
+    }
+  }
+
+  private async tick(): Promise<void> {
+    try {
+      const res = await fetch(`${config.HL_API_URL}/info`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'meta' }),
+      });
+      const meta = (await res.json()) as HlMeta;
+      await upsertMarginTablesPg(meta);
+      logger.info(
+        { tables: meta.marginTables?.length ?? 0, assets: meta.universe.length },
+        'Margin tables synced to Postgres',
+      );
+    } catch (err) {
+      logger.error({ err }, 'MarginTable sync failed');
+    }
+  }
+}
+
 class StakingWorker {
   private timer: NodeJS.Timeout | null = null;
   private readonly POLL_INTERVAL_MS = 60_000; // check every 60 seconds
@@ -232,6 +284,7 @@ export class Worker {
   private scheduleCancelWorker: ScheduleCancelWorker;
   private stakingWorker: StakingWorker;
   private liquidationWorker: LiquidationWorker;
+  private marginTableSyncWorker: MarginTableSyncWorker;
 
   constructor() {
     this.orderMatcher = new OrderMatcher(eventBus);
@@ -239,6 +292,7 @@ export class Worker {
     this.scheduleCancelWorker = new ScheduleCancelWorker();
     this.stakingWorker = new StakingWorker();
     this.liquidationWorker = new LiquidationWorker(eventBus);
+    this.marginTableSyncWorker = new MarginTableSyncWorker();
     this.priceUpdater = new PriceUpdater(() => {
       // Fire-and-forget match on every price update
       this.orderMatcher.matchAll();
@@ -284,6 +338,7 @@ export class Worker {
     // order matcher already listens on, plus its own fallback poll).
     await initVault();
     this.liquidationWorker.start();
+    this.marginTableSyncWorker.start();
 
     // Subscribe l2Book over WS for coins with open/trigger orders so the
     // matcher reads fresh book depth from Redis (via price-updater's l2Book
@@ -640,6 +695,7 @@ export class Worker {
     this.scheduleCancelWorker.stop();
     this.stakingWorker.stop();
     this.liquidationWorker.stop();
+    this.marginTableSyncWorker.stop();
     this.wsClient?.close();
     logger.info("Worker stopped");
   }

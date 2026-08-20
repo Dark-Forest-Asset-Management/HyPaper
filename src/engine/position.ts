@@ -9,7 +9,8 @@ import {
   calculatePositionMarginUsed,
   calculateLiquidationPrice,
 } from './margin.js';
-import { abs, sub, mul, div, isZero, gt, D } from '../utils/math.js';
+import { getMarginTiersForCoin, maintenanceMarginForNotional } from './marginTiers.js';
+import { abs, sub, mul, div, isZero, gt, add, D } from '../utils/math.js';
 import type { HlClearinghouseState, HlAssetPosition, HlMeta } from '../types/hl.js';
 
 export async function getClearinghouseState(userId: string, scope = ''): Promise<HlClearinghouseState> {
@@ -27,6 +28,13 @@ export async function getClearinghouseState(userId: string, scope = ''): Promise
   let totalNtlPos = '0';
   let totalMarginUsed = '0';
   let totalUnrealizedPnl = '0';
+  // Real per-tier maintenance margin, summed across CROSS positions only
+  // (isolated positions have their own dedicated margin and aren't part of
+  // the shared cross pool). Replaces the old `totalMarginUsed / 2`
+  // approximation — see engine/marginTiers.ts and the
+  // hl-cross-maintenance-margin.md research doc for the formula and
+  // verification against real HL testnet data.
+  let crossMaintMarginUsed = '0';
 
   for (const assetStr of positionAssets) {
     const asset = parseInt(assetStr, 10);
@@ -46,12 +54,28 @@ export async function getClearinghouseState(userId: string, scope = ''): Promise
     const marginUsed = await calculatePositionMarginUsed(userId, asset, pos.szi, midPx);
 
     const accountValue = await calculateAccountValue(userId, scope);
+
+    // Real per-tier margin schedule for this coin, falling back to a
+    // synthetic flat tier at this position's own leverage when meta is
+    // unavailable or the asset isn't found — this keeps behaviour identical
+    // to the old approximation in that degraded case instead of throwing.
+    const tiers = getMarginTiersForCoin(meta, coin) ?? [{ lowerBound: '0.0', maxLeverage: leverage }];
+
     // Forward the user-added dedicated margin for isolated positions so the
     // liq line moves when they call updateIsolatedMargin / topUpIsolatedOnly.
     // Cross positions don't read this (calculateLiquidationPrice ignores it
-    // on the cross branch), so it's safe to always pass.
+    // on the cross branch), so it's safe to always pass. Tiers are only
+    // forwarded for cross positions — isolated liquidation math is
+    // unaffected by this task (still the 1/(2×leverage) approximation).
     const extraIsolatedMargin = isCross ? '0' : (pos.rawUsd ?? '0');
-    const liqPx = calculateLiquidationPrice(pos.szi, pos.entryPx, accountValue, leverage, isCross, extraIsolatedMargin);
+    const liqPx = calculateLiquidationPrice(
+      pos.szi, pos.entryPx, accountValue, leverage, isCross,
+      extraIsolatedMargin, isCross ? tiers : undefined,
+    );
+
+    if (isCross) {
+      crossMaintMarginUsed = add(crossMaintMarginUsed, maintenanceMarginForNotional(tiers, posValue));
+    }
 
     const roe = isZero(marginUsed)
       ? '0'
@@ -116,7 +140,10 @@ export async function getClearinghouseState(userId: string, scope = ''): Promise
       totalRawUsd: balance,
       totalMarginUsed,
     },
-    crossMaintenanceMarginUsed: div(totalMarginUsed, '2'),
+    // Real per-tier maintenance margin (Cross Margin Updates task) — was
+    // `div(totalMarginUsed, '2')`. Verified 2026-07 against two live HL
+    // testnet accounts, matched to 6 decimal places both times.
+    crossMaintenanceMarginUsed: crossMaintMarginUsed,
     withdrawable: gt(withdrawable, '0') ? withdrawable : '0',
     assetPositions,
     time: Date.now(),
