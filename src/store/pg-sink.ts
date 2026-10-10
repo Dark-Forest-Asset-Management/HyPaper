@@ -2,7 +2,8 @@ import type { EventEmitter } from 'node:events';
 import { eq, and, sql } from 'drizzle-orm';
 import { id as keccakId } from 'ethers';
 import { db } from './db.js';
-import { users, orders, fills, consentRecords, funding, ledgerUpdates, twapHistory } from './schema.js';
+import { users, orders, fills, consentRecords, funding, ledgerUpdates, twapHistory, orderStatusEvents } from './schema.js';
+import type { TrailingHistoryEvent } from '../engine/trailing-state.js';
 import { logger } from '../utils/logger.js';
 import { D, mul } from '../utils/math.js';
 import type { PaperOrder, PaperFill } from '../types/order.js';
@@ -95,8 +96,7 @@ export function startPgSink(eventBus: EventEmitter): void {
     });
   });
 
-  eventBus.on('orderUpdate', (event: { userId: string; order: PaperOrder; status: string }) => {
-    const o = event.order;
+  const writeOrder = (o: PaperOrder): void => {
     enqueueWrite(async () => {
       await db.insert(orders)
         .values({
@@ -130,6 +130,29 @@ export function startPgSink(eventBus: EventEmitter): void {
             updatedAt: o.updatedAt,
           },
         });
+    });
+  };
+  eventBus.on('orderUpdate', (event: { userId: string; order: PaperOrder; status: string }) => {
+    writeOrder(event.order);
+  });
+  // Several updates delivered in one WS frame (a fired trailing stop's [triggered, filled]).
+  eventBus.on('orderUpdateBatch', (event: { updates: Array<{ order: PaperOrder }> }) => {
+    for (const u of event.updates) writeOrder(u.order);
+  });
+
+  // Append-only status history for trailing stops (→ /info historicalOrders: one row per status,
+  // each with the body frozen as of that transition). A stop reaches each status at most once.
+  eventBus.on('trailingHistory', (ev: TrailingHistoryEvent) => {
+    enqueueWrite(async () => {
+      await db.insert(orderStatusEvents)
+        .values({
+          oid: ev.oid,
+          userId: ev.userId,
+          status: ev.status,
+          statusTimestamp: ev.statusTimestamp,
+          body: ev.body,
+        })
+        .onConflictDoNothing({ target: [orderStatusEvents.oid, orderStatusEvents.status] });
     });
   });
 

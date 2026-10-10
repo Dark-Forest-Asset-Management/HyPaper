@@ -8,6 +8,7 @@ import { getUserFills } from '../engine/fill.js';
 import { getUserFundingPg, getLedgerUpdatesPg } from '../store/pg-queries.js';
 import { getActiveAssetData } from '../engine/account.js';
 import { app } from '../api/server.js';
+import { shapeOrderUpdate } from './order-updates.js';
 import type { IncomingMessage } from 'node:http';
 import type { Server } from 'node:http';
 import type {
@@ -16,6 +17,7 @@ import type {
   L2BookEvent,
   FillEvent,
   OrderUpdateEvent,
+  OrderUpdateBatchEvent,
   AccountUpdateEvent,
 } from './types.js';
 
@@ -395,10 +397,13 @@ export class HyPaperWsServer {
         return 'allMids';
       case 'l2Book':
         return sub.coin ? `l2Book:${sub.coin}` : null;
+      // User ids are stored and broadcast LOWERCASED, so the key must be too — real HL treats addresses
+      // case-insensitively and wallet libraries hand out checksummed ones (a checksummed subscriber used to
+      // silently receive nothing on these two channels; every other user channel below already lowercases).
       case 'orderUpdates':
-        return sub.user ? `orderUpdates:${sub.user}` : null;
+        return sub.user ? `orderUpdates:${sub.user.toLowerCase()}` : null;
       case 'userFills':
-        return sub.user ? `userFills:${sub.user}` : null;
+        return sub.user ? `userFills:${sub.user.toLowerCase()}` : null;
       case 'webData2':
         return sub.user ? `webData2:${sub.user.toLowerCase()}` : null;
       // Market feeds (1.2b)
@@ -473,24 +478,26 @@ export class HyPaperWsServer {
       }
     });
 
+    this.eventBus.on('orderUpdateBatch', (event: OrderUpdateBatchEvent) => {
+      if (event.updates.length === 0) return;
+      const json = JSON.stringify({
+        channel: 'orderUpdates',
+        data: event.updates.map((u) => shapeOrderUpdate(u.order, u.status)),
+      });
+      this.broadcast(`orderUpdates:${event.userId}`, json);
+      // One open-order-list change → one webData2 push, however many updates rode the frame.
+      void this.broadcastWebData2(event.userId);
+      const colon = event.updates[0].order.coin?.indexOf(':');
+      if (typeof colon === 'number' && colon > 0) {
+        void this.broadcastDexUserState(event.userId, event.updates[0].order.coin.slice(0, colon));
+      }
+    });
+
     this.eventBus.on('orderUpdate', (event: OrderUpdateEvent) => {
       const order = event.order;
       const json = JSON.stringify({
         channel: 'orderUpdates',
-        data: [{
-          order: {
-            coin: order.coin,
-            side: order.isBuy ? 'B' : 'A',
-            limitPx: order.limitPx,
-            sz: order.sz,
-            oid: order.oid,
-            timestamp: order.createdAt,
-            origSz: order.sz,
-            cloid: order.cloid,
-          },
-          status: event.status,
-          statusTimestamp: order.updatedAt,
-        }],
+        data: [shapeOrderUpdate(order, event.status)],
       });
       this.broadcast(`orderUpdates:${event.userId}`, json);
       // Open-order list changed → push webData2 too.

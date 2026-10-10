@@ -1,0 +1,159 @@
+{
+  "startedAt": "2026-10-08T17:36:07.060Z",
+  "balances": {
+    "perpAccountValue": 0,
+    "spotUsdc": 3.341403
+  },
+  "t2_webdata3": {
+    "channelCounts": {
+      "subscriptionResponse": 4,
+      "userFills": 1,
+      "error": 2,
+      "orderUpdates": 4,
+      "webData3": 33,
+      "pong": 5
+    },
+    "frames": 31,
+    "topKeys": [
+      "userState",
+      "perpDexStates"
+    ],
+    "userStateKeys": [
+      "agentAddress",
+      "agentValidUntil",
+      "cumLedger",
+      "serverTime",
+      "isVault",
+      "user",
+      "dexAbstractionEnabled",
+      "abstraction"
+    ],
+    "perOid": {
+      "w2sell": {
+        "oid": 62189268289,
+        "framesContainingIt": 0,
+        "distinctTextsInWebData3": [],
+        "distinctTextsInPolls": [
+          "Activation immediate, retracement 30, best 2400.7",
+          "Activation immediate, retracement 30, best 2400.9",
+          "Activation immediate, retracement 30, best 2401",
+          "Activation immediate, retracement 30, best 2401.3",
+          "Activation immediate, retracement 30, best 2401.5",
+          "Activation immediate, retracement 30, best 2402.79",
+          "Activation immediate, retracement 30, best 2404.4"
+        ],
+        "followsRatchet": false,
+        "rowKeysEqualFrontendRow": null,
+        "webData3Row": null,
+        "frontendRow": {
+          "coin": "ETH",
+          "side": "A",
+          "limitPx": "2137.0",
+          "sz": "0.005",
+          "oid": 62189268289,
+          "timestamp": 1791481059756,
+          "triggerCondition": "Activation immediate, retracement 30, best 2404.4",
+          "isTrigger": true,
+          "triggerPx": "2374.4",
+          "children": [],
+          "isPositionTpsl": false,
+          "reduceOnly": true,
+          "orderType": "Trailing Stop Market",
+          "origSz": "0.005",
+          "tif": null,
+          "cloid": null
+        }
+      },
+      "w2buy": {
+        "oid": 62189270639,
+        "framesContainingIt": 0,
+        "distinctTextsInWebData3": [],
+        "distinctTextsInPolls": [
+          "Activation immediate, retracement 30, best 2399.6",
+          "Activation immediate, retracement 30, best 2399.2",
+          "Activation immediate, retracement 30, best 2398.9",
+          "Activation immediate, retracement 30, best 2398.8"
+        ],
+        "followsRatchet": false,
+        "rowKeysEqualFrontendRow": null,
+        "webData3Row": null,
+        "frontendRow": {
+          "coin": "ETH",
+          "side": "B",
+          "limitPx": "2671.6",
+          "sz": "0.005",
+          "oid": 62189270639,
+          "timestamp": 1791481061494,
+          "triggerCondition": "Activation immediate, retracement 30, best 2398.8",
+          "isTrigger": true,
+          "triggerPx": "2428.8",
+          "children": [],
+          "isPositionTpsl": false,
+          "reduceOnly": true,
+          "orderType": "Trailing Stop Market",
+          "origSz": "0.005",
+          "tif": null,
+          "cloid": null
+        }
+      }
+    },
+    "perpDexStateKeys": [
+      "totalVaultEquity"
+    ]
+  },
+  "finalState": {
+    "resting": 0,
+    "positions": []
+  },
+  "t5": {
+    "flatSell": "not placed",
+    "flatBuy": "not placed",
+    "observedSeconds": 0
+  },
+  "t2": {
+    "frameKeys": [],
+    "frames": 0,
+    "perOid": {
+      "w2sell": {
+        "oid": 62189268289,
+        "framesContainingIt": 0,
+        "distinctTextsInWebData2": [],
+        "distinctTextsInFrontendOpenOrdersPolls": [
+          "Activation immediate, retracement 30, best 2400.7",
+          "Activation immediate, retracement 30, best 2400.9",
+          "Activation immediate, retracement 30, best 2401",
+          "Activation immediate, retracement 30, best 2401.3",
+          "Activation immediate, retracement 30, best 2401.5",
+          "Activation immediate, retracement 30, best 2402.79",
+          "Activation immediate, retracement 30, best 2404.4"
+        ],
+        "webData2FollowsRatchet": false,
+        "rowKeysEqualFrontendRow": null,
+        "webData2Row": null
+      },
+      "w2buy": {
+        "oid": 62189270639,
+        "framesContainingIt": 0,
+        "distinctTextsInWebData2": [],
+        "distinctTextsInFrontendOpenOrdersPolls": [
+          "Activation immediate, retracement 30, best 2399.6",
+          "Activation immediate, retracement 30, best 2399.2",
+          "Activation immediate, retracement 30, best 2398.9",
+          "Activation immediate, retracement 30, best 2398.8"
+        ],
+        "webData2FollowsRatchet": false,
+        "rowKeysEqualFrontendRow": null,
+        "webData2Row": null
+      }
+    }
+  },
+  "finishedAt": "2026-10-08T17:38:50.618Z",
+  "wsChannelCounts": {
+    "subscriptionResponse": 4,
+    "userFills": 1,
+    "error": 2,
+    "orderUpdates": 4,
+    "webData3": 33,
+    "pong": 5
+  }
+}

@@ -1,0 +1,193 @@
+{
+  "activationPx": "82856",
+  "ticks": [
+    {
+      "t": "2026-10-08T10:57:49.477Z",
+      "mid": 82830.5,
+      "frontend": {
+        "coin": "BTC",
+        "side": "B",
+        "limitPx": "94414.0",
+        "sz": "0.00015",
+        "oid": 62156561212,
+        "timestamp": 1791457155118,
+        "triggerCondition": "Activation below 82856, retracement 3000, best 82831",
+        "isTrigger": true,
+        "triggerPx": "85831.0",
+        "children": [],
+        "isPositionTpsl": false,
+        "reduceOnly": false,
+        "orderType": "Trailing Stop Market",
+        "origSz": "0.00015",
+        "tif": null,
+        "cloid": null
+      },
+      "orderStatus": {
+        "status": "order",
+        "order": {
+          "order": {
+            "coin": "BTC",
+            "side": "B",
+            "limitPx": "94414.0",
+            "sz": "0.00015",
+            "oid": 62156561212,
+            "timestamp": 1791457155118,
+            "triggerCondition": "Activation below 82856, retracement 3000, best 82831",
+            "isTrigger": true,
+            "triggerPx": "85831.0",
+            "children": [],
+            "isPositionTpsl": false,
+            "reduceOnly": false,
+            "orderType": "Trailing Stop Market",
+            "origSz": "0.00015",
+            "tif": null,
+            "cloid": null
+          },
+          "status": "open",
+          "statusTimestamp": 1791457155118
+        }
+      }
+    },
+    {
+      "t": "2026-10-08T10:57:55.572Z",
+      "mid": 82831.5,
+      "frontend": {
+        "coin": "BTC",
+        "side": "B",
+        "limitPx": "94414.0",
+        "sz": "0.00015",
+        "oid": 62156561212,
+        "timestamp": 1791457155118,
+        "triggerCondition": "Activation below 82856, retracement 3000, best 82831",
+        "isTrigger": true,
+        "triggerPx": "85831.0",
+        "children": [],
+        "isPositionTpsl": false,
+        "reduceOnly": false,
+        "orderType": "Trailing Stop Market",
+        "origSz": "0.00015",
+        "tif": null,
+        "cloid": null
+      },
+      "orderStatus": {
+        "status": "order",
+        "order": {
+          "order": {
+            "coin": "BTC",
+            "side": "B",
+            "limitPx": "94414.0",
+            "sz": "0.00015",
+            "oid": 62156561212,
+            "timestamp": 1791457155118,
+            "triggerCondition": "Activation below 82856, retracement 3000, best 82831",
+            "isTrigger": true,
+            "triggerPx": "85831.0",
+            "children": [],
+            "isPositionTpsl": false,
+            "reduceOnly": false,
+            "orderType": "Trailing Stop Market",
+            "origSz": "0.00015",
+            "tif": null,
+            "cloid": null
+          },
+          "status": "open",
+          "statusTimestamp": 1791457155118
+        }
+      }
+    },
+    {
+      "t": "2026-10-08T10:58:01.908Z",
+      "mid": 82831.5,
+      "frontend": {
+        "coin": "BTC",
+        "side": "B",
+        "limitPx": "94414.0",
+        "sz": "0.00015",
+        "oid": 62156561212,
+        "timestamp": 1791457155118,
+        "triggerCondition": "Activation below 82856, retracement 3000, best 82831",
+        "isTrigger": true,
+        "triggerPx": "85831.0",
+        "children": [],
+        "isPositionTpsl": false,
+        "reduceOnly": false,
+        "orderType": "Trailing Stop Market",
+        "origSz": "0.00015",
+        "tif": null,
+        "cloid": null
+      },
+      "orderStatus": {
+        "status": "order",
+        "order": {
+          "order": {
+            "coin": "BTC",
+            "side": "B",
+            "limitPx": "94414.0",
+            "sz": "0.00015",
+            "oid": 62156561212,
+            "timestamp": 1791457155118,
+            "triggerCondition": "Activation below 82856, retracement 3000, best 82831",
+            "isTrigger": true,
+            "triggerPx": "85831.0",
+            "children": [],
+            "isPositionTpsl": false,
+            "reduceOnly": false,
+            "orderType": "Trailing Stop Market",
+            "origSz": "0.00015",
+            "tif": null,
+            "cloid": null
+          },
+          "status": "open",
+          "statusTimestamp": 1791457155118
+        }
+      }
+    },
+    {
+      "t": "2026-10-08T10:58:08.227Z",
+      "mid": 82850.5,
+      "frontend": {
+        "coin": "BTC",
+        "side": "B",
+        "limitPx": "94414.0",
+        "sz": "0.00015",
+        "oid": 62156561212,
+        "timestamp": 1791457155118,
+        "triggerCondition": "Activation below 82856, retracement 3000, best 82831",
+        "isTrigger": true,
+        "triggerPx": "85831.0",
+        "children": [],
+        "isPositionTpsl": false,
+        "reduceOnly": false,
+        "orderType": "Trailing Stop Market",
+        "origSz": "0.00015",
+        "tif": null,
+        "cloid": null
+      },
+      "orderStatus": {
+        "status": "order",
+        "order": {
+          "order": {
+            "coin": "BTC",
+            "side": "B",
+            "limitPx": "94414.0",
+            "sz": "0.00015",
+            "oid": 62156561212,
+            "timestamp": 1791457155118,
+            "triggerCondition": "Activation below 82856, retracement 3000, best 82831",
+            "isTrigger": true,
+            "triggerPx": "85831.0",
+            "children": [],
+            "isPositionTpsl": false,
+            "reduceOnly": false,
+            "orderType": "Trailing Stop Market",
+            "origSz": "0.00015",
+            "tif": null,
+            "cloid": null
+          },
+          "status": "open",
+          "statusTimestamp": 1791457155118
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,1058 @@
+{
+ "_doc": "Distinct live frontendOpenOrders trailing-stop rows captured from HL testnet across probe rounds 1-6 (BTC szDecimals 5, ETH 4, SOL 2). Used to prove the trigger/limit/triggerCondition rules reproduce HL byte-for-byte.",
+ "rows": [
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "B",
+   "triggerCondition": "Activation below 81052, retracement 2507, best waiting",
+   "triggerPx": "0.0",
+   "limitPx": "91914.0",
+   "reduceOnly": false
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "B",
+   "triggerCondition": "Activation immediate, retracement 5%, best 83561",
+   "triggerPx": "87739.1",
+   "limitPx": "96513.0",
+   "reduceOnly": false
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "B",
+   "triggerCondition": "Activation immediate, retracement 2507, best 83559",
+   "triggerPx": "86066.0",
+   "limitPx": "94672.0",
+   "reduceOnly": false
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "A",
+   "triggerCondition": "Activation above 86066, retracement 2507, best waiting",
+   "triggerPx": "0.0",
+   "limitPx": "75204.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 5%, best 83564",
+   "triggerPx": "79385.8",
+   "limitPx": "71448.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 2507, best 83564",
+   "triggerPx": "81057.0",
+   "limitPx": "72952.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 2507, best 83563",
+   "triggerPx": "81056.0",
+   "limitPx": "72951.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 5%, best 83563",
+   "triggerPx": "79384.9",
+   "limitPx": "71447.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "B",
+   "triggerCondition": "Activation immediate, retracement 5%, best 83564",
+   "triggerPx": "87742.2",
+   "limitPx": "96516.0",
+   "reduceOnly": false
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 5%, best 83565",
+   "triggerPx": "79386.8",
+   "limitPx": "71449.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 2507, best 83565",
+   "triggerPx": "81058.0",
+   "limitPx": "72953.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 5%, best 83569",
+   "triggerPx": "79390.6",
+   "limitPx": "71452.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 2507, best 83569",
+   "triggerPx": "81062.0",
+   "limitPx": "72956.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 5%, best 83579",
+   "triggerPx": "79400.1",
+   "limitPx": "71461.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 2507, best 83579",
+   "triggerPx": "81072.0",
+   "limitPx": "72965.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 5%, best 83581",
+   "triggerPx": "79402.0",
+   "limitPx": "71462.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 2507, best 83581",
+   "triggerPx": "81074.0",
+   "limitPx": "72967.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 5%, best 83583",
+   "triggerPx": "79403.9",
+   "limitPx": "71464.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 2507, best 83583",
+   "triggerPx": "81076.0",
+   "limitPx": "72969.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 5%, best 83587",
+   "triggerPx": "79407.7",
+   "limitPx": "71467.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 2507, best 83587",
+   "triggerPx": "81080.0",
+   "limitPx": "72973.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "B",
+   "triggerCondition": "Activation immediate, retracement 5%, best 83553",
+   "triggerPx": "87730.7",
+   "limitPx": "96503.0",
+   "reduceOnly": false
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "B",
+   "triggerCondition": "Activation immediate, retracement 2507, best 83553",
+   "triggerPx": "86060.0",
+   "limitPx": "94666.0",
+   "reduceOnly": false
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 5, best 82760.2",
+   "triggerPx": "82755.2",
+   "limitPx": "74480.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "A",
+   "triggerCondition": "Activation above 82761, retracement 3000, best 82762",
+   "triggerPx": "79762.0",
+   "limitPx": "71786.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "A",
+   "triggerCondition": "Activation above 82761, retracement 3000, best waiting",
+   "triggerPx": "0.0",
+   "limitPx": "71785.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "A",
+   "triggerCondition": "Activation above 82680, retracement 3000, best 82747",
+   "triggerPx": "79747.0",
+   "limitPx": "71773.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "A",
+   "triggerCondition": "Activation above 82680, retracement 3000, best 82705",
+   "triggerPx": "79705.0",
+   "limitPx": "71735.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "A",
+   "triggerCondition": "Activation above 81054, retracement 2507, best 83548",
+   "triggerPx": "81041.0",
+   "limitPx": "72937.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 5%, best 83604",
+   "triggerPx": "79423.8",
+   "limitPx": "71482.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 3000, best 83590.1",
+   "triggerPx": "80590.1",
+   "limitPx": "72532.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "A",
+   "triggerCondition": "Activation above 86218, retracement 3000, best waiting",
+   "triggerPx": "0.0",
+   "limitPx": "74897.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "B",
+   "triggerCondition": "Activation below 81196, retracement 3000, best waiting",
+   "triggerPx": "0.0",
+   "limitPx": "92615.0",
+   "reduceOnly": false
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "B",
+   "triggerCondition": "Activation immediate, retracement 3000, best 83531",
+   "triggerPx": "86531.0",
+   "limitPx": "95184.0",
+   "reduceOnly": false
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "B",
+   "triggerCondition": "Activation immediate, retracement 5%, best 83531",
+   "triggerPx": "87707.6",
+   "limitPx": "96478.0",
+   "reduceOnly": false
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "B",
+   "triggerCondition": "Activation immediate, retracement 3000, best 83567",
+   "triggerPx": "86567.0",
+   "limitPx": "95223.0",
+   "reduceOnly": false
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "B",
+   "triggerCondition": "Activation immediate, retracement 5%, best 83552",
+   "triggerPx": "87729.6",
+   "limitPx": "96502.0",
+   "reduceOnly": false
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 3000, best 83550",
+   "triggerPx": "80550.0",
+   "limitPx": "72496.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "A",
+   "triggerCondition": "Activation above 82680, retracement 3000, best 82706",
+   "triggerPx": "79706.0",
+   "limitPx": "71736.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "A",
+   "triggerCondition": "Activation above 82680, retracement 3000, best 82739",
+   "triggerPx": "79739.0",
+   "limitPx": "71766.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "B",
+   "triggerCondition": "Activation below 82856, retracement 3000, best 82831",
+   "triggerPx": "85831.0",
+   "limitPx": "94414.0",
+   "reduceOnly": false
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "B",
+   "triggerCondition": "Activation below 82841, retracement 3000, best 82831",
+   "triggerPx": "85831.0",
+   "limitPx": "94414.0",
+   "reduceOnly": false
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "B",
+   "triggerCondition": "Activation immediate, retracement 0.5, best 82822",
+   "triggerPx": "82822.5",
+   "limitPx": "91104.0",
+   "reduceOnly": false
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "B",
+   "triggerCondition": "Activation immediate, retracement 0.5, best 82831",
+   "triggerPx": "82831.5",
+   "limitPx": "91114.0",
+   "reduceOnly": false
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "B",
+   "triggerCondition": "Activation immediate, retracement 0.5, best 82828",
+   "triggerPx": "82828.5",
+   "limitPx": "91111.0",
+   "reduceOnly": false
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "B",
+   "triggerCondition": "Activation immediate, retracement 0.5, best 82825",
+   "triggerPx": "82825.5",
+   "limitPx": "91108.0",
+   "reduceOnly": false
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 3000, best 82705",
+   "triggerPx": "79705.0",
+   "limitPx": "71735.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 0.01%, best 82719",
+   "triggerPx": "82710.7",
+   "limitPx": "74440.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 0.01%, best 82730",
+   "triggerPx": "82721.7",
+   "limitPx": "74450.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 3000, best 82642",
+   "triggerPx": "79642.0",
+   "limitPx": "71678.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "B",
+   "triggerCondition": "Activation immediate, retracement 3000, best 82642",
+   "triggerPx": "85642.0",
+   "limitPx": "94206.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 3000, best 82639.9",
+   "triggerPx": "79639.9",
+   "limitPx": "71676.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "B",
+   "triggerCondition": "Activation immediate, retracement 5, best 81123",
+   "triggerPx": "81128.0",
+   "limitPx": "89240.0",
+   "reduceOnly": false
+  },
+  {
+   "coin": "SOL",
+   "szDecimals": 2,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 0.05, best 105.9803",
+   "triggerPx": "105.9303",
+   "limitPx": "95.338",
+   "reduceOnly": true
+  },
+  {
+   "coin": "SOL",
+   "szDecimals": 2,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 0.05, best 106.23",
+   "triggerPx": "106.18",
+   "limitPx": "95.563",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 5, best 81266",
+   "triggerPx": "81261.0",
+   "limitPx": "73135.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 5, best 81189",
+   "triggerPx": "81184.0",
+   "limitPx": "73066.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "B",
+   "triggerCondition": "Activation immediate, retracement 5, best 81107",
+   "triggerPx": "81112.0",
+   "limitPx": "89223.0",
+   "reduceOnly": false
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "B",
+   "triggerCondition": "Activation below 81323, retracement 3000, best waiting",
+   "triggerPx": "0.0",
+   "limitPx": "92755.0",
+   "reduceOnly": false
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "B",
+   "triggerCondition": "Activation immediate, retracement 30, best 2398.1",
+   "triggerPx": "2428.1",
+   "limitPx": "2670.9",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 30, best 2399.3",
+   "triggerPx": "2369.3",
+   "limitPx": "2132.4",
+   "reduceOnly": true
+  },
+  {
+   "coin": "SOL",
+   "szDecimals": 2,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 0.05, best 107.28",
+   "triggerPx": "107.23",
+   "limitPx": "96.508",
+   "reduceOnly": true
+  },
+  {
+   "coin": "SOL",
+   "szDecimals": 2,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 0.123, best 107.28",
+   "triggerPx": "107.157",
+   "limitPx": "96.442",
+   "reduceOnly": true
+  },
+  {
+   "coin": "SOL",
+   "szDecimals": 2,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 1.5, best 107.28",
+   "triggerPx": "105.78",
+   "limitPx": "95.203",
+   "reduceOnly": true
+  },
+  {
+   "coin": "SOL",
+   "szDecimals": 2,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 0.5%, best 107.28",
+   "triggerPx": "106.7436",
+   "limitPx": "96.07",
+   "reduceOnly": true
+  },
+  {
+   "coin": "SOL",
+   "szDecimals": 2,
+   "side": "A",
+   "triggerCondition": "Activation above 107.49, retracement 0.5, best waiting",
+   "triggerPx": "0.0",
+   "limitPx": "96.292",
+   "reduceOnly": true
+  },
+  {
+   "coin": "SOL",
+   "szDecimals": 2,
+   "side": "B",
+   "triggerCondition": "Activation immediate, retracement 0.05, best 107.28",
+   "triggerPx": "107.33",
+   "limitPx": "118.06",
+   "reduceOnly": true
+  },
+  {
+   "coin": "SOL",
+   "szDecimals": 2,
+   "side": "B",
+   "triggerCondition": "Activation immediate, retracement 0.123, best 107.28",
+   "triggerPx": "107.403",
+   "limitPx": "118.14",
+   "reduceOnly": true
+  },
+  {
+   "coin": "SOL",
+   "szDecimals": 2,
+   "side": "B",
+   "triggerCondition": "Activation immediate, retracement 0.5%, best 107.28",
+   "triggerPx": "107.8164",
+   "limitPx": "118.59",
+   "reduceOnly": true
+  },
+  {
+   "coin": "SOL",
+   "szDecimals": 2,
+   "side": "B",
+   "triggerCondition": "Activation below 107.07, retracement 0.5, best waiting",
+   "triggerPx": "0.0",
+   "limitPx": "118.32",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 0.05, best 2399.4",
+   "triggerPx": "2399.35",
+   "limitPx": "2159.5",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 0.12, best 2399.4",
+   "triggerPx": "2399.28",
+   "limitPx": "2159.4",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 1.5, best 2399.4",
+   "triggerPx": "2397.9",
+   "limitPx": "2158.2",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 0.5%, best 2398.9",
+   "triggerPx": "2386.91",
+   "limitPx": "2148.3",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "A",
+   "triggerCondition": "Activation above 2403.1, retracement 0.5, best waiting",
+   "triggerPx": "0.0",
+   "limitPx": "2162.4",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "B",
+   "triggerCondition": "Activation immediate, retracement 0.05, best 2398.6",
+   "triggerPx": "2398.65",
+   "limitPx": "2638.5",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "B",
+   "triggerCondition": "Activation immediate, retracement 0.12, best 2398.7",
+   "triggerPx": "2398.82",
+   "limitPx": "2638.7",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "B",
+   "triggerCondition": "Activation immediate, retracement 0.5%, best 2398.7",
+   "triggerPx": "2410.69",
+   "limitPx": "2651.7",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "B",
+   "triggerCondition": "Activation below 2393.5, retracement 0.5, best waiting",
+   "triggerPx": "0.0",
+   "limitPx": "2633.4",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 3000, best 81352.6",
+   "triggerPx": "78352.6",
+   "limitPx": "70518.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "B",
+   "triggerCondition": "Activation immediate, retracement 5, best 81294",
+   "triggerPx": "81299.0",
+   "limitPx": "89428.0",
+   "reduceOnly": false
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 30, best 2398.1",
+   "triggerPx": "2368.1",
+   "limitPx": "2131.3",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 30, best 2399.7",
+   "triggerPx": "2369.7",
+   "limitPx": "2132.8",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 30, best 2399.8",
+   "triggerPx": "2369.8",
+   "limitPx": "2132.9",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 30, best 2401.7",
+   "triggerPx": "2371.7",
+   "limitPx": "2134.6",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 30, best 2401.8",
+   "triggerPx": "2371.8",
+   "limitPx": "2134.7",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 30, best 2401.9",
+   "triggerPx": "2371.9",
+   "limitPx": "2134.8",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 30, best 2402.3",
+   "triggerPx": "2372.3",
+   "limitPx": "2135.1",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 30, best 2402.4",
+   "triggerPx": "2372.4",
+   "limitPx": "2135.2",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 30, best 2402.5",
+   "triggerPx": "2372.5",
+   "limitPx": "2135.3",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 30, best 2402.6",
+   "triggerPx": "2372.6",
+   "limitPx": "2135.4",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 30, best 2399",
+   "triggerPx": "2369.0",
+   "limitPx": "2132.2",
+   "reduceOnly": true
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "B",
+   "triggerCondition": "Activation below 81323, retracement 3000, best 81294",
+   "triggerPx": "84294.0",
+   "limitPx": "92723.0",
+   "reduceOnly": false
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "B",
+   "triggerCondition": "Activation below 81323, retracement 3000, best 81262",
+   "triggerPx": "84262.0",
+   "limitPx": "92688.0",
+   "reduceOnly": false
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "B",
+   "triggerCondition": "Activation below 81323, retracement 3000, best 81256",
+   "triggerPx": "84256.0",
+   "limitPx": "92681.0",
+   "reduceOnly": false
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "B",
+   "triggerCondition": "Activation below 81323, retracement 3000, best 81234",
+   "triggerPx": "84234.0",
+   "limitPx": "92657.0",
+   "reduceOnly": false
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "B",
+   "triggerCondition": "Activation below 81323, retracement 3000, best 81201",
+   "triggerPx": "84201.0",
+   "limitPx": "92621.0",
+   "reduceOnly": false
+  },
+  {
+   "coin": "BTC",
+   "szDecimals": 5,
+   "side": "B",
+   "triggerCondition": "Activation below 81323, retracement 3000, best 81181",
+   "triggerPx": "84181.0",
+   "limitPx": "92599.0",
+   "reduceOnly": false
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 30, best 2392.3",
+   "triggerPx": "2362.3",
+   "limitPx": "2126.1",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 30, best 2393.86",
+   "triggerPx": "2363.86",
+   "limitPx": "2127.5",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 30, best 2393.88",
+   "triggerPx": "2363.88",
+   "limitPx": "2127.5",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "B",
+   "triggerCondition": "Activation immediate, retracement 30, best 2392.1",
+   "triggerPx": "2422.1",
+   "limitPx": "2664.3",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "B",
+   "triggerCondition": "Activation immediate, retracement 30, best 2392",
+   "triggerPx": "2422.0",
+   "limitPx": "2664.2",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "B",
+   "triggerCondition": "Activation immediate, retracement 30, best 2391.8",
+   "triggerPx": "2421.8",
+   "limitPx": "2663.9",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "B",
+   "triggerCondition": "Activation immediate, retracement 30, best 2390.12",
+   "triggerPx": "2420.12",
+   "limitPx": "2662.1",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 30, best 2404.4",
+   "triggerPx": "2374.4",
+   "limitPx": "2137.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "B",
+   "triggerCondition": "Activation immediate, retracement 30, best 2398.8",
+   "triggerPx": "2428.8",
+   "limitPx": "2671.6",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 30, best 2400.7",
+   "triggerPx": "2370.7",
+   "limitPx": "2133.7",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 30, best 2400.9",
+   "triggerPx": "2370.9",
+   "limitPx": "2133.9",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 30, best 2401",
+   "triggerPx": "2371.0",
+   "limitPx": "2134.0",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 30, best 2401.3",
+   "triggerPx": "2371.3",
+   "limitPx": "2134.2",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 30, best 2401.5",
+   "triggerPx": "2371.5",
+   "limitPx": "2134.4",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "A",
+   "triggerCondition": "Activation immediate, retracement 30, best 2402.79",
+   "triggerPx": "2372.79",
+   "limitPx": "2135.6",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "B",
+   "triggerCondition": "Activation immediate, retracement 30, best 2399.6",
+   "triggerPx": "2429.6",
+   "limitPx": "2672.5",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "B",
+   "triggerCondition": "Activation immediate, retracement 30, best 2399.2",
+   "triggerPx": "2429.2",
+   "limitPx": "2672.1",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "B",
+   "triggerCondition": "Activation immediate, retracement 30, best 2398.9",
+   "triggerPx": "2428.9",
+   "limitPx": "2671.7",
+   "reduceOnly": true
+  },
+  {
+   "coin": "ETH",
+   "szDecimals": 4,
+   "side": "B",
+   "triggerCondition": "Activation immediate, retracement 30, best 2400.7",
+   "triggerPx": "2430.7",
+   "limitPx": "2673.7",
+   "reduceOnly": true
+  }
+ ]
+}

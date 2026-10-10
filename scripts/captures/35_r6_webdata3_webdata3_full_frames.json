@@ -1,0 +1,1803 @@
+{
+  "first": [
+    {
+      "channel": "webData3",
+      "data": {
+        "userState": {
+          "agentAddress": "0xc49552efa1a56f4b84cb434b5b9b639f49e0bb4d",
+          "agentValidUntil": 1792614443025,
+          "cumLedger": "997.8",
+          "serverTime": 1791481062570,
+          "isVault": false,
+          "user": "0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b",
+          "dexAbstractionEnabled": false,
+          "abstraction": "unifiedAccount"
+        },
+        "perpDexStates": [
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          }
+        ]
+      }
+    },
+    {
+      "channel": "webData3",
+      "data": {
+        "userState": {
+          "agentAddress": "0xc49552efa1a56f4b84cb434b5b9b639f49e0bb4d",
+          "agentValidUntil": 1792614443025,
+          "cumLedger": "997.8",
+          "serverTime": 1791481064768,
+          "isVault": false,
+          "user": "0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b",
+          "dexAbstractionEnabled": false,
+          "abstraction": "unifiedAccount"
+        },
+        "perpDexStates": [
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          },
+          {
+            "totalVaultEquity": "0.0"
+          }
+        ]
+      }
+    }
+  ],
+  "samples": [
+    {
+      "t": "2026-10-08T17:36:15.527Z",
+      "serverTime": 1791481062570,
+      "ours": []
+    },
+    {
+      "t": "2026-10-08T17:36:17.603Z",
+      "serverTime": 1791481064768,
+      "ours": []
+    },
+    {
+      "t": "2026-10-08T17:36:22.636Z",
+      "serverTime": 1791481069791,
+      "ours": []
+    },
+    {
+      "t": "2026-10-08T17:36:28.283Z",
+      "serverTime": 1791481074810,
+      "ours": []
+    },
+    {
+      "t": "2026-10-08T17:36:32.869Z",
+      "serverTime": 1791481079833,
+      "ours": []
+    },
+    {
+      "t": "2026-10-08T17:36:37.726Z",
+      "serverTime": 1791481084859,
+      "ours": []
+    },
+    {
+      "t": "2026-10-08T17:36:42.784Z",
+      "serverTime": 1791481089890,
+      "ours": []
+    },
+    {
+      "t": "2026-10-08T17:36:47.762Z",
+      "serverTime": 1791481094907,
+      "ours": []
+    },
+    {
+      "t": "2026-10-08T17:36:52.781Z",
+      "serverTime": 1791481099945,
+      "ours": []
+    },
+    {
+      "t": "2026-10-08T17:36:58.837Z",
+      "serverTime": 1791481104992,
+      "ours": []
+    },
+    {
+      "t": "2026-10-08T17:37:03.044Z",
+      "serverTime": 1791481110023,
+      "ours": []
+    },
+    {
+      "t": "2026-10-08T17:37:07.899Z",
+      "serverTime": 1791481115052,
+      "ours": []
+    },
+    {
+      "t": "2026-10-08T17:37:12.924Z",
+      "serverTime": 1791481120099,
+      "ours": []
+    },
+    {
+      "t": "2026-10-08T17:37:18.015Z",
+      "serverTime": 1791481125143,
+      "ours": []
+    },
+    {
+      "t": "2026-10-08T17:37:22.980Z",
+      "serverTime": 1791481130170,
+      "ours": []
+    },
+    {
+      "t": "2026-10-08T17:37:28.098Z",
+      "serverTime": 1791481135208,
+      "ours": []
+    },
+    {
+      "t": "2026-10-08T17:37:33.763Z",
+      "serverTime": 1791481140269,
+      "ours": []
+    },
+    {
+      "t": "2026-10-08T17:37:39.128Z",
+      "serverTime": 1791481145234,
+      "ours": []
+    },
+    {
+      "t": "2026-10-08T17:37:43.227Z",
+      "serverTime": 1791481150254,
+      "ours": []
+    },
+    {
+      "t": "2026-10-08T17:37:48.715Z",
+      "serverTime": 1791481155271,
+      "ours": []
+    },
+    {
+      "t": "2026-10-08T17:37:53.230Z",
+      "serverTime": 1791481160319,
+      "ours": []
+    },
+    {
+      "t": "2026-10-08T17:37:58.867Z",
+      "serverTime": 1791481165355,
+      "ours": []
+    },
+    {
+      "t": "2026-10-08T17:38:03.283Z",
+      "serverTime": 1791481170367,
+      "ours": []
+    },
+    {
+      "t": "2026-10-08T17:38:09.038Z",
+      "serverTime": 1791481175437,
+      "ours": []
+    },
+    {
+      "t": "2026-10-08T17:38:13.977Z",
+      "serverTime": 1791481180451,
+      "ours": []
+    },
+    {
+      "t": "2026-10-08T17:38:18.799Z",
+      "serverTime": 1791481185457,
+      "ours": []
+    },
+    {
+      "t": "2026-10-08T17:38:23.481Z",
+      "serverTime": 1791481190466,
+      "ours": []
+    },
+    {
+      "t": "2026-10-08T17:38:28.554Z",
+      "serverTime": 1791481195494,
+      "ours": []
+    },
+    {
+      "t": "2026-10-08T17:38:33.763Z",
+      "serverTime": 1791481200818,
+      "ours": []
+    },
+    {
+      "t": "2026-10-08T17:38:38.988Z",
+      "serverTime": 1791481205599,
+      "ours": []
+    },
+    {
+      "t": "2026-10-08T17:38:43.786Z",
+      "serverTime": 1791481210654,
+      "ours": []
+    }
+  ]
+}

@@ -1,0 +1,69 @@
+{
+  "startedAt": "2026-10-08T17:23:04.538Z",
+  "balances": {
+    "perpAccountValue": 0,
+    "spotUsdc": 3.482453
+  },
+  "t2_debug": {
+    "channelCounts": {
+      "subscriptionResponse": 4,
+      "userFills": 1,
+      "error": 2,
+      "orderUpdates": 4,
+      "webData3": 33,
+      "pong": 5
+    },
+    "web2Frames": 0
+  },
+  "finalState": {
+    "resting": 0,
+    "positions": []
+  },
+  "t5": {
+    "flatSell": "not placed",
+    "flatBuy": "not placed",
+    "observedSeconds": 0
+  },
+  "t2": {
+    "frameKeys": [],
+    "frames": 0,
+    "perOid": {
+      "w2sell": {
+        "oid": 62187934589,
+        "framesContainingIt": 0,
+        "distinctTextsInWebData2": [],
+        "distinctTextsInFrontendOpenOrdersPolls": [
+          "Activation immediate, retracement 30, best 2392.3",
+          "Activation immediate, retracement 30, best 2393.86",
+          "Activation immediate, retracement 30, best 2393.88"
+        ],
+        "webData2FollowsRatchet": false,
+        "rowKeysEqualFrontendRow": null,
+        "webData2Row": null
+      },
+      "w2buy": {
+        "oid": 62187940018,
+        "framesContainingIt": 0,
+        "distinctTextsInWebData2": [],
+        "distinctTextsInFrontendOpenOrdersPolls": [
+          "Activation immediate, retracement 30, best 2392.1",
+          "Activation immediate, retracement 30, best 2392",
+          "Activation immediate, retracement 30, best 2391.8",
+          "Activation immediate, retracement 30, best 2390.12"
+        ],
+        "webData2FollowsRatchet": false,
+        "rowKeysEqualFrontendRow": null,
+        "webData2Row": null
+      }
+    }
+  },
+  "finishedAt": "2026-10-08T17:25:48.287Z",
+  "wsChannelCounts": {
+    "subscriptionResponse": 4,
+    "userFills": 1,
+    "error": 2,
+    "orderUpdates": 4,
+    "webData3": 33,
+    "pong": 5
+  }
+}

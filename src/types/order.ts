@@ -1,4 +1,8 @@
-export type OrderStatus = 'open' | 'filled' | 'cancelled' | 'triggered' | 'rejected';
+// `reduceOnlyCanceled` / `marginCanceled` are HL status strings (observed for trailing
+// stops: an open reduce-only order whose position went flat or flipped).
+export type OrderStatus =
+  | 'open' | 'filled' | 'cancelled' | 'triggered' | 'rejected'
+  | 'reduceOnlyCanceled' | 'marginCanceled';
 export type OrderSide = 'buy' | 'sell';
 export type TimeInForce = 'Gtc' | 'Ioc' | 'Alo';
 export type TpSl = 'tp' | 'sl';
@@ -12,7 +16,7 @@ export interface PaperOrder {
   isBuy: boolean;
   sz: string;         // original size
   limitPx: string;    // limit price
-  orderType: 'limit' | 'trigger';
+  orderType: 'limit' | 'trigger' | 'trailingStop';
   tif: TimeInForce;
   reduceOnly: boolean;
   // trigger fields

@@ -1,0 +1,36 @@
+{
+  "label": "T9b: ETH flat sell stop with expiresAfter in the PAST",
+  "request": {
+    "action": {
+      "type": "trailingStop",
+      "asset": 4,
+      "isBuy": false,
+      "sz": "0.005",
+      "reduceOnly": true,
+      "retracement": {
+        "px": "30"
+      },
+      "activationPx": null
+    },
+    "nonce": 1791479639899,
+    "signature": {
+      "r": "0xdfc95e06c025660709b56c2b0e89dbff3e63da7a73f2f31ddf6813a48725486b",
+      "s": "0x611a0799648dc1e907194de66fe096070e75328b36173adcdb35332c715b8ed8",
+      "v": 28
+    },
+    "expiresAfter": 1791479629894
+  },
+  "response": {
+    "status": "err",
+    "response": "Action already expired"
+  },
+  "httpStatus": 200,
+  "meta": {
+    "nonce": 1791479639899,
+    "msgpackHex": "0x87a474797065ac747261696c696e6753746f70a5617373657404a56973427579c2a2737aa5302e303035aa7265647563654f6e6c79c3ab726574726163656d656e7481a27078a23330ac61637469766174696f6e5078c0",
+    "connectionId": "0xc69bbd6473e07e4ee867af2f0a9018781a6fe535aeda1de29e384758169e1d5d",
+    "expiresAfter": 1791479629894
+  },
+  "immediateRow": null,
+  "immediateOrderStatus": null
+}

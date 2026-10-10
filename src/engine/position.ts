@@ -12,6 +12,8 @@ import {
 import { getMarginTiersForCoin, maintenanceMarginForNotional } from './marginTiers.js';
 import { abs, sub, mul, div, isZero, gt, add, D } from '../utils/math.js';
 import type { HlClearinghouseState, HlAssetPosition, HlMeta } from '../types/hl.js';
+import { config } from '../config.js';
+import { isTrailingHash, buildTrailingBody, buildTrailingOpenOrderRow, buildTrailingOrderStatus } from './trailing-math.js';
 
 export async function getClearinghouseState(userId: string, scope = ''): Promise<HlClearinghouseState> {
   const balance = await getBalance(userId, scope);
@@ -159,6 +161,12 @@ export async function getOpenOrders(userId: string, scope = '') {
     const data = await redis.hgetall(KEYS.ORDER(oid));
     if (!data.oid || data.status !== 'open') continue;
 
+    // Trailing stops are plain resting orders in openOrders (HL shows no trailing info here).
+    if (isTrailingHash(data)) {
+      orders.push(buildTrailingOpenOrderRow(data));
+      continue;
+    }
+
     // HL prod /info openOrders shape, captured 2026-05-09: each entry has
     // exactly these 8 fields — coin, side, limitPx, sz, oid, timestamp,
     // origSz, reduceOnly. `cloid` is omitted entirely when not set (HL
@@ -196,6 +204,8 @@ function buildFrontendOpenOrderRow(
   oid: number,
   data: Record<string, string>,
 ): FrontendOpenOrderRow {
+  // Trailing stops: orderType "Trailing Stop Market", triggerCondition prose, live triggerPx.
+  if (isTrailingHash(data)) return buildTrailingBody(data, false);
   const isTrigger = data.orderType === 'trigger';
   const isBuy = data.isBuy === 'true';
   const triggerPx = data.triggerPx || '0.0';
@@ -339,6 +349,9 @@ export async function getOrderStatus(oid: number) {
   if (!data.oid) {
     return { status: 'unknownOid' };
   }
+
+  // Trailing stops: frozen snapshot by default (HL parity, D1), live when the env flag is set.
+  if (isTrailingHash(data)) return buildTrailingOrderStatus(data, config.TRAILING_ORDERSTATUS_LIVE === true);
 
   // HL prod /info orderStatus uses a NESTED structure, captured 2026-05-09
   // against oid 418261286180 (filled XRP entry):

@@ -395,6 +395,17 @@ async function closePositionSlice(
 
   await pipeline.exec();
 
+  // The position shrank / closed: orphan any open reduce-only trailing stop that can no longer reduce it.
+  // (Lazy import — the worker module must not be a static dependency of the engine. Skipped entirely
+  // when no trailing stop exists.)
+  if ((await redis.smembers(KEYS.ORDERS_TRAILING)).length > 0) {
+    const { eventBus } = await import('../worker/index.js');
+    const { reconcileReduceOnlyStops } = await import('./trailing-state.js');
+    const szAfter = isZero(newSziAbs) ? '0' : isLong ? newSziAbs : `-${newSziAbs}`;
+    const orphans = await reconcileReduceOnlyStops(eventBus, userId, asset, szAfter);
+    if (orphans.length > 0) eventBus.emit('orderUpdateBatch', { userId, updates: orphans });
+  }
+
   return recoveredClamped;
 }
 

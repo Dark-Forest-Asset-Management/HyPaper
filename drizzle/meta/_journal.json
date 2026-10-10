@@ -50,6 +50,13 @@
       "when": 1784153774127,
       "tag": "0006_quiet_colossus",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791460781153,
+      "tag": "0007_pink_the_twelve",
+      "breakpoints": true
     }
   ]
 }

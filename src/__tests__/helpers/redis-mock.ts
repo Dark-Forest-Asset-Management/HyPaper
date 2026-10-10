@@ -49,7 +49,12 @@ export class RedisMock {
 
   // --- Hash commands ---
 
-  async hset(key: string, ...args: string[]): Promise<number> {
+  async hset(key: string, ...rawArgs: Array<string | Record<string, string>>): Promise<number> {
+    // ioredis also accepts hset(key, {field: value, ...}) — production code (saveOrder) uses it.
+    const args: string[] =
+      rawArgs.length === 1 && typeof rawArgs[0] === 'object'
+        ? Object.entries(rawArgs[0]).flat()
+        : (rawArgs as string[]);
     if (!this.hashes.has(key)) this.hashes.set(key, new Map());
     const hash = this.hashes.get(key)!;
     let count = 0;
@@ -58,6 +63,23 @@ export class RedisMock {
       hash.set(args[i], args[i + 1]);
     }
     return count;
+  }
+
+  /** SCAN with MATCH (glob `*` only) — one pass, cursor always returns to "0". */
+  async scan(_cursor: string, _match?: 'MATCH', pattern = '*', ..._rest: unknown[]): Promise<[string, string[]]> {
+    const re = new RegExp('^' + pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$');
+    const keys = new Set<string>([
+      ...this.store.keys(), ...this.hashes.keys(), ...this.sets.keys(), ...this.sortedSets.keys(), ...this.lists.keys(),
+    ]);
+    return ['0', [...keys].filter((k) => re.test(k))];
+  }
+
+  async zrem(key: string, ...members: string[]): Promise<number> {
+    const z = this.sortedSets.get(key);
+    if (!z) return 0;
+    let n = 0;
+    for (const m of members) if (z.delete(m)) n++;
+    return n;
   }
 
   async hget(key: string, field: string): Promise<string | null> {
@@ -117,6 +139,15 @@ export class RedisMock {
     return isNew ? 1 : 0;
   }
 
+  /** Members with min <= score <= max ('-inf' / '+inf' allowed), ascending by score. */
+  async zrangebyscore(key: string, min: string | number, max: string | number): Promise<string[]> {
+    const lo = min === '-inf' ? -Infinity : Number(min);
+    const hi = max === '+inf' ? Infinity : Number(max);
+    const z = this.sortedSets.get(key);
+    if (!z) return [];
+    return [...z.entries()].filter(([, s]) => s >= lo && s <= hi).sort((a, b) => a[1] - b[1]).map(([m]) => m);
+  }
+
   async zrange(key: string, _start: number, _stop: number): Promise<string[]> {
     const zset = this.sortedSets.get(key);
     if (!zset) return [];
@@ -167,7 +198,7 @@ class PipelineMock {
     this.redis = redis;
   }
 
-  hset(key: string, ...args: string[]): this {
+  hset(key: string, ...args: Array<string | Record<string, string>>): this {
     this.commands.push(() => this.redis.hset(key, ...args));
     return this;
   }
@@ -184,6 +215,11 @@ class PipelineMock {
 
   srem(key: string, ...members: string[]): this {
     this.commands.push(() => this.redis.srem(key, ...members));
+    return this;
+  }
+
+  zrem(key: string, ...members: string[]): this {
+    this.commands.push(() => this.redis.zrem(key, ...members));
     return this;
   }
 

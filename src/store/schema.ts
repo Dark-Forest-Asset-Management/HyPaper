@@ -1,4 +1,4 @@
-import { pgTable, text, integer, bigint, boolean, index, primaryKey, uniqueIndex } from 'drizzle-orm/pg-core';
+import { pgTable, text, integer, bigint, boolean, index, primaryKey, uniqueIndex, jsonb } from 'drizzle-orm/pg-core';
 
 // ---------- Enums as text (matching TS union types) ----------
 
@@ -33,6 +33,29 @@ export const orders = pgTable('orders', {
   index('orders_user_id_idx').on(table.userId),
   index('orders_user_id_status_idx').on(table.userId, table.status),
   index('orders_coin_idx').on(table.coin),
+]);
+
+// ── Order status events (append-only) ───────────────────────────────
+// `orders` keeps ONE row per oid whose status is overwritten on every
+// transition. HL's /info historicalOrders returns one row PER STATUS for a
+// trailing stop — `filled`, `triggered` and the original `open` — each with
+// the order body frozen as of that transition (observed on HL testnet), and
+// `reduceOnlyCanceled` + `open` for an orphaned stop. This table holds exactly
+// those rows; historicalOrders reads trailing-stop history from here and
+// suppresses the single `orders` row for those oids. `status` is HL's own
+// string (open | triggered | filled | canceled | reduceOnlyCanceled |
+// marginCanceled), `body` the HL-shaped order body. A stop reaches each status
+// at most once, hence the unique (oid, status).
+export const orderStatusEvents = pgTable('order_status_events', {
+  id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+  oid: integer('oid').notNull(),
+  userId: text('user_id').notNull().references(() => users.userId),
+  status: text('status').notNull(),
+  statusTimestamp: bigint('status_timestamp', { mode: 'number' }).notNull(),
+  body: jsonb('body').notNull(),
+}, (table) => [
+  uniqueIndex('order_status_events_oid_status_uniq').on(table.oid, table.status),
+  index('order_status_events_user_ts_idx').on(table.userId, table.statusTimestamp),
 ]);
 
 // ── Chart-drawing snapshot NFT (paper-mode chain emulation) ────────

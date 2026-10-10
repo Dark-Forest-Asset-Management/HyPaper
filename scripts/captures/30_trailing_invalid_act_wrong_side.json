@@ -1,0 +1,43 @@
+{
+  "label": "CLOSE long with activation BELOW mark (likely already-past)",
+  "request": {
+    "action": {
+      "type": "trailingStop",
+      "asset": 3,
+      "isBuy": false,
+      "sz": "0.00015",
+      "reduceOnly": true,
+      "retracement": {
+        "px": "2507"
+      },
+      "activationPx": "81054"
+    },
+    "nonce": 1791408266741,
+    "signature": {
+      "r": "0xe70e51280dc34819be98a8cb78eb7d787dfec86c3a9b166f39be88d9644203b2",
+      "s": "0x71c619e8115c7edca3b347b331aab38c3ec59a95b2f6cacabf14880a038ca76a",
+      "v": 28
+    }
+  },
+  "response": {
+    "status": "ok",
+    "response": {
+      "type": "trailingStop",
+      "data": {
+        "oid": 62106387963
+      }
+    }
+  },
+  "httpStatus": 200,
+  "rawBody": "{\"status\":\"ok\",\"response\":{\"type\":\"trailingStop\",\"data\":{\"oid\":62106387963}}}",
+  "meta": {
+    "nonce": 1791408266741,
+    "msgpackHex": "0x87a474797065ac747261696c696e6753746f70a5617373657403a56973427579c2a2737aa7302e3030303135aa7265647563654f6e6c79c3ab726574726163656d656e7481a27078a432353037ac61637469766174696f6e5078a53831303534",
+    "connectionId": "0x73f355f0ddfba45b7ce667d30624e7ab0739a6b27dd0939a4249527bcaa98ae2",
+    "signature": {
+      "r": "0xe70e51280dc34819be98a8cb78eb7d787dfec86c3a9b166f39be88d9644203b2",
+      "s": "0x71c619e8115c7edca3b347b331aab38c3ec59a95b2f6cacabf14880a038ca76a",
+      "v": 28
+    }
+  }
+}

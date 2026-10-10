@@ -1,0 +1,389 @@
+{
+  "attempts": [
+    {
+      "kind": "px",
+      "value": "1",
+      "accepted": true,
+      "response": {
+        "status": "ok",
+        "response": {
+          "type": "trailingStop",
+          "data": {
+            "oid": 62187045523
+          }
+        }
+      },
+      "httpStatus": 200,
+      "text": "Activation immediate, retracement 1, best 81439"
+    },
+    {
+      "kind": "px",
+      "value": "0.5",
+      "accepted": true,
+      "response": {
+        "status": "ok",
+        "response": {
+          "type": "trailingStop",
+          "data": {
+            "oid": 62187050092
+          }
+        }
+      },
+      "httpStatus": 200,
+      "text": "Activation immediate, retracement 0.5, best 81446"
+    },
+    {
+      "kind": "px",
+      "value": "0.1",
+      "accepted": true,
+      "response": {
+        "status": "ok",
+        "response": {
+          "type": "trailingStop",
+          "data": {
+            "oid": 62187054190
+          }
+        }
+      },
+      "httpStatus": 200,
+      "text": "Activation immediate, retracement 0.1, best 81443.4"
+    },
+    {
+      "kind": "px",
+      "value": "0.05",
+      "accepted": false,
+      "response": {
+        "status": "err",
+        "response": "Error converting float to price"
+      },
+      "httpStatus": 200,
+      "text": null
+    },
+    {
+      "kind": "px",
+      "value": "0.01",
+      "accepted": false,
+      "response": {
+        "status": "err",
+        "response": "Error converting float to price"
+      },
+      "httpStatus": 200,
+      "text": null
+    },
+    {
+      "kind": "px",
+      "value": "0.001",
+      "accepted": false,
+      "response": {
+        "status": "err",
+        "response": "Error converting float to price"
+      },
+      "httpStatus": 200,
+      "text": null
+    },
+    {
+      "kind": "px",
+      "value": "0.0001",
+      "accepted": false,
+      "response": {
+        "status": "err",
+        "response": "Error converting float to price"
+      },
+      "httpStatus": 200,
+      "text": null
+    },
+    {
+      "kind": "px",
+      "value": "0.00001",
+      "accepted": false,
+      "response": {
+        "status": "err",
+        "response": "Error converting float to price"
+      },
+      "httpStatus": 200,
+      "text": null
+    },
+    {
+      "kind": "px",
+      "value": "0.000001",
+      "accepted": false,
+      "response": {
+        "status": "err",
+        "response": "Error converting float to price"
+      },
+      "httpStatus": 200,
+      "text": null
+    },
+    {
+      "kind": "pct",
+      "value": "1.0000%",
+      "accepted": true,
+      "response": {
+        "status": "ok",
+        "response": {
+          "type": "trailingStop",
+          "data": {
+            "oid": 62187074403
+          }
+        }
+      },
+      "httpStatus": 200,
+      "text": "Activation immediate, retracement 1%, best 81436.8"
+    },
+    {
+      "kind": "pct",
+      "value": "0.1000%",
+      "accepted": true,
+      "response": {
+        "status": "ok",
+        "response": {
+          "type": "trailingStop",
+          "data": {
+            "oid": 62187079004
+          }
+        }
+      },
+      "httpStatus": 200,
+      "text": "Activation immediate, retracement 0.1%, best 81441.3"
+    },
+    {
+      "kind": "pct",
+      "value": "0.0100%",
+      "accepted": true,
+      "response": {
+        "status": "ok",
+        "response": {
+          "type": "trailingStop",
+          "data": {
+            "oid": 62187082628
+          }
+        }
+      },
+      "httpStatus": 200,
+      "text": "Activation immediate, retracement 0.01%, best 81441.3"
+    },
+    {
+      "kind": "pct",
+      "value": "0.0010%",
+      "accepted": true,
+      "response": {
+        "status": "ok",
+        "response": {
+          "type": "trailingStop",
+          "data": {
+            "oid": 62187085939
+          }
+        }
+      },
+      "httpStatus": 200,
+      "text": "Activation immediate, retracement 0.001%, best 81438.5"
+    },
+    {
+      "kind": "pct",
+      "value": "0.0001%",
+      "accepted": false,
+      "response": {
+        "status": "err",
+        "response": "Percentage is invalid."
+      },
+      "httpStatus": 200,
+      "text": null
+    },
+    {
+      "kind": "pct",
+      "value": "0.00001%",
+      "accepted": false,
+      "response": {
+        "status": "err",
+        "response": "Percentage is invalid."
+      },
+      "httpStatus": 200,
+      "text": null
+    },
+    {
+      "kind": "pct",
+      "value": "0.000001%",
+      "accepted": false,
+      "response": {
+        "status": "err",
+        "response": "Percentage is invalid."
+      },
+      "httpStatus": 200,
+      "text": null
+    },
+    {
+      "kind": "pct",
+      "value": "5%",
+      "accepted": true,
+      "response": {
+        "status": "ok",
+        "response": {
+          "type": "trailingStop",
+          "data": {
+            "oid": 62187099970
+          }
+        }
+      },
+      "httpStatus": 200,
+      "text": "Activation immediate, retracement 5%, best 81427.2"
+    },
+    {
+      "kind": "pct",
+      "value": "5.0%",
+      "accepted": true,
+      "response": {
+        "status": "ok",
+        "response": {
+          "type": "trailingStop",
+          "data": {
+            "oid": 62187105160
+          }
+        }
+      },
+      "httpStatus": 200,
+      "text": "Activation immediate, retracement 5%, best 81418.6"
+    },
+    {
+      "kind": "pct",
+      "value": "5.00000%",
+      "accepted": true,
+      "response": {
+        "status": "ok",
+        "response": {
+          "type": "trailingStop",
+          "data": {
+            "oid": 62187109874
+          }
+        }
+      },
+      "httpStatus": 200,
+      "text": "Activation immediate, retracement 5%, best 81403.1"
+    },
+    {
+      "kind": "pct",
+      "value": "05.0000%",
+      "accepted": true,
+      "response": {
+        "status": "ok",
+        "response": {
+          "type": "trailingStop",
+          "data": {
+            "oid": 62187114654
+          }
+        }
+      },
+      "httpStatus": 200,
+      "text": "Activation immediate, retracement 5%, best 81410"
+    },
+    {
+      "kind": "pct",
+      "value": "5",
+      "accepted": false,
+      "response": {
+        "status": "err",
+        "response": "Percentage is invalid."
+      },
+      "httpStatus": 200,
+      "text": null
+    },
+    {
+      "kind": "pct",
+      "value": "5.0000",
+      "accepted": false,
+      "response": {
+        "status": "err",
+        "response": "Percentage is invalid."
+      },
+      "httpStatus": 200,
+      "text": null
+    },
+    {
+      "kind": "pct",
+      "value": "%5",
+      "accepted": false,
+      "response": {
+        "status": "err",
+        "response": "Percentage is invalid."
+      },
+      "httpStatus": 200,
+      "text": null
+    },
+    {
+      "kind": "pct",
+      "value": " 5.0000%",
+      "accepted": false,
+      "response": {
+        "status": "err",
+        "response": "Percentage is invalid."
+      },
+      "httpStatus": 200,
+      "text": null
+    },
+    {
+      "kind": "pct",
+      "value": "99.9999%",
+      "accepted": false,
+      "response": {
+        "status": "err",
+        "response": "Percentage is invalid."
+      },
+      "httpStatus": 200,
+      "text": null
+    },
+    {
+      "kind": "pct",
+      "value": "100.0000%",
+      "accepted": false,
+      "response": {
+        "status": "err",
+        "response": "Trailing stop retracement is invalid."
+      },
+      "httpStatus": 200,
+      "text": null
+    },
+    {
+      "kind": "pct",
+      "value": "150.0000%",
+      "accepted": false,
+      "response": {
+        "status": "err",
+        "response": "Trailing stop retracement is invalid."
+      },
+      "httpStatus": 200,
+      "text": null
+    },
+    {
+      "kind": "px",
+      "value": "100000",
+      "accepted": false,
+      "response": {
+        "status": "err",
+        "response": "Trailing stop retracement is invalid."
+      },
+      "httpStatus": 200,
+      "text": null
+    },
+    {
+      "kind": "px",
+      "value": "1000000",
+      "accepted": false,
+      "response": {
+        "status": "err",
+        "response": "Trailing stop retracement is invalid."
+      },
+      "httpStatus": 200,
+      "text": null
+    },
+    {
+      "kind": "px",
+      "value": "99999999",
+      "accepted": false,
+      "response": {
+        "status": "err",
+        "response": "Trailing stop retracement is invalid."
+      },
+      "httpStatus": 200,
+      "text": null
+    }
+  ]
+}

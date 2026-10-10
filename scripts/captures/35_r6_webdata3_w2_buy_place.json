@@ -1,0 +1,80 @@
+{
+  "label": "T2: ETH flat buy reduce-only stop",
+  "request": {
+    "action": {
+      "type": "trailingStop",
+      "asset": 4,
+      "isBuy": true,
+      "sz": "0.005",
+      "reduceOnly": true,
+      "retracement": {
+        "px": "30"
+      },
+      "activationPx": null
+    },
+    "nonce": 1791480973188,
+    "signature": {
+      "r": "0x3f2a18daf28642fb2daf4b284cfcedda5e1c21535d524e788a151b7d1c2ec519",
+      "s": "0x3c5751ffb25572bb3b6989e916ed1e136ce92295e54f601c7409bfb026db3598",
+      "v": 27
+    }
+  },
+  "response": {
+    "status": "ok",
+    "response": {
+      "type": "trailingStop",
+      "data": {
+        "oid": 62189270639
+      }
+    }
+  },
+  "httpStatus": 200,
+  "meta": {
+    "nonce": 1791480973188,
+    "msgpackHex": "0x87a474797065ac747261696c696e6753746f70a5617373657404a56973427579c3a2737aa5302e303035aa7265647563654f6e6c79c3ab726574726163656d656e7481a27078a23330ac61637469766174696f6e5078c0",
+    "connectionId": "0xe57fcbce9215875088b12601b46ddd68bd1a899fc6735e4bbd571bbec36eba79"
+  },
+  "immediateRow": {
+    "coin": "ETH",
+    "side": "B",
+    "limitPx": "2673.7",
+    "sz": "0.005",
+    "oid": 62189270639,
+    "timestamp": 1791481061494,
+    "triggerCondition": "Activation immediate, retracement 30, best 2400.7",
+    "isTrigger": true,
+    "triggerPx": "2430.7",
+    "children": [],
+    "isPositionTpsl": false,
+    "reduceOnly": true,
+    "orderType": "Trailing Stop Market",
+    "origSz": "0.005",
+    "tif": null,
+    "cloid": null
+  },
+  "immediateOrderStatus": {
+    "status": "order",
+    "order": {
+      "order": {
+        "coin": "ETH",
+        "side": "B",
+        "limitPx": "2673.7",
+        "sz": "0.005",
+        "oid": 62189270639,
+        "timestamp": 1791481061494,
+        "triggerCondition": "Activation immediate, retracement 30, best 2400.7",
+        "isTrigger": true,
+        "triggerPx": "2430.7",
+        "children": [],
+        "isPositionTpsl": false,
+        "reduceOnly": true,
+        "orderType": "Trailing Stop Market",
+        "origSz": "0.005",
+        "tif": null,
+        "cloid": null
+      },
+      "status": "open",
+      "statusTimestamp": 1791481061494
+    }
+  }
+}

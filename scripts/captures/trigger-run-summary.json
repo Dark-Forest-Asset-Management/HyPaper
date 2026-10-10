@@ -1,0 +1,29 @@
+{
+  "coin": "BTC",
+  "asset": 3,
+  "sz": "0.00015",
+  "startedAt": "2026-10-08T10:47:57.419Z",
+  "dryRun": false,
+  "t3": {
+    "oid": 62155943600,
+    "activationPx": "82680",
+    "firstCondition": "Activation above 82680, retracement 3000, best 82706",
+    "firstTriggerPx": "79706.0"
+  },
+  "t2": {
+    "oid": 62155972335,
+    "activationPx": "82761",
+    "activated": true,
+    "ticksToActivate": 3
+  },
+  "t1": {
+    "oid": 62155995023,
+    "retracementPx": "5",
+    "fired": true,
+    "ticks": 1,
+    "finalOrderStatus": "filled",
+    "lastTriggerConditionBeforeFire": null,
+    "fillWithSameOid": true
+  },
+  "finishedAt": "2026-10-08T10:48:59.098Z"
+}

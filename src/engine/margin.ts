@@ -143,6 +143,36 @@ export async function checkMarginForOrder(
   return !lt(available, marginNeeded);
 }
 
+/**
+ * Largest order size the account can still afford at `px` (free margin × leverage ÷ px), or `null` when the
+ * order is not margin-constrained (it reduces an existing position). Used when a trailing stop FIRES: HL fills
+ * as much as the margin allows and drops the rest (round 6, T8), rather than all-or-nothing.
+ */
+export async function maxAffordableOrderSize(
+  userId: string,
+  asset: number,
+  isBuy: boolean,
+  px: string,
+): Promise<string | null> {
+  const { scopeForAsset } = await import('./order.js');
+  const scope = await scopeForAsset(asset);
+  const accountValue = await calculateAccountValue(userId, scope);
+  const currentMarginUsed = await calculateTotalMarginUsed(userId, scope);
+  const available = sub(accountValue, currentMarginUsed);
+
+  const pos = await redis.hgetall(KEYS.USER_POS(userId, asset));
+  const currentSzi = pos.szi ?? '0';
+  if (!isZero(currentSzi)) {
+    const isLong = gt(currentSzi, '0');
+    if ((isLong && !isBuy) || (!isLong && isBuy)) return null; // reducing: no extra margin needed
+  }
+
+  const lev = await redis.hgetall(KEYS.USER_LEV(userId, asset));
+  const leverage = lev.leverage ? parseInt(lev.leverage, 10) : 20;
+  if (!gt(available, '0')) return '0';
+  return div(mul(available, leverage.toString()), px);
+}
+
 /** Compute the price at which this position would be liquidated, mirroring
  *  HL prod's behaviour. `isCross` controls the formula:
  *

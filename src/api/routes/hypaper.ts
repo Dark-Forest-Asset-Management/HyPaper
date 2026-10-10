@@ -46,6 +46,7 @@ hypaperRouter.post('/', async (c) => {
           pipeline.hset(KEYS.ORDER(oid), 'status', 'cancelled', 'updatedAt', Date.now().toString());
           pipeline.srem(KEYS.ORDERS_OPEN, oidStr);
           pipeline.srem(KEYS.ORDERS_TRIGGERS, oidStr);
+          pipeline.srem(KEYS.ORDERS_TRAILING, oidStr);
         }
 
         pipeline.del(KEYS.USER_ORDERS(normalizedUser));

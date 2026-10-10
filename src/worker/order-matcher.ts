@@ -3,9 +3,13 @@ import { redis } from '../store/redis.js';
 import { KEYS } from '../store/keys.js';
 import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
-import { D, sub, mul, add, isZero, gt, lt, gte, lte, abs, neg, min } from '../utils/math.js';
+import { D, sub, mul, add, isZero, gt, lt, gte, lte, abs, neg, min, roundToDecimals } from '../utils/math.js';
 import { nextTid } from '../utils/id.js';
 import { computeFillPrice } from '../utils/slippage.js';
+import { getFreshMark } from './mark-feed.js';
+import { evaluateTrailing, readTrailing } from '../engine/trailing-math.js';
+import { persistTrailingEvaluation, freezeTrailingSnapshot, terminateTrailingStop, emitTrailingHistory, reconcileReduceOnlyStops, paperOrderFromHash } from '../engine/trailing-state.js';
+import { buildTrailingBody } from '../engine/trailing-math.js';
 import type { PaperOrder, PaperFill } from '../types/order.js';
 
 // ── TWAP execution constants (real HL behavior) ──────────────────────────
@@ -41,6 +45,7 @@ export class OrderMatcher {
     try {
       await this.matchOpenOrders();
       await this.matchTriggerOrders();
+      await this.matchTrailingStops();
       await this.matchTwaps();
       await this.sweepExpired();
     } catch (err) {
@@ -270,7 +275,11 @@ export class OrderMatcher {
       pipeline.hset(KEYS.ORDER(oid), 'status', 'cancelled', 'updatedAt', String(now));
       pipeline.srem(KEYS.ORDERS_OPEN, oidStr);
       pipeline.srem(KEYS.ORDERS_TRIGGERS, oidStr);
+      pipeline.srem(KEYS.ORDERS_TRAILING, oidStr);
       await pipeline.exec();
+      if (data.orderType === 'trailingStop') {
+        emitTrailingHistory(this.eventBus, data, 'canceled', now, buildTrailingBody(data, false));
+      }
       this.eventBus.emit('orderUpdate', {
         userId: data.userId,
         order: {
@@ -380,6 +389,92 @@ export class OrderMatcher {
         await redis.srem(KEYS.ORDERS_TRIGGERS, oidStr);
       }
     }
+  }
+
+  /**
+   * Trailing stops, evaluated on the MARK price (never the mid) — see
+   * worker/mark-feed.ts and engine/trailing-math.ts for the rules. Each tick:
+   * read the stop's persisted state, step the state machine with the fresh
+   * mark, persist `best`/`triggerPx`/`limitPx` only if they changed, and
+   * fire when the mark crosses the trigger. A coin with no FRESH mark is
+   * skipped entirely — a stop never trades off a stale price.
+   */
+  private async matchTrailingStops(): Promise<void> {
+    const oids = await redis.smembers(KEYS.ORDERS_TRAILING);
+    if (oids.length === 0) return;
+
+    for (const oidStr of oids) {
+      const oid = parseInt(oidStr, 10);
+      const data = await redis.hgetall(KEYS.ORDER(oid));
+      if (!data.oid || data.status !== 'open') {
+        await redis.srem(KEYS.ORDERS_TRAILING, oidStr);
+        continue;
+      }
+
+      const mark = await getFreshMark(data.coin);
+      if (!mark) continue;
+
+      const { params, state } = readTrailing(data);
+      const ev = evaluateTrailing(params, state, mark);
+      await persistTrailingEvaluation(oid, data, ev);
+      if (!ev.fire) continue;
+
+      await this.fireTrailingStop(oid, data, mark);
+    }
+  }
+
+  /**
+   * Fire a trailing stop: a TAKER market order with the SAME oid, capped at the
+   * stop's current limitPx (trigger × 0.9 sell / × 1.1 buy). `data` is the
+   * freshly-persisted order hash.
+   */
+  private async fireTrailingStop(oid: number, data: Record<string, string>, mark: string): Promise<void> {
+    // A cancel can land between the matcher's read and now.
+    if ((await redis.hget(KEYS.ORDER(oid), 'status')) !== 'open') return;
+
+    const reduceOnly = data.reduceOnly === 'true';
+    const isBuy = data.isBuy === 'true';
+    const asset = parseInt(data.asset, 10);
+
+    if (reduceOnly) {
+      // Reduce-only with nothing it can reduce: the stop keeps resting (HL accepts such stops
+      // on a flat account and leaves them open — probe round 5). It is auto-canceled only on
+      // a position CHANGE, by reconcileReduceOnlyStops.
+      const szi = (await redis.hget(KEYS.USER_POS(data.userId, asset), 'szi')) ?? '0';
+      if (isZero(szi) || (gt(szi, '0') === isBuy)) return;
+    }
+
+    // Freeze the live state at the trigger moment: this becomes the `triggered` row's body.
+    await freezeTrailingSnapshot(oid, data);
+
+    // Margin is checked at FIRE time only (HL does not reserve margin while a stop rests). What HL does
+    // when the margin is short (round 6, T8/T8b): it fills as much as the margin allows and drops the
+    // rest — the order still ends `filled`, with the unfilled remainder left in the body's `sz` — and only
+    // when NOTHING is affordable does it end `marginCanceled` (after a `triggered` row). Reduce-only stops
+    // are never margin-checked.
+    let partialSz: string | null = null;
+    if (!reduceOnly) {
+      const { maxAffordableOrderSize } = await import('../engine/margin.js');
+      const cap = await maxAffordableOrderSize(data.userId, asset, isBuy, mark);
+      if (cap !== null) {
+        const affordable = roundToDecimals(cap, parseInt(data.trSzDec ?? '0', 10));
+        if (lt(affordable, data.sz)) {
+          if (!gt(affordable, '0')) {
+            await terminateTrailingStop(this.eventBus, oid, 'marginCanceled', Date.now(), true, true);
+            return;
+          }
+          partialSz = affordable;
+        }
+      }
+    }
+
+    const full = this.parseOrder(await redis.hgetall(KEYS.ORDER(oid)));
+    // Partial fire: fill only what is affordable. The hash keeps the ORIGINAL sz; executeFill records the
+    // filled amount, so the final body's sz = sz − filledSz = the unfilled remainder.
+    const order = partialSz ? { ...full, sz: partialSz } : full;
+    const mid = (await redis.hget(KEYS.MARKET_MIDS, order.coin)) ?? mark;
+    const fillPx = await computeFillPrice(order, mid, order.limitPx);
+    await this.executeFill(order, fillPx, true); // trigger fills are taker
   }
 
   private checkTrigger(order: PaperOrder, midPx: string): boolean {
@@ -597,6 +692,7 @@ export class OrderMatcher {
     // Remove from open/trigger sets
     pipeline.srem(KEYS.ORDERS_OPEN, order.oid.toString());
     pipeline.srem(KEYS.ORDERS_TRIGGERS, order.oid.toString());
+    pipeline.srem(KEYS.ORDERS_TRAILING, order.oid.toString());
 
     // Push fill
     pipeline.lpush(KEYS.USER_FILLS(userId), JSON.stringify(fill));
@@ -613,17 +709,62 @@ export class OrderMatcher {
       newSzi,
     }, 'Order filled');
 
-    this.eventBus.emit('orderUpdate', {
-      userId,
-      order: { ...order, status: 'filled' as const, filledSz: order.sz, avgPx: fillPx, updatedAt: now },
-      status: 'filled',
-    });
+    // The position just changed: open reduce-only trailing stops that can no longer reduce it
+    // are auto-canceled (reduceOnlyCanceled). HL puts those cancels in the SAME frame as this
+    // order's own updates, so they are collected here and batched below.
+    const orphans = await reconcileReduceOnlyStops(this.eventBus, userId, asset, newSzi, now);
+
+    if (order.orderType === 'trailingStop') {
+      // HL delivers a fired trailing stop as ONE frame [triggered, filled], and its history
+      // as separate `triggered` + `filled` rows (the open row was written at placement).
+      await this.emitTrailingFire(order, fillPx, now, orphans);
+    } else if (orphans.length > 0) {
+      this.eventBus.emit('orderUpdateBatch', {
+        userId,
+        updates: [
+          { order: { ...order, status: 'filled' as const, filledSz: order.sz, avgPx: fillPx, updatedAt: now }, status: 'filled' },
+          ...orphans,
+        ],
+      });
+    } else {
+      this.eventBus.emit('orderUpdate', {
+        userId,
+        order: { ...order, status: 'filled' as const, filledSz: order.sz, avgPx: fillPx, updatedAt: now },
+        status: 'filled',
+      });
+    }
     this.eventBus.emit('fill', { userId, fill });
 
     // Bracket OCO: when one sibling fills, cancel the rest. HL's
     // `normalTpsl` / `positionTpsl` groupings link orders so a TP fill
     // auto-cancels its SL counterpart (and vice versa).
     await this.cancelOrderSiblings(order.oid, userId);
+  }
+
+  /** Emit the history rows + the single [triggered, filled] WS frame for a fired trailing stop. */
+  private async emitTrailingFire(
+    order: PaperOrder,
+    fillPx: string,
+    now: number,
+    alsoInFrame: Array<{ order: PaperOrder; status: string }> = [],
+  ): Promise<void> {
+    const data = await redis.hgetall(KEYS.ORDER(order.oid)); // post-fill: status filled, updatedAt = now
+    // `triggered` row = the live state frozen at the trigger moment (set by fireTrailingStop).
+    const triggeredBody = data.trSnap
+      ? (JSON.parse(data.trSnap) as ReturnType<typeof buildTrailingBody>)
+      : buildTrailingBody({ ...data, status: 'open' }, false);
+    emitTrailingHistory(this.eventBus, data, 'triggered', now, triggeredBody);
+    emitTrailingHistory(this.eventBus, data, 'filled', now, buildTrailingBody(data, true));
+    // Built from the stored hash (original sz + the amount actually filled), so a margin-partial fire
+    // reports the unfilled remainder in the `filled` entry.
+    this.eventBus.emit('orderUpdateBatch', {
+      userId: order.userId,
+      updates: [
+        { order: paperOrderFromHash(data, 'triggered', now), status: 'triggered' },
+        { order: paperOrderFromHash(data, 'filled', now), status: 'filled' },
+        ...alsoInFrame, // e.g. OTHER reduce-only stops this fill just orphaned
+      ],
+    });
   }
 
   /** Bracket cascade on fill. Two cases:
@@ -744,7 +885,7 @@ export class OrderMatcher {
       isBuy: data.isBuy === 'true',
       sz: data.sz,
       limitPx: data.limitPx,
-      orderType: data.orderType as 'limit' | 'trigger',
+      orderType: data.orderType as 'limit' | 'trigger' | 'trailingStop',
       tif: data.tif as 'Gtc' | 'Ioc' | 'Alo',
       reduceOnly: data.reduceOnly === 'true',
       triggerPx: data.triggerPx || undefined,

@@ -83,6 +83,9 @@ export class PriceUpdater {
     const pipeline = redis.pipeline();
     pipeline.hset(KEYS.MARKET_CTX(data.coin),
       'markPx', ctx.markPx ?? '',
+      // Freshness stamp read by worker/mark-feed.ts — trailing stops must never
+      // fire off a stale mark. Only meaningful when markPx is non-empty.
+      'markTs', String(Date.now()),
       'midPx', ctx.midPx ?? '',
       'oraclePx', ctx.oraclePx ?? '',
       'funding', ctx.funding ?? '',

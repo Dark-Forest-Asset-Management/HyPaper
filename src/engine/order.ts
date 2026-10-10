@@ -16,6 +16,8 @@ import type {
   HlMeta,
 } from "../types/hl.js";
 import type { PaperOrder } from "../types/order.js";
+import { buildTrailingBody, ERR_ALREADY_FINISHED, ERR_MODIFY_INVALID } from "./trailing-math.js";
+import { emitTrailingHistory } from "./trailing-state.js";
 
 const matcher = new OrderMatcher(eventBus);
 
@@ -592,8 +594,13 @@ export async function cancelOrders(
     }
 
     if (orderData.status !== "open") {
+      // Trailing stops answer like HL does for a finished/absent order (captured).
+      // Other order types keep their existing message (aligning them is a separate change).
       results.push({
-        error: `Order ${cancel.o} is not open (status: ${orderData.status})`,
+        error:
+          orderData.orderType === "trailingStop"
+            ? ERR_ALREADY_FINISHED(cancel.a)
+            : `Order ${cancel.o} is not open (status: ${orderData.status})`,
       });
       continue;
     }
@@ -609,8 +616,17 @@ export async function cancelOrders(
     );
     pipeline.srem(KEYS.ORDERS_OPEN, cancel.o.toString());
     pipeline.srem(KEYS.ORDERS_TRIGGERS, cancel.o.toString());
+    pipeline.srem(KEYS.ORDERS_TRAILING, cancel.o.toString());
     pipeline.zrem(KEYS.ORDERS_EXPIRY, cancel.o.toString());
+    // Freeze the live trailing-stop state for orderStatus / history (HL serves a snapshot).
+    if (orderData.orderType === "trailingStop") {
+      pipeline.hset(KEYS.ORDER(cancel.o), "trSnap", JSON.stringify(buildTrailingBody(orderData, false)));
+    }
     await pipeline.exec();
+
+    if (orderData.orderType === "trailingStop") {
+      emitTrailingHistory(eventBus, orderData, "canceled", now, buildTrailingBody(orderData, false));
+    }
 
     // Bracket cascade on cancel:
     //   - If THIS oid is a PARENT (has children registered), cascade-cancel
@@ -780,6 +796,10 @@ export async function modifyOrder(
   if (!orderData.oid || orderData.userId !== userId) {
     return { error: `Order ${oid} not found` };
   }
+  if (orderData.orderType === "trailingStop") {
+    // HL (round 6, T7): the modify is refused and the stop is left untouched.
+    return { error: ERR_MODIFY_INVALID };
+  }
   if (orderData.status !== "open") {
     return { error: `Cannot modify canceled or filled order` };
   }
@@ -847,6 +867,10 @@ export async function batchModifyOrders(
       const orderData = await redis.hgetall(KEYS.ORDER(m.oid));
       if (!orderData.oid || orderData.userId !== userId) {
         results.push({ error: `Order ${m.oid} not found` });
+        continue;
+      }
+      if (orderData.orderType === "trailingStop") {
+        results.push({ error: ERR_MODIFY_INVALID });
         continue;
       }
       if (orderData.status !== "open") {

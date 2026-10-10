@@ -1,0 +1,46 @@
+{
+  "request": {
+    "action": {
+      "type": "order",
+      "orders": [
+        {
+          "a": 3,
+          "b": false,
+          "p": "79537",
+          "s": "0.0008",
+          "r": true,
+          "t": {
+            "limit": {
+              "tif": "Ioc"
+            }
+          }
+        }
+      ],
+      "grouping": "na"
+    },
+    "nonce": 1791480377019,
+    "signature": {
+      "r": "0xb0b6ac458d5bbd5fcbd4e60d18504053a44fb156308336bf6c9c3d775cf9e0f0",
+      "s": "0x047e0bb9e5e3599e79e25af3c6932562ec1bf091fc1e2155777456b29b48f671",
+      "v": 27
+    }
+  },
+  "response": {
+    "status": "ok",
+    "response": {
+      "type": "order",
+      "data": {
+        "statuses": [
+          {
+            "filled": {
+              "totalSz": "0.0008",
+              "avgPx": "81419.0",
+              "oid": 62188297073
+            }
+          }
+        ]
+      }
+    }
+  },
+  "httpStatus": 200
+}

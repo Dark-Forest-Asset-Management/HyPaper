@@ -1,0 +1,42 @@
+{
+  "request": {
+    "action": {
+      "type": "order",
+      "orders": [
+        {
+          "a": 3,
+          "b": true,
+          "p": "82937",
+          "s": "0.00015",
+          "r": false,
+          "t": {
+            "limit": {
+              "tif": "Ioc"
+            }
+          }
+        }
+      ],
+      "grouping": "na"
+    },
+    "nonce": 1791479797964,
+    "signature": {
+      "r": "0x56e8b08bf3c90d31a3ed03882c3c582244e3b1932b0e406814f6c346f2e53902",
+      "s": "0x0886799c66993f3356ebb9568b31871b85f052b683b9324c191dd47cd0e375fb",
+      "v": 28
+    }
+  },
+  "response": {
+    "status": "ok",
+    "response": {
+      "type": "order",
+      "data": {
+        "statuses": [
+          {
+            "error": "Insufficient margin to place order. asset=3"
+          }
+        ]
+      }
+    }
+  },
+  "httpStatus": 200
+}

@@ -1,0 +1,31 @@
+{
+  "request": {
+    "action": {
+      "type": "cancel",
+      "cancels": [
+        {
+          "a": 0,
+          "o": 62187184576
+        }
+      ]
+    },
+    "nonce": 1791479732483,
+    "signature": {
+      "r": "0x0ab45e2edc76400084d7f024ac9379128cc5608b26d8672809cad906a1d772c3",
+      "s": "0x0dd6bbd9e7ece4ece948e0bd0ed2135436cf37fef2a59f0ac7b7ee3cf129e9a6",
+      "v": 27
+    }
+  },
+  "response": {
+    "status": "ok",
+    "response": {
+      "type": "cancel",
+      "data": {
+        "statuses": [
+          "success"
+        ]
+      }
+    }
+  },
+  "httpStatus": 200
+}

@@ -191,6 +191,21 @@ export interface HlNoopAction {
   type: 'noop';
 }
 
+/** Trailing stop — its OWN action type (not inside `order`). Confirmed on HL testnet; see
+ *  scripts/captures/trailing-stop-summary.md. msgpack key order (signature-critical):
+ *  type, asset, isBuy, sz, reduceOnly, retracement, activationPx. */
+export interface HlTrailingStopAction {
+  type: 'trailingStop';
+  asset: number;
+  isBuy: boolean;
+  sz: string;
+  reduceOnly: boolean;
+  /** exactly one key: fixed distance {px} or percent {pct:"5.0000%"} */
+  retracement: { px: string } | { pct: string };
+  /** null = track immediately */
+  activationPx: string | null;
+}
+
 // === HlExchangeAction union ===
 // All action types that the /exchange endpoint accepts.
 // Adding a new action type here is all that's needed for TypeScript to
@@ -198,6 +213,7 @@ export interface HlNoopAction {
 
 export type HlExchangeAction =
   | HlOrderAction
+  | HlTrailingStopAction
   | HlCancelAction
   | HlCancelByCloidAction
   | HlModifyAction

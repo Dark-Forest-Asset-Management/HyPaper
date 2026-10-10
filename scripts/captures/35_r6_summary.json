@@ -1,0 +1,456 @@
+{
+  "startedAt": "2026-10-08T17:13:50.107Z",
+  "balances": {
+    "perpAccountValue": 0,
+    "spotUsdc": 3.670633
+  },
+  "t9": {
+    "futureAccepted": true,
+    "futureResponse": {
+      "status": "ok",
+      "response": {
+        "type": "trailingStop",
+        "data": {
+          "oid": 62187036850
+        }
+      }
+    },
+    "expiresAfter": 1791479728020,
+    "pastResponse": {
+      "status": "err",
+      "response": "Action already expired"
+    },
+    "pastAccepted": false,
+    "samplesAfterExpiry": 25,
+    "statusesAfterExpiry": [
+      "open"
+    ],
+    "stillOpenAfterExpiry": true
+  },
+  "t3_start": {
+    "placementAccepted": true,
+    "response": {
+      "status": "ok",
+      "response": {
+        "type": "trailingStop",
+        "data": {
+          "oid": 62187041784
+        }
+      }
+    },
+    "activationPx": "81323",
+    "markAtPlacement": 81420.3,
+    "immediateText": "Activation below 81323, retracement 3000, best waiting"
+  },
+  "t4": {
+    "smallestPxAccepted": 0.1,
+    "smallestPctAccepted": 0.001,
+    "rejected": [
+      {
+        "kind": "px",
+        "value": "0.05",
+        "response": "Error converting float to price"
+      },
+      {
+        "kind": "px",
+        "value": "0.01",
+        "response": "Error converting float to price"
+      },
+      {
+        "kind": "px",
+        "value": "0.001",
+        "response": "Error converting float to price"
+      },
+      {
+        "kind": "px",
+        "value": "0.0001",
+        "response": "Error converting float to price"
+      },
+      {
+        "kind": "px",
+        "value": "0.00001",
+        "response": "Error converting float to price"
+      },
+      {
+        "kind": "px",
+        "value": "0.000001",
+        "response": "Error converting float to price"
+      },
+      {
+        "kind": "pct",
+        "value": "0.0001%",
+        "response": "Percentage is invalid."
+      },
+      {
+        "kind": "pct",
+        "value": "0.00001%",
+        "response": "Percentage is invalid."
+      },
+      {
+        "kind": "pct",
+        "value": "0.000001%",
+        "response": "Percentage is invalid."
+      },
+      {
+        "kind": "pct",
+        "value": "5",
+        "response": "Percentage is invalid."
+      },
+      {
+        "kind": "pct",
+        "value": "5.0000",
+        "response": "Percentage is invalid."
+      },
+      {
+        "kind": "pct",
+        "value": "%5",
+        "response": "Percentage is invalid."
+      },
+      {
+        "kind": "pct",
+        "value": " 5.0000%",
+        "response": "Percentage is invalid."
+      },
+      {
+        "kind": "pct",
+        "value": "99.9999%",
+        "response": "Percentage is invalid."
+      },
+      {
+        "kind": "pct",
+        "value": "100.0000%",
+        "response": "Trailing stop retracement is invalid."
+      },
+      {
+        "kind": "pct",
+        "value": "150.0000%",
+        "response": "Trailing stop retracement is invalid."
+      },
+      {
+        "kind": "px",
+        "value": "100000",
+        "response": "Trailing stop retracement is invalid."
+      },
+      {
+        "kind": "px",
+        "value": "1000000",
+        "response": "Trailing stop retracement is invalid."
+      },
+      {
+        "kind": "px",
+        "value": "99999999",
+        "response": "Trailing stop retracement is invalid."
+      }
+    ],
+    "acceptedFormats": [
+      {
+        "value": "1.0000%",
+        "text": "Activation immediate, retracement 1%, best 81436.8"
+      },
+      {
+        "value": "0.1000%",
+        "text": "Activation immediate, retracement 0.1%, best 81441.3"
+      },
+      {
+        "value": "0.0100%",
+        "text": "Activation immediate, retracement 0.01%, best 81441.3"
+      },
+      {
+        "value": "0.0010%",
+        "text": "Activation immediate, retracement 0.001%, best 81438.5"
+      },
+      {
+        "value": "5%",
+        "text": "Activation immediate, retracement 5%, best 81427.2"
+      },
+      {
+        "value": "5.0%",
+        "text": "Activation immediate, retracement 5%, best 81418.6"
+      },
+      {
+        "value": "5.00000%",
+        "text": "Activation immediate, retracement 5%, best 81403.1"
+      },
+      {
+        "value": "05.0000%",
+        "text": "Activation immediate, retracement 5%, best 81410"
+      }
+    ]
+  },
+  "t7": [
+    {
+      "kind": "modify",
+      "wire": "A_nonRO_buy_limit",
+      "response": {
+        "status": "err",
+        "response": "Attempted to modify to invalid new order"
+      },
+      "stopStatusAfter": "open",
+      "stopStillTrailing": "Trailing Stop Market"
+    },
+    {
+      "kind": "modify",
+      "wire": "B_RO_sell_limit",
+      "response": {
+        "status": "err",
+        "response": "Attempted to modify to invalid new order"
+      },
+      "stopStatusAfter": "open",
+      "stopStillTrailing": "Trailing Stop Market"
+    },
+    {
+      "kind": "batchModify",
+      "wire": "A_nonRO_buy_limit",
+      "response": {
+        "status": "ok",
+        "response": {
+          "type": "order",
+          "data": {
+            "statuses": [
+              {
+                "error": "Attempted to modify to invalid new order"
+              }
+            ]
+          }
+        }
+      },
+      "stopStillTrailing": "Trailing Stop Market"
+    }
+  ],
+  "t6a": {
+    "rows": 22,
+    "mismatches": 0,
+    "mismatchDetail": []
+  },
+  "t8": {
+    "placementAccepted": true,
+    "resolved": true,
+    "seconds": 19.813,
+    "finalStatus": "filled",
+    "finalBody": {
+      "coin": "BTC",
+      "side": "B",
+      "limitPx": "89428.0",
+      "sz": "0.00453",
+      "oid": 62187255982,
+      "timestamp": 1791479879368,
+      "triggerCondition": "Triggered",
+      "isTrigger": false,
+      "triggerPx": "0.0",
+      "children": [],
+      "isPositionTpsl": false,
+      "reduceOnly": false,
+      "orderType": "Trailing Stop Market",
+      "origSz": "0.00542",
+      "tif": "Gtc",
+      "cloid": null
+    },
+    "history": [
+      [
+        "filled",
+        1791479879368
+      ],
+      [
+        "triggered",
+        1791479879368
+      ],
+      [
+        "open",
+        1791479860584
+      ]
+    ],
+    "fills": [
+      {
+        "coin": "BTC",
+        "px": "81311.0",
+        "sz": "0.00027",
+        "side": "B",
+        "time": 1791479879368,
+        "startPosition": "0.00062",
+        "dir": "Open Long",
+        "closedPnl": "0.0",
+        "hash": "0x3b9d43e275bc2b353d17042b3884ef0000d85bc810bf4a07df65ef3534b0051f",
+        "oid": 62187255982,
+        "crossed": true,
+        "fee": "0.009879",
+        "tid": 746968600530554,
+        "feeToken": "USDC",
+        "twapId": null
+      },
+      {
+        "coin": "BTC",
+        "px": "81307.0",
+        "sz": "0.00062",
+        "side": "B",
+        "time": 1791479879368,
+        "startPosition": "0.0",
+        "dir": "Open Long",
+        "closedPnl": "0.0",
+        "hash": "0x3b9d43e275bc2b353d17042b3884ef0000d85bc810bf4a07df65ef3534b0051f",
+        "oid": 62187255982,
+        "crossed": true,
+        "fee": "0.022684",
+        "tid": 1064377219604178,
+        "feeToken": "USDC",
+        "twapId": null
+      }
+    ],
+    "positions": [
+      {
+        "coin": "BTC",
+        "szi": 0.00089
+      }
+    ]
+  },
+  "t1": {
+    "skipped": "could not open the position (no perp margin)",
+    "reason": "Insufficient margin to place order. asset=3"
+  },
+  "t6b": {
+    "skipped": "T1 could not open a position — no perp margin"
+  },
+  "finalState": {
+    "resting": 0,
+    "positions": []
+  },
+  "t5": {
+    "flatSell": {
+      "oid": 62187029526,
+      "samples": 34,
+      "statusesSeen": [
+        "open"
+      ],
+      "everCanceled": false,
+      "stillOpenAtLastSample": true,
+      "lastOpenText": "Activation immediate, retracement 30, best 2402.6"
+    },
+    "flatBuy": {
+      "oid": 62187033043,
+      "samples": 34,
+      "statusesSeen": [
+        "open"
+      ],
+      "everCanceled": false,
+      "stillOpenAtLastSample": true,
+      "lastOpenText": "Activation immediate, retracement 30, best 2398.1"
+    },
+    "observedSeconds": 331
+  },
+  "t2": {
+    "frameKeys": [],
+    "frames": 0,
+    "perOid": {
+      "flatSell": {
+        "oid": 62187029526,
+        "framesContainingIt": 0,
+        "distinctTextsInWebData2": [],
+        "distinctTextsInFrontendOpenOrdersPolls": [
+          "Activation immediate, retracement 30, best 2399.3",
+          "Activation immediate, retracement 30, best 2399.7",
+          "Activation immediate, retracement 30, best 2399.8",
+          "Activation immediate, retracement 30, best 2401.7",
+          "Activation immediate, retracement 30, best 2401.8",
+          "Activation immediate, retracement 30, best 2401.9",
+          "Activation immediate, retracement 30, best 2402.3",
+          "Activation immediate, retracement 30, best 2402.4",
+          "Activation immediate, retracement 30, best 2402.5",
+          "Activation immediate, retracement 30, best 2402.6"
+        ],
+        "webData2FollowsRatchet": false,
+        "rowKeysEqualFrontendRow": null,
+        "webData2Row": null
+      },
+      "flatBuy": {
+        "oid": 62187033043,
+        "framesContainingIt": 0,
+        "distinctTextsInWebData2": [],
+        "distinctTextsInFrontendOpenOrdersPolls": [
+          "Activation immediate, retracement 30, best 2398.1"
+        ],
+        "webData2FollowsRatchet": "n/a (mark did not move)",
+        "rowKeysEqualFrontendRow": null,
+        "webData2Row": null
+      },
+      "t3": {
+        "oid": 62187041784,
+        "framesContainingIt": 0,
+        "distinctTextsInWebData2": [],
+        "distinctTextsInFrontendOpenOrdersPolls": [
+          "Activation below 81323, retracement 3000, best waiting",
+          "Activation below 81323, retracement 3000, best 81294",
+          "Activation below 81323, retracement 3000, best 81262",
+          "Activation below 81323, retracement 3000, best 81256",
+          "Activation below 81323, retracement 3000, best 81234",
+          "Activation below 81323, retracement 3000, best 81201",
+          "Activation below 81323, retracement 3000, best 81181"
+        ],
+        "webData2FollowsRatchet": false,
+        "rowKeysEqualFrontendRow": null,
+        "webData2Row": null
+      }
+    }
+  },
+  "t3": {
+    "oid": 62187041784,
+    "transitions": [
+      {
+        "t": "2026-10-08T17:14:07.700Z",
+        "mark": 81425,
+        "status": "open",
+        "triggerCondition": "Activation below 81323, retracement 3000, best waiting",
+        "triggerPx": "0.0",
+        "limitPx": "92755.0"
+      },
+      {
+        "t": "2026-10-08T17:16:07.222Z",
+        "mark": 81294,
+        "status": "open",
+        "triggerCondition": "Activation below 81323, retracement 3000, best 81294",
+        "triggerPx": "84294.0",
+        "limitPx": "92723.0"
+      },
+      {
+        "t": "2026-10-08T17:18:47.678Z",
+        "mark": 81272,
+        "status": "open",
+        "triggerCondition": "Activation below 81323, retracement 3000, best 81262",
+        "triggerPx": "84262.0",
+        "limitPx": "92688.0"
+      },
+      {
+        "t": "2026-10-08T17:18:58.395Z",
+        "mark": 81256,
+        "status": "open",
+        "triggerCondition": "Activation below 81323, retracement 3000, best 81256",
+        "triggerPx": "84256.0",
+        "limitPx": "92681.0"
+      },
+      {
+        "t": "2026-10-08T17:19:09.343Z",
+        "mark": 81234,
+        "status": "open",
+        "triggerCondition": "Activation below 81323, retracement 3000, best 81234",
+        "triggerPx": "84234.0",
+        "limitPx": "92657.0"
+      },
+      {
+        "t": "2026-10-08T17:19:19.388Z",
+        "mark": 81201,
+        "status": "open",
+        "triggerCondition": "Activation below 81323, retracement 3000, best 81201",
+        "triggerPx": "84201.0",
+        "limitPx": "92621.0"
+      },
+      {
+        "t": "2026-10-08T17:19:29.510Z",
+        "mark": 81185,
+        "status": "open",
+        "triggerCondition": "Activation below 81323, retracement 3000, best 81181",
+        "triggerPx": "84181.0",
+        "limitPx": "92599.0"
+      }
+    ],
+    "activated": true
+  },
+  "finishedAt": "2026-10-08T17:19:51.720Z"
+}

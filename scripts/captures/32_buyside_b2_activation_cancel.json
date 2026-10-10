@@ -1,0 +1,41 @@
+{
+  "request": {
+    "action": {
+      "type": "cancel",
+      "cancels": [
+        {
+          "a": 3,
+          "o": 62156592088
+        }
+      ]
+    },
+    "nonce": 1791457098833,
+    "signature": {
+      "r": "0xa36d4e45c5072e44325a3634801ccc0ffd8a6415d89c79de5cf6e0ea18f62478",
+      "s": "0x3fcad3c5488ca11ee845a77441c36eb2f84efb912387cc90736d356c25c844c7",
+      "v": 27
+    }
+  },
+  "response": {
+    "status": "ok",
+    "response": {
+      "type": "cancel",
+      "data": {
+        "statuses": [
+          "success"
+        ]
+      }
+    }
+  },
+  "httpStatus": 200,
+  "meta": {
+    "nonce": 1791457098833,
+    "msgpackHex": "0x82a474797065a663616e63656ca763616e63656c739182a16103a16fcf0000000e78d253d8",
+    "connectionId": "0xe8fcd0ba7f8fa4e6ce3deeb3d3225d91a4e524a5b5bc544308be6d8c61df7c15",
+    "signature": {
+      "r": "0xa36d4e45c5072e44325a3634801ccc0ffd8a6415d89c79de5cf6e0ea18f62478",
+      "s": "0x3fcad3c5488ca11ee845a77441c36eb2f84efb912387cc90736d356c25c844c7",
+      "v": 27
+    }
+  }
+}

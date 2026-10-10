@@ -54,6 +54,10 @@ export const KEYS = {
   ORDER: (oid: number) => `order:${oid}`,
   ORDERS_OPEN: 'orders:open',
   ORDERS_TRIGGERS: 'orders:triggers',
+  // Open trailing stops. Deliberately a SEPARATE set from ORDERS_OPEN /
+  // ORDERS_TRIGGERS so the limit + TP/SL matchers never touch them; evaluated
+  // by OrderMatcher.matchTrailingStops() on the MARK price.
+  ORDERS_TRAILING: 'orders:trailing',
   ORDER_BRACKET: (oid: number) => `order:${oid}:bracket`,
   ORDER_CHILDREN: (oid: number) => `order:${oid}:children`,
   ORDER_PARENT: (oid: number) => `order:${oid}:parent`,
