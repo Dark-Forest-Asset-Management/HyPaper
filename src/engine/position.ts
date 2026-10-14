@@ -334,9 +334,14 @@ function hlOrderTypeString(isTrigger: boolean, tpsl: string | undefined, isMarke
   return isMarket ? 'Stop Market' : 'Stop Limit';
 }
 
-export async function getOrderStatus(oid: number) {
+export async function getOrderStatus(oid: number, user?: string) {
   const data = await redis.hgetall(KEYS.ORDER(oid));
   if (!data.oid) {
+    return { status: 'unknownOid' };
+  }
+  // Scoped to the requesting user, as on HL prod (which 404s the oid for
+  // anyone else rather than revealing it exists).
+  if (user && (data.user ?? '').toLowerCase() !== user.toLowerCase()) {
     return { status: 'unknownOid' };
   }
 

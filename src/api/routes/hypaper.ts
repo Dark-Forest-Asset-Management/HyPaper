@@ -4,6 +4,7 @@ import { KEYS } from '../../store/keys.js';
 import { config } from '../../config.js';
 import { logger } from '../../utils/logger.js';
 import { ensureAccount } from '../middleware/auth.js';
+import { isInternalRequest } from '../middleware/internal.js';
 import { upsertUser, updateUserBalance, recordLedgerUpdate } from '../../store/pg-sink.js';
 import { sub, isZero, gt, abs } from '../../utils/math.js';
 import { getLiquidationEventsPg } from '../../store/pg-queries.js';
@@ -24,6 +25,13 @@ hypaperRouter.post('/', async (c) => {
     return c.json({ error: 'Missing user' }, 400);
   }
   const normalizedUser = user.toLowerCase();
+
+  // Mutations were reachable from the public internet with nothing but
+  // the victim's address in the body (HP-03). They are paper-admin
+  // operations for the MCP server only; see api/middleware/internal.ts.
+  if ((type === 'setBalance' || type === 'resetAccount') && !isInternalRequest(c)) {
+    return c.json({ error: `${type} is not accepted from this caller` }, 401);
+  }
 
   await ensureAccount(normalizedUser);
 
