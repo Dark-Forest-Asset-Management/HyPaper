@@ -124,6 +124,8 @@ const USER_SIGNED_SPECS: Record<string, { primaryType: string; fields: Eip712Fie
   },
 };
 
+export const PAPER_HYPERLIQUID_CHAIN = 'Testnet';
+
 /** True if `type` is an HL user-signed action (vs an L1 action). */
 export function isUserSignedActionType(type: string): boolean {
   return Object.prototype.hasOwnProperty.call(USER_SIGNED_SPECS, type);
@@ -137,6 +139,14 @@ export function recoverUserSignedAction(
 ): string {
   const spec = USER_SIGNED_SPECS[action.type];
   if (!spec) throw new Error(`Not a user-signed action type: ${action.type}`);
+  // `hyperliquidChain` is a SIGNED field on every user-signed type. HyPaper
+  // accepts only the testnet value so a paper transfer signature can never
+  // be forwarded to mainnet (same reasoning as PAPER_SOURCE in
+  // recoverHlSigner.ts). A client that signs 'Mainnet' is signing a real
+  // mainnet transfer and must not be talking to HyPaper at all.
+  if (action.hyperliquidChain !== PAPER_HYPERLIQUID_CHAIN) {
+    throw new Error(`hyperliquidChain must be '${PAPER_HYPERLIQUID_CHAIN}' for paper actions`);
+  }
   if (typeof action.signatureChainId !== 'string') {
     throw new Error('user-signed action missing signatureChainId');
   }

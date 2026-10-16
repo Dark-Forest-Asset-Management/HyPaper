@@ -20,14 +20,19 @@
 
 import { ethers } from 'ethers';
 import { encode as msgpackEncode } from '@msgpack/msgpack';
-import { config } from '../../config.js';
 
 // HL's phantom-agent `source` is "a" on mainnet, "b" on testnet
-// (construct_phantom_agent in signing.py). Recovering with the wrong source
-// yields a phantom address, so derive it from the configured HL endpoint
-// instead of hardcoding. slushy.trade runs mainnet exclusively.
-const HL_IS_MAINNET = !/testnet/i.test(config.HL_API_URL);
-const HL_SOURCE = HL_IS_MAINNET ? 'a' : 'b';
+// (construct_phantom_agent in signing.py). HyPaper accepts ONLY the
+// testnet source, regardless of which HL endpoint it proxies market data
+// from. Reason (2026-10-13 review, C1): a paper signature made with the
+// mainnet source is byte-for-byte a valid mainnet signature for the same
+// key, and HyPaper receives every one of them — anyone on that path could
+// replay a paper order/transfer against the user's real account for the
+// ~2-day HL nonce window. With source "b" a mainnet replay recovers to a
+// phantom address that holds nothing. slushy signs paper mode with
+// isMainnet=false to match (src/api/hlSign.ts).
+export const PAPER_SOURCE = 'b';
+const HL_SOURCE = PAPER_SOURCE;
 
 // HL's L1-action EIP-712 domain. Identical to what slushy signs
 // against. chainId 1337 is HL's hardcoded value for L1 actions.

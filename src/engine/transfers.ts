@@ -35,6 +35,24 @@
 import { redis } from '../store/redis.js';
 import { KEYS } from '../store/keys.js';
 import { logger } from '../utils/logger.js';
+import { eventBus } from '../worker/index.js';
+
+/** Tell the WS server these accounts' balances just changed, so it pushes
+ *  fresh state to anyone subscribed. Uses the existing `accountUpdate`
+ *  event (ws/server.ts), the one already meant for account changes that
+ *  have no fill/order hook.
+ *
+ *  Transfers emitted nothing before this, so a paper transfer moved the
+ *  balances in Redis while every connected client kept showing the old
+ *  numbers until the user's next order or fill.
+ *
+ *  `dexes` are the HIP-3 venues touched; native ("") is covered by the
+ *  webData2 push, and "spot"/"evm" have no per-dex state to push. */
+function emitAccountUpdate(userIds: Array<string | null | undefined>, dexes: string[] = []): void {
+  const users = [...new Set(userIds.filter((u): u is string => !!u).map((u) => u.toLowerCase()))];
+  const venues = [...new Set(dexes.filter((d) => !!d && d !== 'spot' && d !== 'evm'))];
+  for (const userId of users) eventBus.emit('accountUpdate', { userId, dexes: venues });
+}
 
 // ─── Subaccount suffix parser ─────────────────────────────────────────────────
 //
@@ -128,6 +146,7 @@ export async function usdClassTransfer(
       { userId, subAccount, amountNum, toPerp },
       'usdClassTransfer — subaccount routing executed',
     );
+    emitAccountUpdate([userId, subAccount]);
     return { ok: true };
   }
 
@@ -159,6 +178,7 @@ export async function usdClassTransfer(
   await pipeline.exec();
 
   logger.info({ userId, amountNum, toPerp }, 'usdClassTransfer executed');
+  emitAccountUpdate([userId]);
   return { ok: true };
 }
 
@@ -205,6 +225,7 @@ export async function usdSend(
   }
 
   await pipeline.exec();
+  emitAccountUpdate([senderUserId, destAddr]);
   return { ok: true };
 }
 
@@ -259,6 +280,7 @@ export async function spotSend(
 
   // Non-USDC tokens: acknowledged only (no balance tracking).
   logger.info({ senderUserId, destination, token, amount }, 'spotSend executed');
+  emitAccountUpdate([senderUserId, destination]);
   return { ok: true };
 }
 
@@ -273,7 +295,14 @@ export async function spotSend(
 // EVM destination: debits the sender's balance (funds leave HyperCore).
 //   No EVM balance is tracked in HyPaper, but the debit is real.
 // Cross-user transfer: debit sender, credit recipient if known.
-// Same-user transfer: rejected ("Invalid send") — matches real HL.
+// Same-user, SAME bucket: rejected ("Invalid send") — matches real HL.
+// Same-user, DIFFERENT bucket: ALLOWED. This is how a venue transfer is
+//   expressed — moving USDC between the canonical perp DEX and a HIP-3
+//   DEX is a sendAsset to your OWN address with differing sourceDex /
+//   destinationDex. The agent variant's docs make this explicit:
+//   "Destination must match the source address." Rejecting every
+//   self-send therefore rejected 100% of venue transfers in paper while
+//   the same call succeeded against live HL.
 //
 // Real HL success response: { status: "ok", response: { type: "default" } }
 
@@ -293,8 +322,11 @@ export async function sendAsset(
 
   const destAddr = destination.toLowerCase();
 
-  // Self-transfer not allowed (matches real HL "Invalid send" error)
-  if (destAddr === senderUserId.toLowerCase()) {
+  // Self-transfer to the SAME bucket is a no-op and real HL rejects it.
+  // Self-transfer ACROSS buckets is the venue-transfer mechanism and must
+  // go through — see the note above. Compared before normalisation so
+  // '' (canonical perp) vs 'xyz' and 'spot' vs '' all read as different.
+  if (destAddr === senderUserId.toLowerCase() && sourceDex === destinationDex) {
     return { error: 'Invalid send' };
   }
 
@@ -335,11 +367,22 @@ export async function sendAsset(
       { senderUserId, destAddr, token, amount, sourceDex },
       'sendAsset → evm: sender debited, EVM balance not tracked in HyPaper',
     );
+    emitAccountUpdate([senderUserId, fromSubAccount], [sourceDex]);
     return { ok: true };
   }
 
   // Non-EVM: credit recipient if they are a known HyPaper account
   const recipientRaw = await redis.hgetall(KEYS.USER_ACCOUNT(destAddr));
+  // A SELF-send must always credit, even if the destination bucket has no
+  // field yet. Accounts are seeded with a balance field per dex that
+  // existed at creation time (see auth.ts), so a dex deployed afterwards
+  // has no field for an older account — and the `undefined` branch below
+  // debits without crediting, which would silently burn the user's funds
+  // on their own venue transfer. Treat a missing own-bucket as zero.
+  const isSelfSend = destAddr === senderUserId.toLowerCase();
+  if (isSelfSend && recipientRaw[dstField] === undefined) {
+    recipientRaw[dstField] = '0';
+  }
   if (recipientRaw[dstField] !== undefined) {
     const newRecipientBal = (parseFloat(recipientRaw[dstField]) + amountNum).toFixed(6);
     pipeline.hset(KEYS.USER_ACCOUNT(destAddr), dstField, newRecipientBal);
@@ -349,6 +392,7 @@ export async function sendAsset(
   }
 
   await pipeline.exec();
+  emitAccountUpdate([senderUserId, fromSubAccount, destAddr], [sourceDex, destinationDex]);
   return { ok: true };
 }
 
@@ -420,5 +464,6 @@ export async function sendToEvmWithData(
     { userId, token, amount, destinationRecipient, destinationChainId },
     'sendToEvmWithData — sender debited, EVM balance not tracked in HyPaper',
   );
+  emitAccountUpdate([userId]);
   return { ok: true };
 }

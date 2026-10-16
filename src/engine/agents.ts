@@ -104,6 +104,19 @@ export async function approveAgent(
 //   ...
 // ]
 
+/** True if `signer` is an approved agent (named or unnamed) of `masterUserId`. */
+export async function isAgentOf(masterUserId: string, signer: string): Promise<boolean> {
+  const raw = await redis.hgetall(KEYS.USER_AGENTS(masterUserId));
+  const want = signer.toLowerCase();
+  for (const json of Object.values(raw ?? {})) {
+    try {
+      const entry = JSON.parse(String(json)) as { agentAddress?: string };
+      if (entry.agentAddress?.toLowerCase() === want) return true;
+    } catch { /* malformed entry — treat as no match */ }
+  }
+  return false;
+}
+
 export async function getExtraAgents(masterUserId: string): Promise<unknown[]> {
   const agentsKey = KEYS.USER_AGENTS(masterUserId);
   const raw       = await redis.hgetall(agentsKey);

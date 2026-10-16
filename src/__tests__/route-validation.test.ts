@@ -31,8 +31,11 @@ vi.mock('../config.js', () => ({
   config: {
     DEFAULT_BALANCE: '10000',
     LOG_LEVEL: 'silent',
+    INTERNAL_API_SECRET: 'test-internal-secret-0123456789',
   },
 }));
+
+const INTERNAL = { 'content-type': 'application/json', 'x-hypaper-internal': 'test-internal-secret-0123456789' };
 
 const { exchangeRouter } = await import('../api/routes/exchange.js');
 const { hypaperRouter } = await import('../api/routes/hypaper.js');
@@ -48,7 +51,7 @@ describe('route validation', () => {
 
     const res = await app.request('/exchange', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: INTERNAL,
       body: JSON.stringify({
         wallet: '0xabc',
         action: {
@@ -81,7 +84,7 @@ describe('route validation', () => {
 
     const res = await app.request('/exchange', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: INTERNAL,
       body: JSON.stringify({
         wallet: '0xabc',
         action: {
@@ -114,7 +117,7 @@ describe('route validation', () => {
 
     const res = await app.request('/hypaper', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: INTERNAL,
       body: JSON.stringify({
         type: 'setBalance',
         user: '0xabc',
@@ -134,7 +137,7 @@ describe('route validation', () => {
 
     const res = await app.request('/hypaper', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: INTERNAL,
       body: JSON.stringify({
         type: 'setBalance',
         user: '0xabc',
@@ -154,7 +157,7 @@ describe('route validation', () => {
 
     const res = await app.request('/hypaper', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: INTERNAL,
       body: JSON.stringify({
         type: 'setBalance',
         user: '0xabc',
@@ -168,5 +171,56 @@ describe('route validation', () => {
       balance: '123.45',
     });
     await expect(redisMock.hget(KEYS.USER_ACCOUNT('0xabc'), 'balance')).resolves.toBe('123.45');
+  });
+
+  it('refuses the unsigned {wallet} form from a caller without the internal secret (HP-01)', async () => {
+    const app = new Hono();
+    app.route('/exchange', exchangeRouter);
+    const body = JSON.stringify({ wallet: '0xabc', action: { type: 'cancel', cancels: [{ a: 0, o: 1 }] } });
+
+    const anon = await app.request('/exchange', { method: 'POST', headers: { 'content-type': 'application/json' }, body });
+    expect(anon.status).toBe(401);
+
+    const spoofed = await app.request('/exchange', { method: 'POST', headers: { 'content-type': 'application/json', 'x-hypaper-internal': 'wrong' }, body });
+    expect(spoofed.status).toBe(401);
+  });
+
+  it('refuses vaultAddress the signer does not own, honours it for a sub-account master (HP-02)', async () => {
+    const app = new Hono();
+    app.route('/exchange', exchangeRouter);
+    const master = '0x1111111111111111111111111111111111111111';
+    const sub = '0x2222222222222222222222222222222222222222';
+    const victim = '0x3333333333333333333333333333333333333333';
+    await redisMock.set(KEYS.SUBACCOUNT_MASTER(sub), master);
+    const action = { type: 'cancel', cancels: [{ a: 0, o: 1 }] };
+
+    const stranger = await app.request('/exchange', {
+      method: 'POST', headers: INTERNAL,
+      body: JSON.stringify({ wallet: master, vaultAddress: victim, action }),
+    });
+    expect(stranger.status).toBe(403);
+
+    const owner = await app.request('/exchange', {
+      method: 'POST', headers: INTERNAL,
+      body: JSON.stringify({ wallet: master, vaultAddress: sub, action }),
+    });
+    expect(owner.status).toBe(200);
+  });
+
+  it('refuses /hypaper setBalance and resetAccount without the internal secret (HP-03)', async () => {
+    const app = new Hono();
+    app.route('/hypaper', hypaperRouter);
+    for (const type of ['setBalance', 'resetAccount']) {
+      const res = await app.request('/hypaper', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ type, user: '0xabc', balance: 1e15 }),
+      });
+      expect(res.status).toBe(401);
+    }
+    const ok = await app.request('/hypaper', {
+      method: 'POST', headers: INTERNAL,
+      body: JSON.stringify({ type: 'setBalance', user: '0xabc', balance: 5 }),
+    });
+    expect(ok.status).toBe(200);
   });
 });

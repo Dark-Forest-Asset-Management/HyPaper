@@ -13,6 +13,10 @@ const envSchema = z.object({
   HL_WS_URL: z.string().default('wss://api.hyperliquid.xyz/ws'),
   HL_API_URL: z.string().default('https://api.hyperliquid.xyz'),
   PORT: z.coerce.number().default(3000),
+  // Shared secret for the unsigned /exchange `{wallet}` path and the
+  // /hypaper setBalance/resetAccount admin actions. See
+  // api/middleware/internal.ts. Unset = those paths are disabled.
+  INTERNAL_API_SECRET: z.string().min(16).optional(),
   DEFAULT_BALANCE: z.coerce.number().default(100_000),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
   WS_RECONNECT_MIN_MS: z.coerce.number().default(1000),
