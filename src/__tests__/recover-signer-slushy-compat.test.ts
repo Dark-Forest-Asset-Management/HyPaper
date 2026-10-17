@@ -4,7 +4,8 @@
  * must keep recovering the SAME wallet.
  *
  * Independent signer on purpose: slushy signs with the `hyperliquid` SDK's `signL1Action`
- * (src/api/hlSign.ts → nomeidaSignL1Action(wallet, action, vault|null, nonce, isMainnet=true),
+ * (src/api/hlSign.ts → nomeidaSignL1Action(wallet, action, vault|null, nonce, signForMainnet()),
+ * which is false in paper mode — the only mode that reaches HyPaper),
  * which has no expiresAfter parameter at all). That same SDK is a HyPaper dependency, so these
  * tests sign with it and verify through HyPaper's real /exchange route — not through our own
  * hashing code.
@@ -29,13 +30,15 @@ vi.mock('../engine/trailingStop.js', () => ({ placeTrailingStop }));
 vi.mock('../store/pg-sink.js', () => ({
   upsertUser: vi.fn(), updateUserBalance: vi.fn(), recordLedgerUpdate: vi.fn(), recordFunding: vi.fn(),
 }));
-// slushy.trade runs mainnet exclusively → phantom-agent source "a" (HyPaper derives it from HL_API_URL).
+// HyPaper accepts only the testnet phantom-agent source "b" whatever HL_API_URL is (C1),
+// so the mainnet URL here proves the source no longer follows the endpoint.
 vi.mock('../config.js', () => ({
   config: { HL_API_URL: 'https://api.hyperliquid.xyz', DEFAULT_BALANCE: '10000', LOG_LEVEL: 'silent' },
 }));
 
 const { exchangeRouter } = await import('../api/routes/exchange.js');
 const { recoverHlSigner } = await import('../api/middleware/recoverHlSigner.js');
+const { KEYS } = await import('../store/keys.js');
 const app = new Hono();
 app.route('/exchange', exchangeRouter);
 
@@ -50,7 +53,7 @@ let nonce = Date.now();
 async function slushyBody(action: unknown, vault: string | null = null) {
   const n = ++nonce;
   // ethers ships separate ESM/CJS typings; the SDK is typed against the CJS one.
-  const sig = await signL1Action(wallet as unknown as Parameters<typeof signL1Action>[0], action, vault, n, true);
+  const sig = await signL1Action(wallet as unknown as Parameters<typeof signL1Action>[0], action, vault, n, false);
   return { action, nonce: n, signature: sig, ...(vault ? { vaultAddress: vault } : {}) };
 }
 
@@ -61,7 +64,11 @@ const orderAction = {
 };
 
 describe('requests WITHOUT expiresAfter (what slushy sends today) still recover the signer after D3', () => {
-  beforeEach(() => { redisMock.flushall(); placeOrders.mockClear(); cancelOrders.mockClear(); });
+  beforeEach(async () => {
+    redisMock.flushall(); placeOrders.mockClear(); cancelOrders.mockClear();
+    // vaultAddress is honoured only for the signer's own sub-account (HP-02).
+    await redisMock.set(KEYS.SUBACCOUNT_MASTER(VAULT.toLowerCase()), wallet.address.toLowerCase());
+  });
 
   it('order — acts as the signer', async () => {
     const res = await post(await slushyBody(orderAction));

@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { isInternalRequest } from '../middleware/internal.js';
 import {
   placeOrders,
   cancelOrders,
@@ -11,7 +12,7 @@ import {
   createTwapOrder,
   cancelTwapOrder,
 } from '../../engine/order.js';
-import {
+import { isSubAccountOf,
   createSubAccount,
   subAccountModify,
   subAccountTransfer,
@@ -26,7 +27,7 @@ import {
   agentSendAsset,
   sendToEvmWithData,
 } from '../../engine/transfers.js';
-import {
+import { isAgentOf,
   approveAgent,
   approveBuilderFee,
   setReferrer,
@@ -92,7 +93,9 @@ exchangeRouter.post('/', async (c) => {
   }
 
   // Derive the wallet from the EIP-712 signature when present (production path).
-  // Fall back to `body.wallet` only for unsigned local tests / scripts.
+  // The unsigned `{ wallet }` form is accepted ONLY from an internal caller
+  // presenting the shared secret (the MCP server) — never from the public
+  // internet, where it let anyone act as any paper account (HP-01).
   // `expiresAfter` is part of what HL signs (see recoverHlSigner), so it must be
   // read BEFORE signature recovery and fed into the hash.
   const expiresAfter: number | undefined =
@@ -101,6 +104,7 @@ exchangeRouter.post('/', async (c) => {
       : undefined;
 
   let wallet: string;
+  const userSigned = !!body.action && isUserSignedActionType(body.action.type);
   if (body.signature && body.action && typeof body.nonce === 'number') {
     try {
       // User-signed actions (transfers/approvals/staking) use a different
@@ -114,24 +118,50 @@ exchangeRouter.post('/', async (c) => {
         response: `Signature recovery failed: ${(err as Error).message}`,
       }, 400);
     }
-  } else if (typeof body.wallet === 'string') {
+  } else if (typeof body.wallet === 'string' && isInternalRequest(c)) {
     wallet = body.wallet.toLowerCase();
+  } else if (typeof body.wallet === 'string') {
+    return c.json({ status: 'err', response: 'Unsigned actions are not accepted from this caller' }, 401);
   } else {
-    return c.json({ status: 'err', response: 'Missing signature (or wallet for unsigned tests)' }, 400);
+    return c.json({ status: 'err', response: 'Missing signature' }, 400);
   }
 
   await ensureAccount(wallet);
 
-  // vaultAddress — when present the signer is acting on behalf of a vault or
-  // sub-account. We treat it as the effective acting wallet for this request.
+  // vaultAddress — the signer is acting on behalf of a sub-account (or
+  // vault). HL only honours it when the signer is that account's master
+  // or an approved agent; HyPaper used to take it on faith, which let any
+  // paper user act as any other address (HP-02). User-signed types carry
+  // no vaultAddress on HL at all (it isn't part of the signed payload), so
+  // it is rejected there outright.
   let effectiveWallet = wallet;
-  if (body.vaultAddress && typeof body.vaultAddress === 'string') {
-    effectiveWallet = body.vaultAddress.toLowerCase();
+  if (body.vaultAddress !== undefined && body.vaultAddress !== null) {
+    if (typeof body.vaultAddress !== 'string' || !/^0x[0-9a-fA-F]{40}$/.test(body.vaultAddress)) {
+      return c.json({ status: 'err', response: 'Invalid vaultAddress' }, 400);
+    }
+    if (userSigned) {
+      return c.json({ status: 'err', response: 'vaultAddress is not valid on user-signed actions' }, 400);
+    }
+    const target = body.vaultAddress.toLowerCase();
+    if (target !== wallet) {
+      const allowed = (await isSubAccountOf(wallet, target)) || (await isAgentOf(target, wallet));
+      if (!allowed) {
+        return c.json({ status: 'err', response: `Signer ${wallet} may not act for ${target}` }, 403);
+      }
+    }
+    effectiveWallet = target;
     await ensureAccount(effectiveWallet);
   }
 
-  // Replay protection
+  // Replay protection — HL's rule (docs, "Nonces and API wallets"): a nonce
+  // must fall within (T − 2 days, T + 1 day) of the block time and be
+  // higher than the stored high-water mark. Without the window a single
+  // absurd nonce (2^53) bricked the wallet forever (2026-10-13 review, M16).
   if (typeof body.nonce === 'number' && Number.isFinite(body.nonce)) {
+    const now = Date.now();
+    if (body.nonce <= now - 2 * 86_400_000 || body.nonce >= now + 86_400_000) {
+      return c.json({ status: 'err', response: `Nonce ${body.nonce} outside the accepted window (T-2d, T+1d)` }, 400);
+    }
     const prevStr = await redis.get(KEYS.USER_NONCE_MAX(wallet));
     const prev    = prevStr ? parseInt(prevStr, 10) : 0;
     if (body.nonce <= prev) {

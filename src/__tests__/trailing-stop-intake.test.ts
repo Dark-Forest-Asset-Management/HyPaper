@@ -25,7 +25,10 @@ vi.mock('../store/pg-sink.js', () => ({
 }));
 // The captured requests were signed against HL TESTNET (phantom-agent source "b").
 vi.mock('../config.js', () => ({
-  config: { HL_API_URL: 'https://api.hyperliquid-testnet.xyz', DEFAULT_BALANCE: '10000', LOG_LEVEL: 'silent' },
+  config: {
+    HL_API_URL: 'https://api.hyperliquid-testnet.xyz', DEFAULT_BALANCE: '10000', LOG_LEVEL: 'silent',
+    INTERNAL_API_SECRET: 'test-internal-secret-0123456789',
+  },
 }));
 const placeTrailingStop = vi.fn(async (_w: string, _a: unknown, _o?: unknown): Promise<{ oid: number } | { error: string }> => ({ oid: 4242 }));
 vi.mock('../engine/trailingStop.js', () => ({ placeTrailingStop }));
@@ -36,6 +39,13 @@ app.route('/exchange', exchangeRouter);
 
 const post = (body: unknown) =>
   app.request('/exchange', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+/** Unsigned `{ wallet }` bodies are accepted only from the internal caller (HP-01). */
+const postInternal = (body: unknown) =>
+  app.request('/exchange', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-hypaper-internal': 'test-internal-secret-0123456789' },
+    body: JSON.stringify(body),
+  });
 
 /** Same request, action keys in the order the HL UI's DevTools shows (alphabetical). */
 const sortKeys = (a: Record<string, unknown>) => Object.fromEntries(Object.entries(a).sort(([x], [y]) => x.localeCompare(y)));
@@ -45,6 +55,10 @@ describe('POST /exchange — trailingStop intake', () => {
     redisMock.flushall();
     placeTrailingStop.mockClear();
     placeTrailingStop.mockResolvedValue({ oid: 4242 });
+    // The captures are real signatures, so their nonces cannot be re-minted; pin
+    // the clock just after capture so they sit inside the (T-2d, T+1d) window.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(fixtures.probeCaptures[0].nonce + 60_000);
   });
   afterEach(() => vi.useRealTimers());
 
@@ -69,7 +83,6 @@ describe('POST /exchange — trailingStop intake', () => {
   });
 
   it('real HL web-UI requests (key-sorted JSON, expiresAfter, isFrontend, vaultAddress:null) recover the UI AGENT wallet', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
     for (const cap of fixtures.uiCaptures) {
       vi.setSystemTime(cap.expiresAfter - 60_000);
       placeTrailingStop.mockClear();
@@ -83,8 +96,9 @@ describe('POST /exchange — trailingStop intake', () => {
   });
 
   it('an expiresAfter in the past is refused: HTTP 200 + "Action already expired" (checked AFTER the signature, which covers expiresAfter)', async () => {
-    // the real UI captures carry an expiresAfter that is long past by now; no fake timers here
+    // just past each capture's expiresAfter, but still inside the nonce window
     for (const cap of fixtures.uiCaptures) {
+      vi.setSystemTime(cap.expiresAfter + 60_000);
       placeTrailingStop.mockClear();
       const res = await post(cap);
       expect(res.status).toBe(200);
@@ -96,12 +110,12 @@ describe('POST /exchange — trailingStop intake', () => {
   it('modify of a trailing stop: HL\'s text comes back as HTTP 200; any other modify error stays HTTP 400', async () => {
     const wire = { a: 3, b: true, p: '80000', s: '0.00015', r: false, t: { limit: { tif: 'Gtc' } } };
     modifyOrder.mockResolvedValueOnce({ error: 'Attempted to modify to invalid new order' });
-    let res = await post({ wallet: '0xabc', action: { type: 'modify', oid: 5, order: wire } });
+    let res = await postInternal({ wallet: '0xabc', action: { type: 'modify', oid: 5, order: wire } });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ status: 'err', response: 'Attempted to modify to invalid new order' });
 
     modifyOrder.mockResolvedValueOnce({ error: 'Order 5 not found' });
-    res = await post({ wallet: '0xabc', action: { type: 'modify', oid: 5, order: wire } });
+    res = await postInternal({ wallet: '0xabc', action: { type: 'modify', oid: 5, order: wire } });
     expect(res.status).toBe(400);
   });
 

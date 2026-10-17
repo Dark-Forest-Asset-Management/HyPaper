@@ -516,10 +516,18 @@ export class HyPaperWsServer {
       this.broadcast(`trades:${e.coin}`, JSON.stringify({ channel: 'trades', data: e.trades }));
     });
     // Engine actions that change account state without a fill/order hook
-    // (updateIsolatedMargin / topUpIsolatedOnlyMargin) fire accountUpdate so
-    // the client sees fresh marginUsed + liqPx without waiting for a poll.
+    // fire accountUpdate so the client sees fresh state without waiting for
+    // a poll: isolated-margin changes (engine/order.ts) and, since
+    // 2026-10-12, every balance transfer (engine/transfers.ts). Transfers
+    // previously emitted nothing, so a paper transfer moved the balances in
+    // Redis while connected clients kept the old numbers until the user's
+    // next order. activeAssetData is re-pushed too because available-to-
+    // trade moves with the balance, and per-dex state for any HIP-3 venue
+    // the action touched.
     this.eventBus.on('accountUpdate', (event: AccountUpdateEvent) => {
       void this.broadcastWebData2(event.userId);
+      void this.repushActiveAssetData(event.userId);
+      for (const dex of event.dexes ?? []) void this.broadcastDexUserState(event.userId, dex);
     });
     this.eventBus.on('bbo', (e: { coin: string; frame: unknown }) => {
       this.broadcast(`bbo:${e.coin}`, JSON.stringify({ channel: 'bbo', data: e.frame }));

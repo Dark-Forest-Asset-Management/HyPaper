@@ -133,4 +133,7 @@ export interface OrderUpdateBatchEvent {
  *  new marginUsed / liqPx / accountValue without polling. */
 export interface AccountUpdateEvent {
   userId: string;
+  /** HIP-3 venues whose per-dex state also changed (e.g. a perp <-> sub-dex
+   *  transfer). Native ("") is always covered by the webData2 push. */
+  dexes?: string[];
 }

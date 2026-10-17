@@ -214,7 +214,10 @@ infoRouter.post('/', async (c) => {
       }
 
       case 'orderStatus': {
-        const status = await getOrderStatus(body.oid);
+        // HL prod requires `user`; an oid alone enumerated everyone's
+        // orders here (oids are sequential).
+        if (!user) return c.json({ error: 'Missing user' }, 400);
+        const status = await getOrderStatus(body.oid, user);
         return c.json(status);
       }
 

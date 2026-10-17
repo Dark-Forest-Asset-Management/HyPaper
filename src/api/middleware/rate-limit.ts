@@ -17,6 +17,7 @@
  */
 
 import { createMiddleware } from 'hono/factory';
+import { getConnInfo } from '@hono/node-server/conninfo';
 import { config } from '../../config.js';
 
 interface RateBucket {
@@ -33,9 +34,27 @@ setInterval(() => {
   }
 }, 60_000).unref();
 
+/** The client IP as nginx reports it. nginx APPENDS the socket address to
+ *  any X-Forwarded-For the client sent ($proxy_add_x_forwarded_for), so the
+ *  only trustworthy hop is the RIGHTMOST one; keying on the whole header
+ *  let a client rotate buckets per request by prefixing junk (HP-06).
+ *  Without the header (direct / WS post tunnel) fall back to the socket. */
+function clientIp(c: Parameters<Parameters<typeof createMiddleware>[0]>[0]): string {
+  const xff = c.req.header('x-forwarded-for');
+  if (xff) {
+    const last = xff.split(',').pop()?.trim();
+    if (last) return last;
+  }
+  try {
+    return getConnInfo(c).remote.address ?? 'anon';
+  } catch {
+    return 'anon';
+  }
+}
+
 function makeRateLimit(routeFamily: string, perMinute: number) {
   return createMiddleware(async (c, next) => {
-    const ip = c.req.header('x-forwarded-for') ?? 'anon';
+    const ip = clientIp(c);
     const key = `${routeFamily}|${ip}`;
     const now = Date.now();
 
