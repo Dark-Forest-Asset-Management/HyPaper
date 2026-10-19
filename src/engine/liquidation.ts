@@ -1,82 +1,81 @@
 /**
- * Liquidation engine — core logic.
+ * Liquidation engine.
  *
- * Implements the full 5-phase plan:
- *   1. Data is already in Redis (positions, leverage, mids) — read from there.
- *   2. Equity is calculated via existing margin.ts helpers.
- *   3. Maintenance margin check (this file).
- *   4. Position close execution (this file, calls fill engine).
- *   5. Logging — inserts a LiquidationEvent row into Postgres.
+ * Follows HL's published rules (docs, Trading → Liquidations / Margining):
  *
- * Called by LiquidationWorker (worker/liquidation-worker.ts) on every price
- * update. Also exported for unit tests.
+ *   • Trigger: "account equity falls below the maintenance margin", using the
+ *     MARK price. Maintenance margin is half the initial margin at the asset's
+ *     max leverage (per-tier, engine/marginTiers.ts).
+ *       – ISOLATED: the position's own dedicated margin + its own PnL vs its
+ *         own maintenance margin. The rest of the account is untouched.
+ *       – CROSS: the cross account value (balance − isolated margins + cross
+ *         PnL) vs the SUM of maintenance margin over every cross position in
+ *         that dex. When it trips, every cross position is liquidated.
+ *   • Market liquidation: "the system first tries to close the full position
+ *     with market orders sent to the book." The trader keeps whatever
+ *     collateral remains. Paper closes at the mark, as a taker (fee charged).
+ *   • Partial: a liquidatable position above 100k USDC sends only 20% to the
+ *     book; then a 30-second cooldown during which "market liquidation orders
+ *     for that user cover the entire position".
+ *   • Backstop: once equity is below 2/3 of maintenance margin the liquidator
+ *     vault takes the position and "the maintenance margin is not returned to
+ *     the user". Isolated: that position and its margin transfer. Cross: all
+ *     cross positions and cross margin transfer (cross equity ends at zero).
  *
- * Key design decisions:
- *   • Unrealized PnL is fetched from the existing margin.ts path — HL API
- *     returns it; HyPaper already computes it the same way.
- *   • Backstop vault disbursements are a no-op; vault only collects proceeds.
- *   • Positions > $100 k USDC: close 20 % first, 30 s sim-time cooldown,
- *     then close remaining 80 %.
- *   • Maintenance margin rate: uses HL's real per-tier schedule
- *     (engine/marginTiers.ts) when market meta is available in Redis,
- *     falling back to the `1 / (2 × leverage)` approximation otherwise —
- *     same fallback margin.ts's calculateLiquidationPrice uses, so the two
- *     stay consistent in every case (Cross Margin Updates task, 2026-07).
+ * Every liquidation close is written the way HL reports it: as a FILL
+ * (→ userFills / userFillsByTime / WS userFills + userEvents) carrying
+ * `liquidation: { liquidatedUser, markPx, method }`. A backstop also writes
+ * the `liquidation` ledger delta (→ userNonFundingLedgerUpdates) and a WS
+ * userEvents `liquidation` event. Shapes from public HL, captured 2026-10-19
+ * for 0xcb02837caaee310c178501855b63bf7f4f4b1f8b (HMSTR isolated short):
+ *   market fills:   dir "Close Short", fee charged, method "market"
+ *   backstop fill:  dir "Liquidated Isolated Short", fee "0.0", method "backstop"
+ *
+ * Before 2026-10-19 a liquidation deleted the position without writing any
+ * fill and credited margin + PnL to the balance — where margin had never been
+ * deducted — so the trader was paid back their margin while the same amount
+ * was credited to the vault, and the position simply vanished from history.
+ *
+ * Balance model (unchanged): `balance` holds realized cash; margin is a
+ * reservation against it, never deducted. So a close credits closedPnl − fee,
+ * and a backstop then debits the equity that transfers to the vault.
  */
 
 import { redis } from '../store/redis.js';
 import { KEYS } from '../store/keys.js';
+import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { randomBytes } from 'node:crypto';
-import {
-  calculateAccountValue,
-  calculatePositionUnrealizedPnl,
-  calculatePositionMarginUsed,
-} from './margin.js';
+import { calculatePositionUnrealizedPnl, isolatedMarginOf, getBalance } from './margin.js';
 import { getMarginTiersForCoin, maintenanceMarginForNotional, maintenanceMarginRateForNotional } from './marginTiers.js';
-import { creditVault } from './liquidator-vault.js';
+import { getLeverageSetting, loadUniverseEntry, subDexNames } from './assetMeta.js';
+import { queueVaultCredit, mirrorVaultCreditPg } from './liquidator-vault.js';
+import { getL2Book } from '../utils/l2-cache.js';
+import { computeVwap } from '../utils/slippage.js';
+import { withUserLock } from '../utils/userLock.js';
 import { insertLiquidationEventPg } from '../store/pg-queries.js';
-import {
-  D,
-  abs,
-  add,
-  sub,
-  mul,
-  div,
-  gt,
-  lt,
-  isZero,
-} from '../utils/math.js';
+import { getFreshMark } from '../worker/mark-feed.js';
+import { nextOid, nextTid } from '../utils/id.js';
+import { abs, add, sub, mul, div, gt, lt, isZero, neg, roundToDecimals } from '../utils/math.js';
 import type { LiquidationEvent, MaintenanceMarginResult, LiquidationCheckResult } from '../types/liquidation.js';
 import type { HlMeta, HlMarginTier } from '../types/hl.js';
+import type { PaperFill, PaperOrder } from '../types/order.js';
 
-// ── Maintenance margin rate lookup ────────────────────────────────────────
-//
-// Fallback approximation, used only when real per-tier data (HlMeta from
-// Redis) isn't available:
-//   maintRate = 1 / (2 × maxLeverage)
-// which gives the same values documented:
-//   40× → 1.25 %,  20× → 2.5 %,  10× → 5 %,  3× → 16.7 %
-// When tiers ARE available, computeMaintenanceMargin uses the real HL
-// tiered formula from engine/marginTiers.ts instead (Cross Margin Updates
-// task) — verified against real testnet data in
-// hl-cross-maintenance-margin.md.
+// ── Maintenance margin ────────────────────────────────────────────────────
 
+/** Fallback when no tier data is cached: 1 / (2 × leverage). */
 function maintenanceMarginRate(leverage: number): string {
   // Clamp leverage to at least 1 to avoid divide-by-zero on malformed data.
   const lev = Math.max(1, leverage);
   return div('1', (lev * 2).toString());
 }
 
-// ── Public calculation helpers (also used by tests) ───────────────────────
-
 /**
  * Compute the maintenance margin for a single position.
  *
  * When `marginTiers` is supplied, uses HL's real per-tier formula. When
- * omitted (e.g. no market meta cached yet), falls back to the old
- * `1 / (2 × leverage)` approximation — every existing call site/test that
- * doesn't pass tiers keeps its previous exact behaviour.
+ * omitted (e.g. no market meta cached yet), falls back to the
+ * `1 / (2 × leverage)` approximation.
  */
 export function computeMaintenanceMargin(
   szi: string,
@@ -98,397 +97,454 @@ export function computeMaintenanceMargin(
   return { maintenanceMargin, maintenanceMarginRate: rate, positionNotional };
 }
 
+// ── Constants (HL docs, Liquidations) ─────────────────────────────────────
+
+const PARTIAL_LIQ_THRESHOLD_USDC = '100000'; // "above 100k USDC" (mainnet)
+const PARTIAL_LIQ_PCT = '0.2';               // "only 20% goes to the book"
+const PARTIAL_LIQ_COOLDOWN_MS = 30_000;      // "30-second cooldown"
+const BACKSTOP_FRACTION = div('2', '3');     // "below 2/3 of maintenance margin"
+
+
+// ── Position snapshot ─────────────────────────────────────────────────────
+
+interface PositionView {
+  asset: number;
+  coin: string;
+  szi: string;
+  entryPx: string;
+  /** Price the check runs on: fresh mark, else mid. */
+  px: string;
+  leverage: number;
+  isCross: boolean;
+  notional: string;
+  pnl: string;
+  maintenanceMargin: string;
+  /** Isolated only: the position's dedicated margin. */
+  isolatedMargin: string;
+  raw: Record<string, string>;
+}
+
+/** HL liquidates on the MARK. Paper's mark is fresh only for coins with a
+ *  live per-coin feed (worker/mark-feed.ts — the liquidation worker requests
+ *  one for every coin with an open position); otherwise the mid is used. */
+async function priceFor(coin: string, mids: Record<string, string>): Promise<string | undefined> {
+  return (await getFreshMark(coin)) ?? mids[coin];
+}
+
+async function loadPositions(userId: string, scope: string): Promise<PositionView[]> {
+  const assets = await redis.smembers(KEYS.USER_POSITIONS_SCOPED(userId, scope));
+  if (assets.length === 0) return [];
+  const mids = await redis.hgetall(KEYS.MARKET_MIDS);
+  const metaRaw = await redis.get(scope ? KEYS.MARKET_META_DEX(scope) : KEYS.MARKET_META);
+  const meta: HlMeta | null = metaRaw ? JSON.parse(metaRaw) : null;
+
+  const out: PositionView[] = [];
+  for (const assetStr of assets) {
+    const asset = parseInt(assetStr, 10);
+    const raw = await redis.hgetall(KEYS.USER_POS(userId, asset));
+    if (!raw.szi || isZero(raw.szi)) continue;
+    const px = await priceFor(raw.coin, mids);
+    if (!px) continue;
+    const { leverage, isCross } = await getLeverageSetting(userId, asset);
+    // Falls back to a flat tier at the position's own leverage only when
+    // meta for the coin isn't cached.
+    const tiers = getMarginTiersForCoin(meta, raw.coin) ?? [{ lowerBound: '0.0', maxLeverage: leverage }];
+    const { maintenanceMargin, positionNotional } = computeMaintenanceMargin(raw.szi, px, leverage, tiers);
+    out.push({
+      asset,
+      coin: raw.coin,
+      szi: raw.szi,
+      entryPx: raw.entryPx,
+      px,
+      leverage,
+      isCross,
+      notional: positionNotional,
+      pnl: calculatePositionUnrealizedPnl(raw.szi, raw.entryPx, px),
+      maintenanceMargin,
+      isolatedMargin: isCross ? '0' : isolatedMarginOf(raw, leverage),
+      raw,
+    });
+  }
+  return out;
+}
+
+/** Cross account value for a dex: balance − margin dedicated to isolated
+ *  positions + cross unrealized PnL. Isolated equity is excluded both ways —
+ *  its margin is reserved, its PnL is its own. */
+function crossAccountValue(balance: string, positions: PositionView[]): string {
+  let v = balance;
+  for (const p of positions) v = p.isCross ? add(v, p.pnl) : sub(v, p.isolatedMargin);
+  return v;
+}
+
+// ── Check ─────────────────────────────────────────────────────────────────
+
+interface Assessment {
+  shouldLiquidate: boolean;
+  equity: string;
+  maintenanceMargin: string;
+  method: 'market' | 'backstop';
+  /** The positions this liquidation closes. */
+  targets: PositionView[];
+}
+
+function assess(equity: string, maintenanceMargin: string, targets: PositionView[]): Assessment {
+  const shouldLiquidate = targets.length > 0 && lt(equity, maintenanceMargin);
+  const method = lt(equity, mul(maintenanceMargin, BACKSTOP_FRACTION)) ? 'backstop' : 'market';
+  return { shouldLiquidate, equity, maintenanceMargin, method, targets };
+}
+
+function assessIsolated(p: PositionView): Assessment {
+  return assess(add(p.isolatedMargin, p.pnl), p.maintenanceMargin, [p]);
+}
+
+function assessCross(balance: string, positions: PositionView[]): Assessment {
+  const cross = positions.filter((p) => p.isCross);
+  let mm = '0';
+  for (const p of cross) mm = add(mm, p.maintenanceMargin);
+  return assess(crossAccountValue(balance, positions), mm, cross);
+}
+
 /**
- * Check whether a position should be liquidated.
- *
- * Branches on margin type, matching real HL semantics:
- *
- *   • CROSS — the position survives as long as the WHOLE account's equity
- *     (balance + PnL across every position) stays above the total
- *     maintenance margin owed across every cross position. A single small
- *     position can't be liquidated in isolation if the rest of the account
- *     has a large enough cushion — this is intentional and matches HL.
- *
- *   • ISOLATED — completely independent of the rest of the account. Only
- *     the margin specifically allocated to THIS position (marginUsed,
- *     which includes any extra isolated margin added via
- *     updateIsolatedMargin) backs it. The check is:
- *         positionMargin + positionUnrealizedPnl  <  maintenanceMargin
- *     i.e. once this position's own dedicated cushion is eaten through by
- *     its own losses, it liquidates — regardless of how large the rest of
- *     the account's balance is.
- *
- * BUG FIX (2026-06-19): the original version always used the full-account
- * calculateAccountValue() as the equity figure, even for isolated
- * positions. That meant an isolated position with a $50 margin could never
- * trigger if the account's overall balance was large (e.g. $97k), because
- * $97k always compared as "greater than" the ~$25 maintenance margin
- * required — even though the position's OWN $50 cushion had gone to zero.
- * Confirmed via live testnet trace: isolated XRP position, liquidationPx
- * correctly computed as $1.0955, price forced below it, but
- * shouldLiquidate stayed false because accountEquity was $97,093 (whole
- * account) instead of ~$50 (this position's own margin + its PnL).
- *
- * MAINTENANCE MARGIN FIX (Cross Margin Updates, 2026-07): now reads market
- * meta from Redis to get the asset's real tier schedule, instead of always
- * using the `1/(2×leverage)` approximation. If meta or the coin isn't
- * found (e.g. in tests that don't seed MARKET_META), falls back to a
- * synthetic flat tier at this position's own leverage — numerically
- * IDENTICAL to the old approximation, so every existing test keeps
- * passing unchanged.
+ * Should the position on `asset` be liquidated right now? For an isolated
+ * position this is that position alone; for a cross position it is the whole
+ * cross account of the asset's dex (`accountEquity` = cross account value,
+ * `maintenanceMargin` = summed over every cross position).
  */
 export async function checkLiquidation(
   userId: string,
   asset: number,
   scope = '',
 ): Promise<LiquidationCheckResult> {
-  const pos = await redis.hgetall(KEYS.USER_POS(userId, asset));
-  if (!pos.szi || isZero(pos.szi)) {
-    return {
-      shouldLiquidate: false,
-      accountEquity: '0',
-      maintenanceMargin: '0',
-      shortfall: '0',
-    };
-  }
-
-  const mids = await redis.hgetall(KEYS.MARKET_MIDS);
-  const markPx = mids[pos.coin];
-  if (!markPx) {
-    return {
-      shouldLiquidate: false,
-      accountEquity: '0',
-      maintenanceMargin: '0',
-      shortfall: '0',
-    };
-  }
-
-  const lev = await redis.hgetall(KEYS.USER_LEV(userId, asset));
-  const leverage = lev.leverage ? parseInt(lev.leverage, 10) : 20;
-  const isCross = lev.isCross !== 'false';
-
-  // Real per-tier margin schedule for this coin (Cross Margin Updates).
-  // Falls back to a synthetic flat tier at this position's own leverage
-  // when meta/coin isn't found — numerically identical to the old
-  // 1/(2×leverage) approximation, so tests without seeded MARKET_META are
-  // unaffected.
-  const metaKey = scope ? KEYS.MARKET_META_DEX(scope) : KEYS.MARKET_META;
-  const metaRaw = await redis.get(metaKey);
-  const meta: HlMeta | null = metaRaw ? JSON.parse(metaRaw) : null;
-  const tiers = getMarginTiersForCoin(meta, pos.coin) ?? [{ lowerBound: '0.0', maxLeverage: leverage }];
-
-  const { maintenanceMargin } = computeMaintenanceMargin(pos.szi, markPx, leverage, tiers);
-
-  if (!isCross) {
-    // ── Isolated: this position's own margin + its own PnL, nothing else ──
-    const positionMargin = await calculatePositionMarginUsed(userId, asset, pos.szi, markPx);
-    const positionPnl = calculatePositionUnrealizedPnl(pos.szi, pos.entryPx, markPx);
-    const positionEquity = add(positionMargin, positionPnl);
-
-    const shouldLiquidate = lt(positionEquity, maintenanceMargin);
-    const shortfall = shouldLiquidate ? sub(maintenanceMargin, positionEquity) : '0';
-
-    return { shouldLiquidate, accountEquity: positionEquity, maintenanceMargin, shortfall };
-  }
-
-  // ── Cross: whole-account equity vs this position's maintenance margin ──
-
-  const accountEquity = await calculateAccountValue(userId, scope);
-
-  const shouldLiquidate = lt(accountEquity, maintenanceMargin);
-  const shortfall = shouldLiquidate
-    ? sub(maintenanceMargin, accountEquity)
-    : '0';
-
-  return { shouldLiquidate, accountEquity, maintenanceMargin, shortfall };
+  const none: LiquidationCheckResult = { shouldLiquidate: false, accountEquity: '0', maintenanceMargin: '0', shortfall: '0' };
+  const positions = await loadPositions(userId, scope);
+  const p = positions.find((x) => x.asset === asset);
+  if (!p) return none;
+  const a = p.isCross ? assessCross(await getBalance(userId, scope), positions) : assessIsolated(p);
+  return {
+    shouldLiquidate: a.shouldLiquidate,
+    accountEquity: a.equity,
+    maintenanceMargin: a.maintenanceMargin,
+    shortfall: a.shouldLiquidate ? sub(a.maintenanceMargin, a.equity) : '0',
+  };
 }
 
-// ── Partial-liquidation threshold ─────────────────────────────────────────
+// ── Execute ───────────────────────────────────────────────────────────────
 
-const PARTIAL_LIQ_THRESHOLD_USDC = '100000'; // $100 k
-const PARTIAL_LIQ_PCT = '0.2';               // 20 %
-const PARTIAL_LIQ_DELAY_MS = 30_000;         // 30 seconds sim-time
+async function szDecimalsFor(asset: number): Promise<number> {
+  const found = await loadUniverseEntry(asset);
+  return found ? found.universe[found.localIdx].szDecimals : 8;
+}
 
-// Track pending second-half closes so the worker doesn't double-schedule.
-// Map key: `${userId}:${asset}`, value: timestamp when the 80 % close fires.
-const pendingSecondClose = new Map<string, NodeJS.Timeout>();
+/** Fill price for a liquidation close. Market: the close is a taker order
+ *  into the book, so it walks the real L2 book (public HL, utils/l2-cache.ts)
+ *  exactly like a paper market order, falling back to the mark when no book
+ *  is available. Backstop: the vault takes the position at the mark. */
+async function liquidationFillPx(p: PositionView, sz: string, method: 'market' | 'backstop'): Promise<string> {
+  if (method === 'backstop') return p.px;
+  const book = await getL2Book(p.coin);
+  if (!book) return p.px;
+  const isBuy = !gt(p.szi, '0'); // closing a long sells into bids
+  return computeVwap(isBuy ? book.levels[1] : book.levels[0], sz, isBuy, null, p.px).fillPx;
+}
 
-// ── Liquidation executor ──────────────────────────────────────────────────
+interface PlannedClose {
+  p: PositionView;
+  order: PaperOrder;
+  fill: PaperFill;
+  remaining: string;
+}
 
-/**
- * Execute a liquidation for `userId`/`asset`.
- *
- * Decides full vs partial close, credits the liquidator vault, logs the
- * event to Postgres, and updates Redis account state.
- *
- * Returns `true` if a liquidation was executed, `false` if the position was
- * already flat or the check re-ran and the account recovered.
- */
-export async function executeLiquidation(
+/** Build one liquidation close (no writes yet). */
+async function planClose(
   userId: string,
-  asset: number,
-  scope = '',
-): Promise<boolean> {
-  const pos = await redis.hgetall(KEYS.USER_POS(userId, asset));
-  if (!pos.szi || isZero(pos.szi)) return false;
+  p: PositionView,
+  closeAbs: string,
+  method: 'market' | 'backstop',
+  now: number,
+): Promise<PlannedClose> {
+  const isLong = gt(p.szi, '0');
+  const posAbs = abs(p.szi);
+  const sz = gt(closeAbs, posAbs) ? posAbs : closeAbs;
+  const px = await liquidationFillPx(p, sz, method);
+  const closedPnl = calculatePositionUnrealizedPnl(isLong ? sz : neg(sz), p.entryPx, px);
+  // A market liquidation is a taker order into the book; the backstop
+  // transfer pays no fee (public HL backstop fill: "fee": "0.0").
+  const fee = method === 'market' && config.FEES_ENABLED ? mul(mul(sz, px), config.FEE_RATE_TAKER) : '0';
+  const dir = method === 'market'
+    ? (isLong ? 'Close Long' : 'Close Short')
+    : `Liquidated ${p.isCross ? 'Cross' : 'Isolated'} ${isLong ? 'Long' : 'Short'}`;
+  const oid = await nextOid();
+  const tid = await nextTid();
+  const order: PaperOrder = {
+    oid, userId, asset: p.asset, coin: p.coin, isBuy: !isLong, sz, limitPx: px,
+    orderType: 'limit', tif: 'Ioc', reduceOnly: true, grouping: 'na',
+    status: 'filled', filledSz: sz, avgPx: px, createdAt: now, updatedAt: now,
+  };
+  const fill: PaperFill = {
+    coin: p.coin,
+    px,
+    sz,
+    side: isLong ? 'A' : 'B',
+    time: now,
+    startPosition: p.szi,
+    dir,
+    closedPnl,
+    hash: `0x${tid.toString(16).padStart(64, '0')}`,
+    oid,
+    crossed: true,
+    fee,
+    tid,
+    // markPx is the mark the liquidation was evaluated on, as on HL.
+    liquidation: { liquidatedUser: userId, markPx: p.px, method },
+    feeToken: 'USDC',
+    twapId: null,
+  };
+  return { p, order, fill, remaining: sub(posAbs, sz) };
+}
 
-  const mids = await redis.hgetall(KEYS.MARKET_MIDS);
-  const markPx = mids[pos.coin];
-  if (!markPx) return false;
+/** Queue a planned close's Redis writes: position, balance (closedPnl − fee), fill list. */
+function queueClose(pipeline: ReturnType<typeof redis.multi>, userId: string, scope: string, c: PlannedClose): void {
+  const { p, fill, remaining } = c;
+  const isLong = gt(p.szi, '0');
+  const posKey = KEYS.USER_POS(userId, p.asset);
+  const balField = KEYS.USER_BAL_FIELD(scope);
+  if (isZero(remaining)) {
+    pipeline.del(posKey);
+    pipeline.srem(KEYS.USER_POSITIONS_SCOPED(userId, scope), p.asset.toString());
+    pipeline.srem(KEYS.USER_POSITIONS(userId), p.asset.toString());
+  } else {
+    pipeline.hset(posKey, 'szi', isLong ? remaining : neg(remaining));
+    if (!p.isCross) {
+      // "Margin is proportionally removed as the position is closed."
+      const keep = div(remaining, abs(p.szi));
+      pipeline.hset(posKey, 'marginAlloc', mul(p.raw.marginAlloc ?? div(mul(abs(p.szi), p.entryPx), p.leverage.toString()), keep));
+      if (p.raw.rawUsd) pipeline.hset(posKey, 'rawUsd', mul(p.raw.rawUsd, keep));
+    }
+  }
+  if (!isZero(fill.closedPnl)) pipeline.hincrbyfloat(KEYS.USER_ACCOUNT(userId), balField, fill.closedPnl);
+  if (!isZero(fill.fee)) pipeline.hincrbyfloat(KEYS.USER_ACCOUNT(userId), balField, neg(fill.fee));
+  pipeline.lpush(KEYS.USER_FILLS(userId), JSON.stringify(fill));
+}
 
-  const lev = await redis.hgetall(KEYS.USER_LEV(userId, asset));
-  const leverage = lev.leverage ? parseInt(lev.leverage, 10) : 20;
-  const isCross = lev.isCross !== 'false';
-
-  // Re-check — price may have recovered between the worker tick and now.
-  const { shouldLiquidate, accountEquity, maintenanceMargin } =
-    await checkLiquidation(userId, asset, scope);
-  if (!shouldLiquidate) return false;
-
-  const positionKey = `${userId}:${asset}`;
-
-  // Don't schedule a second close if one is already pending.
-  if (pendingSecondClose.has(positionKey)) return false;
-
-  const szi = pos.szi;
-  const positionNotional = mul(abs(szi), markPx);
-  const isLargePosition = gt(positionNotional, PARTIAL_LIQ_THRESHOLD_USDC);
+/** Run one liquidation (all its target positions). Caller holds the user lock. */
+async function runLiquidation(userId: string, scope: string, a: Assessment): Promise<boolean> {
+  const first = a.targets[0];
+  const cooldownKey = KEYS.LIQ_COOLDOWN(`${userId}:${scope}:${first.isCross ? 'cross' : first.asset}`);
+  const inCooldown = (await redis.get(cooldownKey)) !== null;
+  const now = Date.now();
 
   logger.info(
-    { userId, asset, coin: pos.coin, szi, markPx, accountEquity, maintenanceMargin, isLargePosition },
+    { userId, scope, method: a.method, equity: a.equity, maintenanceMargin: a.maintenanceMargin,
+      marginType: first.isCross ? 'cross' : 'isolated', assets: a.targets.map((t) => t.asset), inCooldown },
     'Liquidation triggered',
   );
 
-  if (isLargePosition) {
-    // ── Partial: close 20 % now, 80 % after 30 s ──────────────────────────
-    const closeSzi20 = mul(abs(szi), PARTIAL_LIQ_PCT);
-    const isLong = gt(szi, '0');
-    const closeAmt20 = isLong ? closeSzi20 : `-${closeSzi20}`;
+  let partial = false;
+  const closes: PlannedClose[] = [];
+  for (const p of a.targets) {
+    let closeAbs = abs(p.szi);
+    if (a.method === 'market' && !inCooldown && gt(p.notional, PARTIAL_LIQ_THRESHOLD_USDC)) {
+      const slice = roundToDecimals(mul(closeAbs, PARTIAL_LIQ_PCT), await szDecimalsFor(p.asset));
+      if (gt(slice, '0')) { closeAbs = slice; partial = true; }
+    }
+    closes.push(await planClose(userId, p, closeAbs, a.method, now));
+  }
+  if (closes.length === 0) return false;
 
-    const recovered20 = await closePositionSlice(userId, asset, closeAmt20, markPx, scope);
+  // Backstop: the remaining equity of what was liquidated goes to the vault
+  // ("the maintenance margin is not returned to the user"). Backstop fills
+  // are at the same mark the equity was computed on, so once the closes
+  // credit their PnL the debit leaves: isolated → balance down by exactly its
+  // margin; cross → cross equity at zero. A negative equity is the vault's
+  // loss: the debit is negative (the trader can't lose more than that margin)
+  // and the vault is credited nothing.
+  const transferred = a.method === 'backstop' ? a.equity : '0';
 
-    await recordLiquidationEvent(userId, asset, pos.coin, closeAmt20, markPx,
-      pos.entryPx, leverage, isCross ? 'cross' : 'isolated',
-      recovered20, maintenanceMargin, 'partial');
+  // ONE MULTI/EXEC transaction: every close, the backstop debit, the vault
+  // credit and the cooldown marker commit together or not at all. (A plain
+  // ioredis pipeline only batches — it is not atomic.)
+  const pipeline = redis.multi();
+  for (const c of closes) queueClose(pipeline, userId, scope, c);
+  if (!isZero(transferred)) {
+    pipeline.hincrbyfloat(KEYS.USER_ACCOUNT(userId), KEYS.USER_BAL_FIELD(scope), neg(transferred));
+  }
+  const vaultCredited = queueVaultCredit(pipeline, transferred, now);
+  if (partial) pipeline.set(cooldownKey, '1', 'PX', PARTIAL_LIQ_COOLDOWN_MS);
+  await pipeline.exec();
+  if (vaultCredited) mirrorVaultCreditPg(transferred);
 
-    await creditVault(recovered20);
-
-    // Schedule the 80 % close after 30 s
-    const timer = setTimeout(async () => {
-      pendingSecondClose.delete(positionKey);
-      try {
-        // Re-read position — may have been partially filled or closed by user
-        const pos2 = await redis.hgetall(KEYS.USER_POS(userId, asset));
-        if (!pos2.szi || isZero(pos2.szi)) return;
-
-        const mids2 = await redis.hgetall(KEYS.MARKET_MIDS);
-        const markPx2 = mids2[pos2.coin] ?? markPx;
-
-        const recovered80 = await closePositionSlice(userId, asset, pos2.szi, markPx2, scope);
-
-        await recordLiquidationEvent(userId, asset, pos2.coin, pos2.szi, markPx2,
-          pos2.entryPx, leverage, isCross ? 'cross' : 'isolated',
-          recovered80, '0', 'full');
-
-        await creditVault(recovered80);
-
-        logger.info(
-          { userId, asset, coin: pos2.coin, markPx: markPx2, recovered80 },
-          'Liquidation: 80 % close complete',
-        );
-      } catch (err) {
-        logger.error({ err, userId, asset }, 'Liquidation: 80 % close failed');
-      }
-    }, PARTIAL_LIQ_DELAY_MS);
-
-    pendingSecondClose.set(positionKey, timer);
-
+  // Lazy import — the worker module must not be a static dependency of the engine.
+  const { eventBus } = await import('../worker/index.js');
+  for (const c of closes) {
+    eventBus.emit('liquidationOrder', { order: c.order }); // order row first (fills.oid references it)
+    eventBus.emit('fill', { userId, fill: c.fill });        // → PG fills, WS userFills + userEvents
     logger.info(
-      { userId, asset, coin: pos.coin, closeSzi20, markPx, recovered20 },
-      'Liquidation: 20 % close complete — 80 % scheduled in 30 s',
-    );
-  } else {
-    // ── Full: close 100 % immediately ─────────────────────────────────────
-    const recovered = await closePositionSlice(userId, asset, szi, markPx, scope);
-
-    const marginUsed = await calculatePositionMarginUsed(userId, asset, szi, markPx);
-
-    await recordLiquidationEvent(userId, asset, pos.coin, szi, markPx,
-      pos.entryPx, leverage, isCross ? 'cross' : 'isolated',
-      recovered, marginUsed, 'full');
-
-    await creditVault(recovered);
-
-    logger.info(
-      { userId, asset, coin: pos.coin, szi, markPx, recovered },
-      'Liquidation: full close complete',
+      { userId, asset: c.p.asset, coin: c.p.coin, method: a.method, sz: c.fill.sz, px: c.fill.px,
+        closedPnl: c.fill.closedPnl, fee: c.fill.fee, dir: c.fill.dir },
+      'Liquidation fill',
     );
   }
 
+  if (a.method === 'backstop') {
+    let ntl = '0';
+    for (const p of a.targets) ntl = add(ntl, p.notional);
+    eventBus.emit('liquidationLedger', {
+      userId,
+      time: now,
+      delta: {
+        type: 'liquidation',
+        liquidatedNtlPos: ntl,
+        accountValue: a.equity,
+        leverageType: first.isCross ? 'Cross' : 'Isolated',
+        liquidatedPositions: a.targets.map((p) => ({ coin: p.coin, szi: p.szi })),
+      },
+    });
+    // WS userEvents `liquidation` variant (HL docs, websocket subscriptions:
+    // WsLiquidation { lid, liquidator, liquidated_user, liquidated_ntl_pos,
+    // liquidated_account_value }).
+    eventBus.emit('liquidationEvent', {
+      userId,
+      liquidation: {
+        lid: closes[0].fill.tid,
+        liquidator: config.LIQUIDATOR_VAULT_ADDRESS,
+        liquidated_user: userId,
+        liquidated_ntl_pos: ntl,
+        liquidated_account_value: a.equity,
+      },
+    });
+  }
+
+  // The positions shrank / closed: orphan any open reduce-only trailing stop that can no longer reduce them.
+  if ((await redis.smembers(KEYS.ORDERS_TRAILING)).length > 0) {
+    const { reconcileReduceOnlyStops } = await import('./trailing-state.js');
+    for (const c of closes) {
+      const isLong = gt(c.p.szi, '0');
+      const szAfter = isZero(c.remaining) ? '0' : isLong ? c.remaining : neg(c.remaining);
+      const orphans = await reconcileReduceOnlyStops(eventBus, userId, c.p.asset, szAfter);
+      if (orphans.length > 0) eventBus.emit('orderUpdateBatch', { userId, updates: orphans });
+    }
+  }
+
+  for (let i = 0; i < closes.length; i++) {
+    const { p, fill, remaining } = closes[i];
+    await recordLiquidationEvent({
+      userId, asset: p.asset, coin: p.coin, szi: fill.sz, markPx: p.px, entryPx: p.entryPx,
+      leverage: p.leverage, marginType: p.isCross ? 'cross' : 'isolated',
+      amountRecovered: i === 0 ? transferred : '0',
+      marginLost: a.method === 'backstop' ? (p.isCross ? p.maintenanceMargin : p.isolatedMargin) : '0',
+      liquidationType: isZero(remaining) ? 'full' : 'partial',
+      time: fill.time,
+    });
+  }
+
+  eventBus.emit('accountUpdate', { userId, dexes: scope ? [scope] : [] });
   return true;
 }
 
-// ── Internal: close a position slice at mark price ────────────────────────
-
-/**
- * Force-close `closeSzi` units of `asset` at `markPx` for `userId`.
- *
- * This directly mutates Redis position state (like a market fill at markPx)
- * without going through the order book — liquidations skip the queue.
- * Returns the USDC amount recovered (proceeds − original position cost).
- */
-async function closePositionSlice(
-  userId: string,
-  asset: number,
-  closeSzi: string,
-  markPx: string,
-  scope: string,
-): Promise<string> {
-  const pos = await redis.hgetall(KEYS.USER_POS(userId, asset));
-  if (!pos.szi || isZero(pos.szi)) return '0';
-
-  const currentSzi = pos.szi;
-  const isLong = gt(currentSzi, '0');
-  const closeAbs = abs(closeSzi);
-  const currentAbs = abs(currentSzi);
-
-  // Clamp close to position size
-  const actualCloseAbs = gt(closeAbs, currentAbs) ? currentAbs : closeAbs;
-
-  // PnL on the closed slice
-  const closedPnl = calculatePositionUnrealizedPnl(
-    isLong ? actualCloseAbs : `-${actualCloseAbs}`,
-    pos.entryPx,
-    markPx,
-  );
-
-  // Margin released on the closed slice
-  const lev = await redis.hgetall(KEYS.USER_LEV(userId, asset));
-  const leverage = lev.leverage ? parseInt(lev.leverage, 10) : 20;
-  const sliceNotional = mul(actualCloseAbs, markPx);
-  const marginReleased = div(sliceNotional, leverage.toString());
-
-  // Amount recovered = margin released + PnL (can be negative = losses)
-  const recovered = add(marginReleased, closedPnl);
-  const recoveredClamped = gt(recovered, '0') ? recovered : '0';
-
-  // Update position in Redis
-  const newSziAbs = sub(currentAbs, actualCloseAbs);
-  const pipeline = redis.pipeline();
-
-  if (isZero(newSziAbs)) {
-    // Position fully closed — remove it
-    pipeline.del(KEYS.USER_POS(userId, asset));
-    pipeline.srem(KEYS.USER_POSITIONS_SCOPED(userId, scope), asset.toString());
-    pipeline.srem(KEYS.USER_POSITIONS(userId), asset.toString());
-  } else {
-    // Partially closed — update size
-    const newSzi = isLong ? newSziAbs : `-${newSziAbs}`;
-    pipeline.hset(KEYS.USER_POS(userId, asset), 'szi', newSzi);
-  }
-
-  // Credit recovered amount back to the user's balance
-  const balanceField = scope ? `balance:${scope}` : 'balance';
-  const currentBalance = (await redis.hget(KEYS.USER_ACCOUNT(userId), balanceField)) ?? '0';
-  const newBalance = add(currentBalance, recoveredClamped);
-  pipeline.hset(KEYS.USER_ACCOUNT(userId), balanceField, newBalance);
-
-  await pipeline.exec();
-
-  // The position shrank / closed: orphan any open reduce-only trailing stop that can no longer reduce it.
-  // (Lazy import — the worker module must not be a static dependency of the engine. Skipped entirely
-  // when no trailing stop exists.)
-  if ((await redis.smembers(KEYS.ORDERS_TRAILING)).length > 0) {
-    const { eventBus } = await import('../worker/index.js');
-    const { reconcileReduceOnlyStops } = await import('./trailing-state.js');
-    const szAfter = isZero(newSziAbs) ? '0' : isLong ? newSziAbs : `-${newSziAbs}`;
-    const orphans = await reconcileReduceOnlyStops(eventBus, userId, asset, szAfter);
-    if (orphans.length > 0) eventBus.emit('orderUpdateBatch', { userId, updates: orphans });
-  }
-
-  return recoveredClamped;
-}
-
-// ── Internal: record liquidation event to Postgres ───────────────────────
-
-async function recordLiquidationEvent(
-  userId: string,
-  asset: number,
-  coin: string,
-  szi: string,
-  markPx: string,
-  entryPx: string,
-  leverage: number,
-  marginType: 'cross' | 'isolated',
-  amountRecovered: string,
-  marginLost: string,
-  liquidationType: 'full' | 'partial',
-): Promise<void> {
-  const event: LiquidationEvent = {
-    userId,
-    asset,
-    coin,
-    szi,
-    markPx,
-    entryPx,
-    leverage,
-    marginType,
-    amountRecovered,
-    marginLost,
-    liquidationType,
-    time: Date.now(),
-    // Mirrors the 0x-prefixed hex hash format used elsewhere (fills, funding
-    // rows) without depending on a project-specific id generator — randomBytes
-    // gives a collision-safe unique value with no external dependency.
-    hash: `0x${randomBytes(16).toString('hex')}`,
-  };
-
+async function recordLiquidationEvent(e: Omit<LiquidationEvent, 'hash'>): Promise<void> {
   try {
-    await insertLiquidationEventPg(event);
+    await insertLiquidationEventPg({ ...e, hash: `0x${randomBytes(16).toString('hex')}` });
   } catch (err) {
     // Log but don't rethrow — position is already closed.
-    logger.error({ err, userId, asset }, 'Failed to persist liquidation event');
+    logger.error({ err, userId: e.userId, asset: e.asset }, 'Failed to persist liquidation event');
   }
 }
 
-// ── Scan all open positions for a user and check each ────────────────────
-
 /**
- * Run the full liquidation check + execute pass for all open positions of
- * a single user. Called by the LiquidationWorker on every price tick.
+ * Liquidate whatever `asset`'s position belongs to if it is liquidatable:
+ * the isolated position itself, or every cross position in its dex.
+ * Assessed and executed under the user's lock (utils/userLock.ts), so no fill
+ * can move the position between the check and the close.
+ * Returns true if a liquidation ran.
  */
-export async function checkAndLiquidateUser(userId: string, scope = ''): Promise<void> {
-  const positionAssets = await redis.smembers(KEYS.USER_POSITIONS_SCOPED(userId, scope));
-  if (positionAssets.length === 0) return;
+export async function executeLiquidation(userId: string, asset: number, scope = ''): Promise<boolean> {
+  return withUserLock(userId, async () => {
+    const positions = await loadPositions(userId, scope);
+    const p = positions.find((x) => x.asset === asset);
+    if (!p) return false;
+    const a = p.isCross ? assessCross(await getBalance(userId, scope), positions) : assessIsolated(p);
+    if (!a.shouldLiquidate) return false;
+    return runLiquidation(userId, scope, a);
+  });
+}
 
-  for (const assetStr of positionAssets) {
-    const asset = parseInt(assetStr, 10);
-    try {
-      const result = await checkLiquidation(userId, asset, scope);
-      if (result.shouldLiquidate) {
-        logger.info(
-          { userId, asset, accountEquity: result.accountEquity, maintenanceMargin: result.maintenanceMargin },
-          'Liquidation check: flagging position',
-        );
-        await executeLiquidation(userId, asset, scope);
+// ── Scan ──────────────────────────────────────────────────────────────────
+
+/** One liquidation pass over a user's positions in one dex, under the user's
+ *  lock: isolated positions first (each on its own), then the cross account —
+ *  re-read, since an isolated close returns its remaining margin to cross. */
+export async function checkAndLiquidateUser(userId: string, scope = ''): Promise<void> {
+  try {
+    await withUserLock(userId, async () => {
+      for (const p of await loadPositions(userId, scope)) {
+        if (p.isCross) continue;
+        const a = assessIsolated(p);
+        if (a.shouldLiquidate) await runLiquidation(userId, scope, a);
       }
-    } catch (err) {
-      logger.error({ err, userId, asset }, 'Error during liquidation check for asset');
+      const positions = await loadPositions(userId, scope);
+      if (positions.some((p) => p.isCross)) {
+        const a = assessCross(await getBalance(userId, scope), positions);
+        if (a.shouldLiquidate) await runLiquidation(userId, scope, a);
+      }
+    });
+  } catch (err) {
+    logger.error({ err, userId, scope }, 'Error during liquidation check');
+  }
+}
+
+/** The (user, dex) accounts holding positions, from KEYS.POSITION_HOLDERS.
+ *  Entries whose position set has emptied are pruned here. */
+async function positionHolders(): Promise<Array<{ userId: string; scope: string }>> {
+  const out: Array<{ userId: string; scope: string }> = [];
+  for (const member of await redis.smembers(KEYS.POSITION_HOLDERS)) {
+    const bar = member.lastIndexOf('|');
+    const userId = member.slice(0, bar);
+    const scope = member.slice(bar + 1);
+    if ((await redis.scard(KEYS.USER_POSITIONS_SCOPED(userId, scope))) === 0) {
+      await redis.srem(KEYS.POSITION_HOLDERS, member);
+      continue;
+    }
+    out.push({ userId, scope });
+  }
+  return out;
+}
+
+/** One-off at worker start: index positions opened before POSITION_HOLDERS
+ *  existed (every active user × native + every HIP-3 dex). */
+export async function backfillPositionHolders(): Promise<number> {
+  const scopes = ['', ...(await subDexNames())];
+  let added = 0;
+  for (const userId of await redis.smembers(KEYS.USERS_ACTIVE)) {
+    for (const scope of scopes) {
+      if ((await redis.scard(KEYS.USER_POSITIONS_SCOPED(userId, scope))) > 0) {
+        added += await redis.sadd(KEYS.POSITION_HOLDERS, `${userId}|${scope}`);
+      }
     }
   }
+  return added;
 }
 
 /**
- * Run liquidation checks across ALL active users.
- * Called by LiquidationWorker on every price update.
+ * Run liquidation checks for every account holding a position, on the native
+ * dex AND every HIP-3 dex — each dex is its own account on HL. (Only the
+ * native dex was ever checked before 2026-10-19, so builder-dex positions
+ * could not be liquidated at all.) Called by LiquidationWorker on every price
+ * update.
  */
 export async function checkAndLiquidateAll(): Promise<void> {
-  const users = await redis.smembers(KEYS.USERS_ACTIVE);
-  for (const userId of users) {
-    try {
-      await checkAndLiquidateUser(userId);
-    } catch (err) {
-      logger.error({ err, userId }, 'Error during liquidation check for user');
+  for (const { userId, scope } of await positionHolders()) await checkAndLiquidateUser(userId, scope);
+}
+
+/** Every coin with an open perp position — the liquidation worker keeps a
+ *  fresh mark for each. */
+export async function positionCoins(): Promise<Set<string>> {
+  const coins = new Set<string>();
+  for (const { userId, scope } of await positionHolders()) {
+    for (const assetStr of await redis.smembers(KEYS.USER_POSITIONS_SCOPED(userId, scope))) {
+      const coin = await redis.hget(KEYS.USER_POS(userId, parseInt(assetStr, 10)), 'coin');
+      if (coin) coins.add(coin);
     }
   }
+  return coins;
 }

@@ -78,6 +78,36 @@ export async function creditVault(proceeds: string): Promise<void> {
 }
 
 /**
+ * Queue the vault's Redis credit onto `pipeline`, so it commits atomically
+ * with the liquidation that produced it (engine/liquidation.ts). Returns
+ * true when ops were queued; the caller then calls mirrorVaultCreditPg after
+ * exec. Non-positive proceeds (a backstop whose equity was already gone) and
+ * an unset vault address queue nothing, matching creditVault.
+ */
+export function queueVaultCredit(
+  pipeline: { hincrbyfloat: (k: string, f: string, v: string) => unknown; hset: (k: string, ...a: string[]) => unknown },
+  proceeds: string,
+  now: number,
+): boolean {
+  if (!gt(proceeds, '0')) return false;
+  const vaultAddress = config.LIQUIDATOR_VAULT_ADDRESS;
+  if (!vaultAddress) {
+    logger.warn('LIQUIDATOR_VAULT_ADDRESS not set — vault credit skipped');
+    return false;
+  }
+  pipeline.hincrbyfloat(VAULT_KEY, 'totalCollected', proceeds);
+  pipeline.hset(VAULT_KEY, 'vaultAddress', vaultAddress, 'lastUpdated', now.toString());
+  return true;
+}
+
+/** Durable Postgres mirror of a credit queued by queueVaultCredit. */
+export function mirrorVaultCreditPg(proceeds: string): void {
+  creditVaultPg(proceeds).catch((err) =>
+    logger.error({ err, proceeds }, 'Failed to mirror vault credit to Postgres'),
+  );
+}
+
+/**
  * Return the current vault state.
  * Exposed via /hypaper endpoint so the frontend can display vault balance.
  */

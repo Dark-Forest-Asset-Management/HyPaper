@@ -11,15 +11,26 @@ export class RedisMock {
   private sets = new Map<string, Set<string>>();
   private sortedSets = new Map<string, Map<string, number>>();
   private lists = new Map<string, string[]>();
+  /** String-key expiry (ms epoch) for SET … PX / EX. Read against Date.now(), so fake timers apply. */
+  private expiries = new Map<string, number>();
 
   // --- String commands ---
 
   async get(key: string): Promise<string | null> {
+    const exp = this.expiries.get(key);
+    if (exp !== undefined && Date.now() >= exp) {
+      this.store.delete(key);
+      this.expiries.delete(key);
+    }
     return this.store.get(key) ?? null;
   }
 
-  async set(key: string, value: string): Promise<'OK'> {
+  /** SET key value [PX ms | EX s]. */
+  async set(key: string, value: string, mode?: 'PX' | 'EX', ttl?: number): Promise<'OK'> {
     this.store.set(key, value);
+    if (mode === 'PX' && ttl !== undefined) this.expiries.set(key, Date.now() + ttl);
+    else if (mode === 'EX' && ttl !== undefined) this.expiries.set(key, Date.now() + ttl * 1000);
+    else this.expiries.delete(key);
     return 'OK';
   }
 
@@ -124,6 +135,10 @@ export class RedisMock {
     return count;
   }
 
+  async scard(key: string): Promise<number> {
+    return this.sets.get(key)?.size ?? 0;
+  }
+
   async smembers(key: string): Promise<string[]> {
     const set = this.sets.get(key);
     return set ? [...set] : [];
@@ -179,6 +194,12 @@ export class RedisMock {
     return new PipelineMock(this);
   }
 
+  /** MULTI — the mock runs commands synchronously in one exec, so it is the
+   *  same object as a pipeline here; production gets real MULTI/EXEC. */
+  multi(): PipelineMock {
+    return new PipelineMock(this);
+  }
+
   // --- Utility ---
 
   flushall(): void {
@@ -187,6 +208,7 @@ export class RedisMock {
     this.sets.clear();
     this.sortedSets.clear();
     this.lists.clear();
+    this.expiries.clear();
   }
 }
 
@@ -240,6 +262,11 @@ class PipelineMock {
 
   lpush(key: string, ...values: string[]): this {
     this.commands.push(() => this.redis.lpush(key, ...values));
+    return this;
+  }
+
+  set(key: string, value: string, mode?: 'PX' | 'EX', ttl?: number): this {
+    this.commands.push(() => this.redis.set(key, value, mode, ttl));
     return this;
   }
 

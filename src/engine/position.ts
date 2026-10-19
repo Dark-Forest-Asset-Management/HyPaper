@@ -8,7 +8,9 @@ import {
   calculatePositionUnrealizedPnl,
   calculatePositionMarginUsed,
   calculateLiquidationPrice,
+  isolatedMarginOf,
 } from './margin.js';
+import { getLeverageSetting } from './assetMeta.js';
 import { getMarginTiersForCoin, maintenanceMarginForNotional } from './marginTiers.js';
 import { abs, sub, mul, div, isZero, gt, add, D } from '../utils/math.js';
 import type { HlClearinghouseState, HlAssetPosition, HlMeta } from '../types/hl.js';
@@ -47,9 +49,7 @@ export async function getClearinghouseState(userId: string, scope = ''): Promise
     const midPx = mids[coin];
     if (!midPx) continue;
 
-    const lev = await redis.hgetall(KEYS.USER_LEV(userId, asset));
-    const leverage = lev.leverage ? parseInt(lev.leverage, 10) : 20;
-    const isCross = lev.isCross !== 'false';
+    const { leverage, isCross } = await getLeverageSetting(userId, asset);
 
     const posValue = mul(abs(pos.szi), midPx);
     const unrealizedPnl = calculatePositionUnrealizedPnl(pos.szi, pos.entryPx, midPx);
@@ -63,16 +63,12 @@ export async function getClearinghouseState(userId: string, scope = ''): Promise
     // to the old approximation in that degraded case instead of throwing.
     const tiers = getMarginTiersForCoin(meta, coin) ?? [{ lowerBound: '0.0', maxLeverage: leverage }];
 
-    // Forward the user-added dedicated margin for isolated positions so the
-    // liq line moves when they call updateIsolatedMargin / topUpIsolatedOnly.
-    // Cross positions don't read this (calculateLiquidationPrice ignores it
-    // on the cross branch), so it's safe to always pass. Tiers are only
-    // forwarded for cross positions — isolated liquidation math is
-    // unaffected by this task (still the 1/(2×leverage) approximation).
-    const extraIsolatedMargin = isCross ? '0' : (pos.rawUsd ?? '0');
+    // Isolated: the position's own dedicated margin (allocation at open +
+    // updateIsolatedMargin adjustments) — the same figure the liquidation
+    // engine checks against, so the displayed liq line is where it fires.
     const liqPx = calculateLiquidationPrice(
       pos.szi, pos.entryPx, accountValue, leverage, isCross,
-      extraIsolatedMargin, isCross ? tiers : undefined,
+      isCross ? undefined : isolatedMarginOf(pos, leverage), tiers,
     );
 
     if (isCross) {

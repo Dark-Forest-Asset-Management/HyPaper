@@ -63,12 +63,13 @@ export interface PaperFill {
   // fill wasn't part of a TWAP). Captured 2026-05-09 from open-hl-bracket
   // userFills snapshot — every entry has the field.
   twapId: string | null;
-  // Optional: only present when this fill was the counterparty to
-  // someone else's liquidation. HyPaper has no paper-liquidation engine
-  // so it never produces this; included for type parity with HL prod.
+  // Present only on fills produced by a liquidation (engine/liquidation.ts).
+  // Shape from public HL userFills: { liquidatedUser, markPx, method } with
+  // method "market" (closed into the book) or "backstop" (taken by the
+  // liquidator vault).
   liquidation?: {
     liquidatedUser: string;
     markPx: string;
-    method: string;
+    method: 'market' | 'backstop';
   };
 }

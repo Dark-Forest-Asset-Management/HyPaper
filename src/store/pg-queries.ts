@@ -264,14 +264,15 @@ export async function getUserFundingPg(
  *  ascending by time. */
 export async function getLedgerUpdatesPg(
   userId: string, startTime: number, endTime?: number,
-): Promise<Array<{ time: number; hash: string; delta: { type: string; usdc: string } }>> {
+): Promise<Array<{ time: number; hash: string; delta: Record<string, unknown> }>> {
   const conds = [eq(ledgerUpdates.userId, userId), gte(ledgerUpdates.time, startTime)];
   if (endTime !== undefined) conds.push(lte(ledgerUpdates.time, endTime));
   const rows = await db.select().from(ledgerUpdates).where(and(...conds)).orderBy(asc(ledgerUpdates.time));
   return rows.map((r) => ({
     time: r.time,
     hash: r.hash,
-    delta: { type: r.deltaType, usdc: r.usdc },
+    // Rows that stored HL's full delta (liquidation) return it verbatim.
+    delta: (r.delta as Record<string, unknown> | null) ?? { type: r.deltaType, usdc: r.usdc },
   }));
 }
 
@@ -280,7 +281,10 @@ export async function getNetDepositsPg(userId: string): Promise<string> {
   const rows = await db.select().from(ledgerUpdates).where(eq(ledgerUpdates.userId, userId));
   let net = D('0');
   for (const r of rows) {
-    net = r.deltaType === 'withdraw' ? net.minus(D(r.usdc)) : net.plus(D(r.usdc));
+    // Only deposits/withdrawals move net deposits; a liquidation row is a
+    // loss, already reflected in accountValue.
+    if (r.deltaType === 'withdraw') net = net.minus(D(r.usdc));
+    else if (r.deltaType === 'deposit') net = net.plus(D(r.usdc));
   }
   return net.toString();
 }
@@ -386,6 +390,9 @@ function rowToFill(row: typeof fills.$inferSelect): PaperFill {
     crossed: row.crossed,
     fee: row.fee,
     tid: row.tid,
+    // HL places `liquidation` right after `tid` (public HL userFills,
+    // 2026-10-19) and omits the key on ordinary fills.
+    ...(row.liquidation ? { liquidation: row.liquidation as NonNullable<PaperFill['liquidation']> } : {}),
     cloid: row.cloid ?? undefined,
     feeToken: row.feeToken,
     // HL always emits `twapId: null` inside the fill object on every endpoint

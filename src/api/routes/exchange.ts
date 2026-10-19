@@ -372,10 +372,10 @@ exchangeRouter.post('/', async (c) => {
             typeof action.isCross !== 'boolean') {
           return c.json({ status: 'err', response: 'updateLeverage requires asset, leverage, isCross' }, 400);
         }
-        if (action.leverage < 1 || action.leverage > 200) {
-          return c.json({ status: 'err', response: 'Leverage must be between 1 and 200' }, 400);
-        }
-        await updateLeverage(effectiveWallet, action.asset, action.isCross, action.leverage);
+        // Range is checked against the asset's live HL maxLeverage in the
+        // engine; HL answers a rejected leverage with HTTP 200 + status err.
+        const levResult = await updateLeverage(effectiveWallet, action.asset, action.isCross, action.leverage);
+        if ('error' in levResult) return c.json({ status: 'err', response: levResult.error });
         return c.json({ status: 'ok', response: { type: 'default' } });
       }
 

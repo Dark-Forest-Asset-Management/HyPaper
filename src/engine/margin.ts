@@ -1,7 +1,8 @@
 import { redis } from '../store/redis.js';
 import { KEYS } from '../store/keys.js';
 import { D, add, sub, mul, div, abs, gt, gte, lt, lte, isZero, neg } from '../utils/math.js';
-import { maintenanceMarginForNotional } from './marginTiers.js';
+import { maintenanceMarginForNotional, maintenanceMarginRateForNotional } from './marginTiers.js';
+import { getLeverageSetting } from './assetMeta.js';
 import type { HlMarginTier } from '../types/hl.js';
 
 // ── Per-dex scope ─────────────────────────────────────────────────────────
@@ -69,15 +70,27 @@ export async function calculateTotalMarginUsed(userId: string, scope = ''): Prom
     const midPx = mids[pos.coin];
     if (!midPx) continue;
 
-    const lev = await redis.hgetall(KEYS.USER_LEV(userId, asset));
-    const leverage = lev.leverage ? parseInt(lev.leverage, 10) : 20;
-
-    const posValue = mul(abs(pos.szi), midPx);
-    const margin = div(posValue, leverage.toString());
+    const margin = await calculatePositionMarginUsed(userId, asset, pos.szi, midPx);
     totalMargin = add(totalMargin, margin);
   }
 
   return totalMargin;
+}
+
+/** The margin dedicated to an ISOLATED position: the allocation made when it
+ *  was opened/grown (`marginAlloc`, written by the matcher — HL: "The margin
+ *  required to open a position is position_size * mark_price / leverage",
+ *  and "Margin is proportionally removed as the position is closed"), plus
+ *  margin the user added/removed via updateIsolatedMargin (`rawUsd`).
+ *
+ *  It does NOT move with the mark. It used to be recomputed as
+ *  size × mark / leverage on every read, which grew the cushion as price rose
+ *  and shrank it as price fell, on top of the PnL already counted.
+ *  Positions opened before marginAlloc existed fall back to the entry-price
+ *  allocation, which is what the matcher would have written. */
+export function isolatedMarginOf(pos: Record<string, string>, leverage: number): string {
+  const alloc = pos.marginAlloc ?? div(mul(abs(pos.szi ?? '0'), pos.entryPx ?? '0'), leverage.toString());
+  return add(alloc, pos.rawUsd ?? '0');
 }
 
 export async function calculatePositionMarginUsed(
@@ -87,22 +100,11 @@ export async function calculatePositionMarginUsed(
   markPx: string,
 ): Promise<string> {
   if (isZero(szi)) return '0';
-  const lev = await redis.hgetall(KEYS.USER_LEV(userId, asset));
-  const leverage = lev.leverage ? parseInt(lev.leverage, 10) : 20;
-  const posValue = mul(abs(szi), markPx);
-  const baseMargin = div(posValue, leverage.toString());
-  // For ISOLATED positions, surface the user-added dedicated margin from
-  // updateIsolatedMargin / topUpIsolatedOnlyMargin. Those actions bump
-  // `rawUsd` on the position hash (signed delta in USD). Without adding
-  // it here, every isolated-margin adjust action was silently a no-op
-  // from the user's perspective — the action landed but the displayed
-  // marginUsed never moved. Cross positions ignore rawUsd (their
-  // margin is the whole account's cushion, not per-position).
-  const isCross = lev.isCross !== 'false';   // default → cross
-  if (isCross) return baseMargin;
+  const { leverage, isCross } = await getLeverageSetting(userId, asset);
+  // Cross margin is the shared account cushion, sized off the current mark.
+  if (isCross) return div(mul(abs(szi), markPx), leverage.toString());
   const posData = await redis.hgetall(KEYS.USER_POS(userId, asset));
-  const dedicatedDelta = posData.rawUsd ?? '0';
-  return add(baseMargin, dedicatedDelta);
+  return isolatedMarginOf({ ...posData, szi }, leverage);
 }
 
 export async function checkMarginForOrder(
@@ -120,8 +122,7 @@ export async function checkMarginForOrder(
   const available = sub(accountValue, currentMarginUsed);
 
   // Calculate margin needed for this order
-  const lev = await redis.hgetall(KEYS.USER_LEV(userId, asset));
-  const leverage = lev.leverage ? parseInt(lev.leverage, 10) : 20;
+  const { leverage } = await getLeverageSetting(userId, asset);
 
   // Check if this is reducing an existing position
   const pos = await redis.hgetall(KEYS.USER_POS(userId, asset));
@@ -167,8 +168,7 @@ export async function maxAffordableOrderSize(
     if ((isLong && !isBuy) || (!isLong && isBuy)) return null; // reducing: no extra margin needed
   }
 
-  const lev = await redis.hgetall(KEYS.USER_LEV(userId, asset));
-  const leverage = lev.leverage ? parseInt(lev.leverage, 10) : 20;
+  const { leverage } = await getLeverageSetting(userId, asset);
   if (!gt(available, '0')) return '0';
   return div(mul(available, leverage.toString()), px);
 }
@@ -185,48 +185,46 @@ export async function maxAffordableOrderSize(
  *    maintenance margin: cushion ≈ $143.82, offset ≈ $17.98, liqPx_long
  *    ≈ −16.56 → HL prod emits `liquidationPx: null`.
  *
- *  - **Isolated**: dedicated margin per position; never null. Same formula
- *    HyPaper used historically: `entryPx × (1 − 1/leverage + maintRate)`
- *    for longs, mirrored for shorts. The `accountValue` arg is ignored
- *    in this branch, matching how isolated positions don't share equity.
+ *  - **Isolated**: the price p where the position's own equity meets its
+ *    maintenance margin — margin + size·(p − entry) = size·p·r for a long,
+ *    margin + size·(entry − p) = size·p·r for a short — solved exactly:
+ *        long:  p = (size·entry − margin) / (size·(1 − r))
+ *        short: p = (size·entry + margin) / (size·(1 + r))
+ *    `margin` is the position's dedicated isolated margin (isolatedMarginOf);
+ *    r is the asset's maintenance rate from `marginTiers` — HL's rate is
+ *    half the initial margin at the asset's MAX leverage, not the user's.
+ *    The old isolated formula used 1/(2 × the user's leverage), which is
+ *    the wrong rate whenever the user's leverage is below the max.
+ *    `accountValue` is ignored here, matching how isolated positions don't
+ *    share equity.
  *
- *  Maintenance margin rate: for CROSS positions, uses HL's real per-tier
- *  schedule when `marginTiers` is supplied (see engine/marginTiers.ts) —
- *  verified against real testnet data (Cross Margin Updates task, 2026-07).
- *  When `marginTiers` is omitted (e.g. meta wasn't available), falls back
- *  to the old `1 / (2 × leverage)` approximation HyPaper used previously,
- *  so existing callers are unaffected. ISOLATED positions still use the
- *  `1 / (2 × leverage)` approximation unconditionally — this task's scope
- *  (crossMaintenanceMarginUsed + cross liquidation price) doesn't touch
- *  isolated math. */
+ *  When `marginTiers` is omitted (meta unavailable), both branches fall back
+ *  to the `1 / (2 × leverage)` approximation. */
 export function calculateLiquidationPrice(
   szi: string,
   entryPx: string,
   accountValue: string,
   leverage: number,
   isCross: boolean,
-  /** Extra dedicated margin added to an isolated position via
-   *  updateIsolatedMargin / topUpIsolatedOnlyMargin (signed USD; positive
-   *  pushes liq away). Ignored when `isCross`. Defaults to '0' so existing
-   *  callers that haven't been updated keep their previous behaviour. */
-  extraIsolatedMargin: string = '0',
+  /** Isolated only: the position's dedicated margin (isolatedMarginOf —
+   *  allocation at open plus user adjustments). Defaults to the entry-price
+   *  allocation size × entry / leverage. Ignored when `isCross`. */
+  isolatedMargin?: string,
   /** Real per-tier margin schedule for this asset (from HlMeta.marginTables,
-   *  resolved via getMarginTiersForCoin). Only used on the cross branch.
-   *  Optional and defaults to undefined so every existing caller/test that
-   *  doesn't pass it keeps getting the old approximate behaviour exactly. */
+   *  resolved via getMarginTiersForCoin). */
   marginTiers?: HlMarginTier[],
 ): string | null {
   if (isZero(szi)) return null;
 
   const isLong = gt(szi, '0');
   const size = abs(szi);
-  const maintMarginRate = div('1', (leverage * 2).toString());
+  const positionNotional = mul(size, entryPx);
+  const hasTiers = !!marginTiers && marginTiers.length > 0;
 
   if (isCross) {
-    const positionNotional = mul(size, entryPx);
-    const maintMargin = marginTiers && marginTiers.length > 0
-      ? maintenanceMarginForNotional(marginTiers, positionNotional)
-      : mul(positionNotional, maintMarginRate); // fallback: old approximation
+    const maintMargin = hasTiers
+      ? maintenanceMarginForNotional(marginTiers!, positionNotional)
+      : mul(positionNotional, div('1', (leverage * 2).toString())); // fallback: old approximation
     const cushion = sub(accountValue, maintMargin);
     // If cushion ≥ positionNotional, the account can absorb the position
     // going to zero (long) or doubling (short) without liquidating.
@@ -237,17 +235,29 @@ export function calculateLiquidationPrice(
     return isLong ? sub(entryPx, offset) : add(entryPx, offset);
   }
 
-  // Isolated: baseline formula collapses to
-  //   entryPx ∓ (1/leverage − maintMarginRate) × entryPx
-  // which is equivalent to `entryPx ∓ (initialMargin − maintMargin) / size`
-  // when initialMargin = positionNotional / leverage. Adding user-injected
-  // extra margin widens that cushion: pushes long-liq DOWN, short-liq UP.
-  const baseCushionUsd = mul(mul(size, entryPx), sub(div('1', leverage.toString()), maintMarginRate));
-  const cushion = add(baseCushionUsd, extraIsolatedMargin);
-  const offset = div(cushion, size);
-  if (isLong) {
-    const liqPx = sub(entryPx, offset);
-    return gt(liqPx, '0') ? liqPx : '0';
+  const margin = isolatedMargin ?? div(positionNotional, leverage.toString());
+  // Maintenance margin at notional n is n·r − d (tier rate r, deduction d
+  // that keeps the schedule continuous). The tier that applies is the one at
+  // the notional AT the liquidation price — what the engine checks when the
+  // mark gets there — so solve, re-pick the tier at size × p, and repeat
+  // until it stops moving (tier schedules have a handful of steps).
+  //   long:  margin + size·(p − entry) = size·p·r − d  →  p = (size·entry − margin − d) / (size·(1 − r))
+  //   short: margin + size·(entry − p) = size·p·r − d  →  p = (size·entry + margin + d) / (size·(1 + r))
+  const solve = (notional: string): string => {
+    const rate = hasTiers
+      ? maintenanceMarginRateForNotional(marginTiers!, notional)
+      : div('1', (leverage * 2).toString());
+    const deduction = hasTiers ? sub(mul(notional, rate), maintenanceMarginForNotional(marginTiers!, notional)) : '0';
+    return isLong
+      ? div(sub(sub(positionNotional, margin), deduction), mul(size, sub('1', rate)))
+      : div(add(add(positionNotional, margin), deduction), mul(size, add('1', rate)));
+  };
+  let liqPx = solve(positionNotional);
+  for (let i = 0; i < 8 && hasTiers && gt(liqPx, '0'); i++) {
+    const next = solve(mul(size, liqPx));
+    if (D(next).eq(D(liqPx))) break;
+    liqPx = next;
   }
-  return add(entryPx, offset);
+  if (isLong) return gt(liqPx, '0') ? liqPx : '0';
+  return liqPx;
 }

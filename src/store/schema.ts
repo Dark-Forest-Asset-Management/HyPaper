@@ -161,8 +161,12 @@ export const ledgerUpdates = pgTable('ledger_updates', {
   userId: text('user_id').notNull().references(() => users.userId),
   time: bigint('time', { mode: 'number' }).notNull(),
   hash: text('hash').notNull(),
-  deltaType: text('delta_type').notNull(),   // 'deposit' | 'withdraw'
+  deltaType: text('delta_type').notNull(),   // 'deposit' | 'withdraw' | 'liquidation'
   usdc: text('usdc').notNull(),
+  // Full HL delta object for types that carry more than `usdc` — e.g.
+  // `liquidation`: { type, liquidatedNtlPos, accountValue, leverageType,
+  // liquidatedPositions }. Null for deposit/withdraw rows.
+  delta: jsonb('delta'),
 }, (t) => [
   index('ledger_user_time_idx').on(t.userId, t.time),
 ]);
@@ -222,6 +226,9 @@ export const fills = pgTable('fills', {
   // twap_id IS NOT NULL — see getUserTwapSliceFillsPg). Null for every
   // regular, non-TWAP fill.
   twapId: integer('twap_id'),
+  // HL's `liquidation` object ({ liquidatedUser, markPx, method }) on fills
+  // produced by a liquidation. Null for every ordinary fill.
+  liquidation: jsonb('liquidation'),
 }, (table) => [
   index('fills_user_id_time_idx').on(table.userId, table.time),
   index('fills_oid_idx').on(table.oid),

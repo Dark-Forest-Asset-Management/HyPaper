@@ -3,7 +3,9 @@ import { redis } from '../store/redis.js';
 import { KEYS } from '../store/keys.js';
 import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
-import { D, sub, mul, add, isZero, gt, lt, gte, lte, abs, neg, min, roundToDecimals } from '../utils/math.js';
+import { D, sub, mul, div, add, isZero, gt, lt, gte, lte, abs, neg, min, roundToDecimals } from '../utils/math.js';
+import { getLeverageSetting } from '../engine/assetMeta.js';
+import { withUserLock } from '../utils/userLock.js';
 import { nextTid } from '../utils/id.js';
 import { computeFillPrice } from '../utils/slippage.js';
 import { getFreshMark } from './mark-feed.js';
@@ -493,6 +495,11 @@ export class OrderMatcher {
   }
 
   async executeFill(order: PaperOrder, fillPx: string, isTaker: boolean = true): Promise<void> {
+    // Serialized per user with liquidations / margin changes (utils/userLock.ts).
+    return withUserLock(order.userId, () => this.executeFillLocked(order, fillPx, isTaker));
+  }
+
+  private async executeFillLocked(order: PaperOrder, fillPx: string, isTaker: boolean): Promise<void> {
     const userId = order.userId;
     const asset = order.asset;
     const fillSz = sub(order.sz, order.filledSz);
@@ -638,6 +645,33 @@ export class OrderMatcher {
       }
     }
 
+    // Isolated margin allocation (engine/margin.ts isolatedMarginOf). HL: "The
+    // margin required to open a position is position_size * mark_price /
+    // leverage" and "Margin is proportionally removed as the position is
+    // closed" (docs, Margining). The opening part is priced at the MARK, as
+    // the docs specify; the fill price is used only when no fresh mark is held
+    // for the coin. Cross positions carry no allocation.
+    const { leverage, isCross } = await getLeverageSetting(userId, asset);
+    const allocPx = (await getFreshMark(order.coin)) ?? fillPx;
+    const isoFields: string[] = [];
+    if (!isCross && !isZero(newSzi)) {
+      const posNow = await redis.hgetall(KEYS.USER_POS(userId, asset));
+      const curAbs = abs(currentSzi);
+      const lev = leverage.toString();
+      const prevAlloc = posNow.marginAlloc ?? div(mul(curAbs, currentEntryPx), lev);
+      if (isIncreasing) {
+        const base = isZero(currentSzi) ? '0' : prevAlloc;
+        isoFields.push('marginAlloc', add(base, div(mul(fillSz, allocPx), lev)));
+      } else if (gt(fillSz, curAbs)) {
+        // Flip: the old side's margin is released in full; the remainder opens fresh.
+        isoFields.push('marginAlloc', div(mul(abs(newSzi), allocPx), lev), 'rawUsd', '0');
+      } else {
+        const keep = div(abs(newSzi), curAbs);
+        isoFields.push('marginAlloc', mul(prevAlloc, keep));
+        if (posNow.rawUsd) isoFields.push('rawUsd', mul(posNow.rawUsd, keep));
+      }
+    }
+
     // Sub-dex scope for this fill (xyz, flx, …) or '' for native. Determines
     // which USER_POSITIONS set the asset belongs to and which balance field
     // PnL + fees write to. Each sub-dex is its own subaccount on HL.
@@ -662,8 +696,10 @@ export class OrderMatcher {
         'cumFunding', cumFunding,
         'cumFundingSinceOpen', cumFundingSinceOpen,
         'cumFundingSinceChange', '0',
+        ...isoFields,
       );
       pipeline.sadd(KEYS.USER_POSITIONS_SCOPED(userId, scope), asset.toString());
+      pipeline.sadd(KEYS.POSITION_HOLDERS, `${userId}|${scope}`);
     }
 
     // Track active user for funding

@@ -13,6 +13,7 @@ import { KEYS } from '../store/keys.js';
 import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { getClearinghouseState } from './position.js';
+import { getLeverageSetting } from './assetMeta.js';
 import { getNetDepositsPg, getVolumeSincePg } from '../store/pg-queries.js';
 import { D, mul, div } from '../utils/math.js';
 import type { HlMeta } from '../types/hl.js';
@@ -162,9 +163,10 @@ export async function getActiveAssetData(userId: string, coin: string): Promise<
   maxTradeSzs: [string, string]; availableToTrade: [string, string]; markPx: string;
 }> {
   const asset = await assetIndexForCoin(coin);
-  const lev = asset >= 0 ? await redis.hgetall(KEYS.USER_LEV(userId, asset)) : {};
-  const leverage = lev.leverage ? parseInt(lev.leverage, 10) : 20;
-  const isCross = lev.isCross !== 'false';
+  // Unset → HL's default for the asset (20x cross capped at its maxLeverage).
+  const { leverage, isCross } = asset >= 0
+    ? await getLeverageSetting(userId, asset)
+    : { leverage: 20, isCross: true };
 
   const ctx = await redis.hgetall(KEYS.MARKET_CTX(coin));
   const markPx = ctx.markPx || (await redis.hget(KEYS.MARKET_MIDS, coin)) || '0';

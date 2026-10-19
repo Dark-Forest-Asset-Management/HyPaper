@@ -544,6 +544,10 @@ export class HyPaperWsServer {
       this.broadcast(`userFundings:${e.userId}`, JSON.stringify({ channel: 'userFundings', data: { isSnapshot: false, user: e.userId, fundings: [e.funding] } }));
       this.broadcast(`userEvents:${e.userId}`, JSON.stringify({ channel: 'user', data: { funding: e.funding } }));
     });
+    // Backstop liquidation → userEvents `liquidation` variant (WsLiquidation).
+    this.eventBus.on('liquidationEvent', (e: { userId: string; liquidation: unknown }) => {
+      this.broadcast(`userEvents:${e.userId}`, JSON.stringify({ channel: 'user', data: { liquidation: e.liquidation } }));
+    });
     this.eventBus.on('ledger', (e: { userId: string; update: unknown }) => {
       this.broadcast(`userNonFundingLedgerUpdates:${e.userId}`, JSON.stringify({ channel: 'userNonFundingLedgerUpdates', data: { isSnapshot: false, user: e.userId, nonFundingLedgerUpdates: [e.update] } }));
     });
