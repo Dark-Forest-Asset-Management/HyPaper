@@ -1,0 +1,43 @@
+{
+  "request": {
+    "action": {
+      "type": "cancel",
+      "cancels": [
+        {
+          "a": 3,
+          "o": 62156953329
+        }
+      ]
+    },
+    "nonce": 1791457449377,
+    "signature": {
+      "r": "0x4c605980ccde12862f4acc6c4e1241913088018a1b87bed3b8e02770c16079d4",
+      "s": "0x5ea210ad5cea6cba2913096fd4a1d261388bb76498cd14ffd2985fc8d59a3061",
+      "v": 28
+    }
+  },
+  "response": {
+    "status": "ok",
+    "response": {
+      "type": "cancel",
+      "data": {
+        "statuses": [
+          {
+            "error": "Order was never placed, already canceled, or filled. asset=3"
+          }
+        ]
+      }
+    }
+  },
+  "httpStatus": 200,
+  "meta": {
+    "nonce": 1791457449377,
+    "msgpackHex": "0x82a474797065a663616e63656ca763616e63656c739182a16103a16fcf0000000e78d7d6f1",
+    "connectionId": "0x54b21be6b85cc85c3b9c37a9ca7758d6b4b255f59ca4197755268b7739eb4205",
+    "signature": {
+      "r": "0x4c605980ccde12862f4acc6c4e1241913088018a1b87bed3b8e02770c16079d4",
+      "s": "0x5ea210ad5cea6cba2913096fd4a1d261388bb76498cd14ffd2985fc8d59a3061",
+      "v": 28
+    }
+  }
+}

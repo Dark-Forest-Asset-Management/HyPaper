@@ -73,11 +73,13 @@ describe('margin calculations', () => {
 
     describe('isolated long positions', () => {
       it('calculates liquidation price for a long', () => {
-        // Long 1 BTC @ 50000, 20x leverage, isolated
-        // liqPx = entryPx * (1 - 1/lev + 1/(2*lev))
-        // = 50000 * (1 - 0.05 + 0.025) = 50000 * 0.975 = 48750
-        const liqPx = calculateLiquidationPrice('1', '50000', '100000', 20, false);
-        expect(liqPx).toBe('48750');
+        // Long 1 BTC @ 50000, 20x isolated: margin 2500, maint rate 1/40 (no tiers → 1/(2·lev)).
+        // Liquidation is where equity meets maintenance: 2500 + (p − 50000) = 0.025·p
+        //   → p = 47500 / 0.975 = 48717.948…
+        const liqPx = calculateLiquidationPrice('1', '50000', '100000', 20, false)!;
+        expect(Number(liqPx)).toBeCloseTo(48717.9487, 3);
+        const equity = 2500 + (Number(liqPx) - 50000);
+        expect(equity).toBeCloseTo(Number(liqPx) * 0.025, 6);
       });
 
       it('liquidation is closer to entry with higher leverage', () => {
@@ -94,8 +96,10 @@ describe('margin calculations', () => {
 
     describe('isolated short positions', () => {
       it('calculates liquidation price for a short', () => {
-        const liqPx = calculateLiquidationPrice('-1', '50000', '100000', 20, false);
-        expect(liqPx).toBe('51250');
+        // Short 1 @ 50000, 20x isolated: 2500 + (50000 − p) = 0.025·p → p = 52500 / 1.025
+        const liqPx = calculateLiquidationPrice('-1', '50000', '100000', 20, false)!;
+        expect(Number(liqPx)).toBeCloseTo(51219.5122, 3);
+        expect(2500 + (50000 - Number(liqPx))).toBeCloseTo(Number(liqPx) * 0.025, 6);
       });
 
       it('liquidation is closer to entry with higher leverage', () => {
@@ -106,9 +110,10 @@ describe('margin calculations', () => {
     });
 
     describe('isolated leverage edge cases', () => {
-      it('1x leverage: wide liquidation distance', () => {
+      it('1x long can never be liquidated: equity p always ≥ maintenance 0.5·p → liq line at 0', () => {
+        // margin 50000 + (p − 50000) = p, maintenance = 0.5·p — equity never falls below it.
         const liqPx = calculateLiquidationPrice('1', '50000', '100000', 1, false);
-        expect(liqPx).toBe('25000');
+        expect(liqPx).toBe('0');
       });
 
       it('200x leverage: very tight liquidation', () => {

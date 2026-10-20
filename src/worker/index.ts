@@ -13,6 +13,9 @@ import { initVault } from '../engine/liquidator-vault.js';
 import type { HlMeta, HlAssetCtx } from '../types/hl.js';
 import { sweepStakingQueue } from '../engine/staking.js';
 import { upsertMarginTablesPg } from '../store/pg-queries.js';
+import { wireMarkSubscriptions, refreshTrailingMarks } from './mark-feed.js';
+import { emitTrailingHistory } from '../engine/trailing-state.js';
+import { buildTrailingBody } from '../engine/trailing-math.js';
 
 export const eventBus = new EventEmitter();
 
@@ -33,7 +36,7 @@ export const eventBus = new EventEmitter();
 // Real HL enforces a max of 10 triggers per day and resets at 00:00 UTC.
 // HyPaper doesn't track that count — it's a v1 approximation.
 
-class ScheduleCancelWorker {
+export class ScheduleCancelWorker {
   private timer: NodeJS.Timeout | null = null;
   private readonly POLL_INTERVAL_MS = 5_000; // check every 5 seconds
 
@@ -129,6 +132,7 @@ class ScheduleCancelWorker {
                 );
                 pipeline.srem(KEYS.ORDERS_OPEN, oid.toString());
                 pipeline.srem(KEYS.ORDERS_TRIGGERS, oid.toString());
+                pipeline.srem(KEYS.ORDERS_TRAILING, oid.toString());
                 pipeline.zrem(KEYS.ORDERS_EXPIRY, oid.toString()); // clean expiry set
               }
               await pipeline.exec();
@@ -137,6 +141,9 @@ class ScheduleCancelWorker {
               // so Slushy frontend sees the update in real time
               for (const { o: oid, a: asset } of cancels) {
                 const orderData = await redis.hgetall(KEYS.ORDER(oid));
+                if (orderData.orderType === "trailingStop") {
+                  emitTrailingHistory(eventBus, orderData, "canceled", now2, buildTrailingBody(orderData, false));
+                }
                 eventBus.emit("orderUpdate", {
                   userId: wallet,
                   order: {
@@ -315,7 +322,11 @@ export class Worker {
     // perp DEX so sub-DEX assets like `xyz:AAPL` get live mark prices.
     this.wsClient!.connect();
     this.wsClient!.subscribe({ type: "allMids" });
-    this.wsClient!.subscribe({ type: "activeAssetCtx" });
+    // NOTE: no coin-less `activeAssetCtx` subscribe here. HL requires a `coin`
+    // for that channel and rejects the coin-less form ("Error parsing JSON
+    // into valid websocket request", verified on testnet 2026-10), so it never
+    // delivered anything. Per-coin subscriptions are created on demand by
+    // ensureUpstreamMarketSub (relays) and by the mark-price feed (trailing stops).
     try {
       const perpDexsRaw = await redis.get(KEYS.MARKET_PERPDEXS);
       if (perpDexsRaw) {
@@ -327,6 +338,16 @@ export class Worker {
       }
     } catch (e) {
       logger.warn({ err: e }, "Failed to subscribe sub-DEX mids");
+    }
+
+    // Mark-price feed for trailing stops (engine/trailingStop.ts). The engine
+    // asks for a per-coin `activeAssetCtx` upstream sub by emitting `markSub`
+    // (no import of this module from the engine → no cycle); subs for coins
+    // that already had an open trailing stop before this boot are restored here.
+    try {
+      await wireMarkSubscriptions(eventBus, (sub) => this.ensureUpstreamMarketSub(sub));
+    } catch (e) {
+      logger.warn({ err: e }, 'Failed to restore trailing-stop mark subscriptions');
     }
 
     this.fundingWorker.start();
@@ -431,6 +452,8 @@ export class Worker {
     const oids = [
       ...(await redis.smembers(KEYS.ORDERS_OPEN)),
       ...(await redis.smembers(KEYS.ORDERS_TRIGGERS)),
+      // Trailing stops fire as market orders → need book depth too.
+      ...(await redis.smembers(KEYS.ORDERS_TRAILING)),
     ];
     for (const oidStr of oids) {
       const coin = await redis.hget(KEYS.ORDER(parseInt(oidStr, 10)), 'coin');
@@ -445,6 +468,10 @@ export class Worker {
   private startMidTrueup(): void {
     const tick = async (): Promise<void> => {
       try {
+        // Mark-price HTTP fallback for open trailing stops whose WS mark went
+        // stale (see worker/mark-feed.ts). Runs before the mid true-up, which
+        // wakes the matcher, so the matcher sees the refreshed marks.
+        await refreshTrailingMarks();
         // Main DEX
         await this.trueupOneDex(undefined);
         // Sub-DEXes from cached perpDexs list (already populated in seedMarketData)

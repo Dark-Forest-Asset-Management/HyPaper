@@ -1,0 +1,252 @@
+{
+  "startedAt": "2026-10-08T17:25:57.382Z",
+  "balances": {
+    "perpAccountValue": 0,
+    "spotUsdc": 3.482453
+  },
+  "t8": {
+    "placementAccepted": true,
+    "resolved": true,
+    "seconds": 0.695,
+    "finalStatus": "filled",
+    "finalBody": {
+      "coin": "BTC",
+      "side": "B",
+      "limitPx": "89223.0",
+      "sz": "0.00436",
+      "oid": 62188273841,
+      "timestamp": 1791480452440,
+      "triggerCondition": "Triggered",
+      "isTrigger": false,
+      "triggerPx": "0.0",
+      "children": [],
+      "isPositionTpsl": false,
+      "reduceOnly": false,
+      "orderType": "Trailing Stop Market",
+      "origSz": "0.00516",
+      "tif": "Gtc",
+      "cloid": null
+    },
+    "history": [
+      [
+        "filled",
+        1791480452440
+      ],
+      [
+        "triggered",
+        1791480452440
+      ],
+      [
+        "open",
+        1791480451263
+      ]
+    ],
+    "fills": [
+      {
+        "coin": "BTC",
+        "px": "81414.0",
+        "sz": "0.0008",
+        "side": "B",
+        "time": 1791480452440,
+        "startPosition": "0.0",
+        "dir": "Open Long",
+        "closedPnl": "0.0",
+        "hash": "0x8113b96843688981828d042b38ad6600004ed14dde6ba85324dc64bb026c636c",
+        "oid": 62188273841,
+        "crossed": true,
+        "fee": "0.029309",
+        "tid": 46750960053685,
+        "feeToken": "USDC",
+        "twapId": null
+      }
+    ],
+    "positions": [
+      {
+        "coin": "BTC",
+        "szi": 0.0008
+      }
+    ]
+  },
+  "t8b": {
+    "positionBefore": 0.0008,
+    "resolved": true,
+    "seconds": 0.676,
+    "finalStatus": "marginCanceled",
+    "finalBody": {
+      "coin": "BTC",
+      "side": "B",
+      "limitPx": "89240.0",
+      "sz": "0.00477",
+      "oid": 62188282789,
+      "timestamp": 1791480457245,
+      "triggerCondition": "Activation immediate, retracement 5, best 81123",
+      "isTrigger": true,
+      "triggerPx": "81128.0",
+      "children": [],
+      "isPositionTpsl": false,
+      "reduceOnly": false,
+      "orderType": "Trailing Stop Market",
+      "origSz": "0.00477",
+      "tif": null,
+      "cloid": null
+    },
+    "history": [
+      "marginCanceled",
+      "triggered",
+      "open"
+    ],
+    "fills": []
+  },
+  "t1": {
+    "positionSz": "0.00015",
+    "stopSz": "0.00045",
+    "fired": true,
+    "seconds": 15.352,
+    "fillSizes": [
+      "0.00015"
+    ],
+    "finalStatus": "filled",
+    "finalBody": {
+      "coin": "BTC",
+      "side": "A",
+      "limitPx": "73135.0",
+      "sz": "0.0",
+      "oid": 62188304944,
+      "timestamp": 1791480485807,
+      "triggerCondition": "Triggered",
+      "isTrigger": false,
+      "triggerPx": "0.0",
+      "children": [],
+      "isPositionTpsl": false,
+      "reduceOnly": true,
+      "orderType": "Trailing Stop Market",
+      "origSz": "0.00045",
+      "tif": "Gtc",
+      "cloid": null
+    },
+    "history": [
+      "filled",
+      "triggered",
+      "open"
+    ],
+    "positionAfter": []
+  },
+  "t6b": {
+    "fired": true,
+    "seconds": 15.158,
+    "placementRow": {
+      "coin": "SOL",
+      "side": "A",
+      "limitPx": "95.338",
+      "sz": "0.12",
+      "oid": 62188357021,
+      "timestamp": 1791480497009,
+      "triggerCondition": "Activation immediate, retracement 0.05, best 105.9803",
+      "isTrigger": true,
+      "triggerPx": "105.9303",
+      "children": [],
+      "isPositionTpsl": false,
+      "reduceOnly": true,
+      "orderType": "Trailing Stop Market",
+      "origSz": "0.12",
+      "tif": null,
+      "cloid": null
+    },
+    "ruleCheckAtPlacement": {
+      "ok": true,
+      "triggerPx": {
+        "hl": "105.9303",
+        "hyPaper": "105.9303"
+      },
+      "limitPx": {
+        "hl": "95.338",
+        "hyPaper": "95.338"
+      },
+      "text": {
+        "hl": "Activation immediate, retracement 0.05, best 105.9803",
+        "hyPaper": "Activation immediate, retracement 0.05, best 105.9803"
+      }
+    },
+    "lastRowBeforeFire": {
+      "coin": "SOL",
+      "side": "A",
+      "limitPx": "95.563",
+      "sz": "0.12",
+      "oid": 62188357021,
+      "timestamp": 1791480497009,
+      "triggerCondition": "Activation immediate, retracement 0.05, best 106.23",
+      "isTrigger": true,
+      "triggerPx": "106.18",
+      "children": [],
+      "isPositionTpsl": false,
+      "reduceOnly": true,
+      "orderType": "Trailing Stop Market",
+      "origSz": "0.12",
+      "tif": null,
+      "cloid": null
+    },
+    "ruleCheckBeforeFire": {
+      "ok": true,
+      "triggerPx": {
+        "hl": "106.18",
+        "hyPaper": "106.18"
+      },
+      "limitPx": {
+        "hl": "95.563",
+        "hyPaper": "95.563"
+      },
+      "text": {
+        "hl": "Activation immediate, retracement 0.05, best 106.23",
+        "hyPaper": "Activation immediate, retracement 0.05, best 106.23"
+      }
+    },
+    "fills": [
+      {
+        "coin": "SOL",
+        "px": "105.98",
+        "sz": "0.12",
+        "side": "A",
+        "time": 1791480509501,
+        "startPosition": "0.12",
+        "dir": "Close Long",
+        "closedPnl": "0.0",
+        "hash": "0xa708e3dc60b76a81a882042b38b15f000043fbc1fbba89534ad18f2f1fbb446c",
+        "oid": 62188357021,
+        "crossed": true,
+        "fee": "0.005722",
+        "tid": 735097782446640,
+        "feeToken": "USDC",
+        "twapId": null
+      }
+    ],
+    "finalStatus": "filled",
+    "history": [
+      "filled",
+      "triggered",
+      "open"
+    ]
+  },
+  "finalState": {
+    "resting": 0,
+    "positions": []
+  },
+  "t5": {
+    "flatSell": "not placed",
+    "flatBuy": "not placed",
+    "observedSeconds": 0
+  },
+  "t2": {
+    "frameKeys": [],
+    "frames": 0,
+    "perOid": {}
+  },
+  "finishedAt": "2026-10-08T17:27:13.075Z",
+  "wsChannelCounts": {
+    "subscriptionResponse": 3,
+    "userFills": 7,
+    "error": 1,
+    "orderUpdates": 11,
+    "user": 6,
+    "pong": 2
+  }
+}

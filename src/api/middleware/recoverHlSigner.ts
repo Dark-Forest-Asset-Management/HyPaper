@@ -57,20 +57,41 @@ interface HlSignature {
 }
 
 /** Build the connectionId — keccak256(msgpack(action) + nonce_be8 +
- *  vaultFlag + vaultAddrBytes). Must byte-match slushy's
- *  actionConnectionId. */
-function buildConnectionId(action: unknown, nonce: number, vaultAddress?: string): string {
+ *  vaultFlag + vaultAddrBytes [+ 0x00 + expiresAfter_be8]). Must byte-match
+ *  slushy's actionConnectionId and HL's own hashing.
+ *
+ *  The optional `expiresAfter` suffix is part of what HL signs: when the
+ *  request carries it, HL appends 0x00 followed by the 8-byte big-endian
+ *  timestamp AFTER the vault bytes (hyperliquid-python-sdk
+ *  signing.action_hash). Verified 2026-10 by recovering the signer of real
+ *  HL web-UI requests (they always carry expiresAfter): the recovered
+ *  address is only consistent across requests WITH the suffix. Omitting it
+ *  recovers a phantom signer. */
+export function buildConnectionId(
+  action: unknown,
+  nonce: number,
+  vaultAddress?: string,
+  expiresAfter?: number,
+): string {
   const packed = msgpackEncode(action);
   const nonceBuf = new ArrayBuffer(8);
   new DataView(nonceBuf).setBigUint64(0, BigInt(nonce), false);
   const nonceBytes = new Uint8Array(nonceBuf);
   const vaultFlag = vaultAddress ? new Uint8Array([1]) : new Uint8Array([0]);
   const vaultBytes = vaultAddress ? hexToBytes(vaultAddress) : new Uint8Array(0);
-  const combined = new Uint8Array(packed.length + nonceBytes.length + vaultFlag.length + vaultBytes.length);
+  const hasExpiry = expiresAfter !== undefined;
+  const combined = new Uint8Array(
+    packed.length + nonceBytes.length + vaultFlag.length + vaultBytes.length + (hasExpiry ? 9 : 0),
+  );
   combined.set(packed, 0);
   combined.set(nonceBytes, packed.length);
   combined.set(vaultFlag, packed.length + nonceBytes.length);
   combined.set(vaultBytes, packed.length + nonceBytes.length + vaultFlag.length);
+  if (hasExpiry) {
+    const o = packed.length + nonceBytes.length + vaultFlag.length + vaultBytes.length;
+    combined[o] = 0;
+    new DataView(combined.buffer).setBigUint64(o + 1, BigInt(expiresAfter), false);
+  }
   return ethers.keccak256(combined);
 }
 
@@ -89,8 +110,9 @@ export function recoverHlSigner(
   nonce: number,
   signature: HlSignature,
   vaultAddress?: string,
+  expiresAfter?: number,
 ): string {
-  const connectionId = buildConnectionId(action, nonce, vaultAddress);
+  const connectionId = buildConnectionId(action, nonce, vaultAddress, expiresAfter);
   const message = { source: HL_SOURCE, connectionId };
   // Reassemble the 65-byte signature from { r, s, v } parts.
   const r = signature.r.startsWith('0x') ? signature.r.slice(2) : signature.r;

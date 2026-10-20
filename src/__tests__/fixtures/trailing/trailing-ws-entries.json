@@ -1,0 +1,263 @@
+{
+ "_doc": "orderUpdates entries captured from HL testnet (probe rounds 2 and 4). Each entry is exactly what HL sent for a trailing stop.",
+ "sellFire": [
+  {
+   "order": {
+    "coin": "BTC",
+    "side": "A",
+    "limitPx": "74480.0",
+    "sz": "0.00015",
+    "oid": 62155995023,
+    "timestamp": 1791456616582,
+    "origSz": "0.00015",
+    "reduceOnly": true
+   },
+   "status": "open",
+   "statusTimestamp": 1791456616582
+  },
+  {
+   "order": {
+    "coin": "BTC",
+    "side": "A",
+    "limitPx": "74480.0",
+    "sz": "0.00015",
+    "oid": 62155995023,
+    "timestamp": 1791456616582,
+    "origSz": "0.00015",
+    "reduceOnly": true
+   },
+   "status": "triggered",
+   "statusTimestamp": 1791456617663
+  },
+  {
+   "order": {
+    "coin": "BTC",
+    "side": "A",
+    "limitPx": "74480.0",
+    "sz": "0.0",
+    "oid": 62155995023,
+    "timestamp": 1791456617663,
+    "origSz": "0.00015",
+    "reduceOnly": true
+   },
+   "status": "filled",
+   "statusTimestamp": 1791456617663
+  }
+ ],
+ "userCancel": [
+  {
+   "order": {
+    "coin": "BTC",
+    "side": "A",
+    "limitPx": "71735.0",
+    "sz": "0.00015",
+    "oid": 62155943600,
+    "timestamp": 1791456569265,
+    "origSz": "0.00015",
+    "reduceOnly": true
+   },
+   "status": "open",
+   "statusTimestamp": 1791456569265
+  },
+  {
+   "order": {
+    "coin": "BTC",
+    "side": "A",
+    "limitPx": "71773.0",
+    "sz": "0.00015",
+    "oid": 62155943600,
+    "timestamp": 1791456569265,
+    "origSz": "0.00015",
+    "reduceOnly": true
+   },
+   "status": "canceled",
+   "statusTimestamp": 1791456592945
+  }
+ ],
+ "orphan": [
+  {
+   "order": {
+    "coin": "BTC",
+    "side": "A",
+    "limitPx": "71735.0",
+    "sz": "0.00015",
+    "oid": 62156953329,
+    "timestamp": 1791457493480,
+    "origSz": "0.00015",
+    "reduceOnly": true
+   },
+   "status": "open",
+   "statusTimestamp": 1791457493480
+  },
+  {
+   "order": {
+    "coin": "BTC",
+    "side": "A",
+    "limitPx": "71735.0",
+    "sz": "0.00015",
+    "oid": 62156953329,
+    "timestamp": 1791457493480,
+    "origSz": "0.00015",
+    "reduceOnly": true
+   },
+   "status": "reduceOnlyCanceled",
+   "statusTimestamp": 1791457498505
+  }
+ ],
+ "buyOpen": [
+  {
+   "order": {
+    "coin": "BTC",
+    "side": "B",
+    "limitPx": "94206.0",
+    "sz": "0.00015",
+    "oid": 62158831480,
+    "timestamp": 1791459044535,
+    "origSz": "0.00015",
+    "reduceOnly": true
+   },
+   "status": "open",
+   "statusTimestamp": 1791459044535
+  },
+  {
+   "order": {
+    "coin": "BTC",
+    "side": "B",
+    "limitPx": "94206.0",
+    "sz": "0.00015",
+    "oid": 62158831480,
+    "timestamp": 1791459044535,
+    "origSz": "0.00015",
+    "reduceOnly": true
+   },
+   "status": "canceled",
+   "statusTimestamp": 1791459048124
+  }
+ ],
+ "partialMarginFire": [
+  {
+   "order": {
+    "coin": "BTC",
+    "side": "B",
+    "limitPx": "89223.0",
+    "sz": "0.00516",
+    "oid": 62188273841,
+    "timestamp": 1791480451263,
+    "origSz": "0.00516"
+   },
+   "status": "open",
+   "statusTimestamp": 1791480451263
+  },
+  {
+   "order": {
+    "coin": "BTC",
+    "side": "B",
+    "limitPx": "89223.0",
+    "sz": "0.00516",
+    "oid": 62188273841,
+    "timestamp": 1791480451263,
+    "origSz": "0.00516"
+   },
+   "status": "triggered",
+   "statusTimestamp": 1791480452440
+  },
+  {
+   "order": {
+    "coin": "BTC",
+    "side": "B",
+    "limitPx": "89223.0",
+    "sz": "0.00436",
+    "oid": 62188273841,
+    "timestamp": 1791480452440,
+    "origSz": "0.00516"
+   },
+   "status": "filled",
+   "statusTimestamp": 1791480452440
+  }
+ ],
+ "zeroMarginFire": [
+  {
+   "order": {
+    "coin": "BTC",
+    "side": "B",
+    "limitPx": "89240.0",
+    "sz": "0.00477",
+    "oid": 62188282789,
+    "timestamp": 1791480457245,
+    "origSz": "0.00477"
+   },
+   "status": "open",
+   "statusTimestamp": 1791480457245
+  },
+  {
+   "order": {
+    "coin": "BTC",
+    "side": "B",
+    "limitPx": "89240.0",
+    "sz": "0.00477",
+    "oid": 62188282789,
+    "timestamp": 1791480457245,
+    "origSz": "0.00477"
+   },
+   "status": "triggered",
+   "statusTimestamp": 1791480458464
+  },
+  {
+   "order": {
+    "coin": "BTC",
+    "side": "B",
+    "limitPx": "89240.0",
+    "sz": "0.00477",
+    "oid": 62188282789,
+    "timestamp": 1791480457245,
+    "origSz": "0.00477"
+   },
+   "status": "marginCanceled",
+   "statusTimestamp": 1791480458464
+  }
+ ],
+ "oversizeClamp": [
+  {
+   "order": {
+    "coin": "BTC",
+    "side": "A",
+    "limitPx": "73066.0",
+    "sz": "0.00045",
+    "oid": 62188304944,
+    "timestamp": 1791480470953,
+    "origSz": "0.00045",
+    "reduceOnly": true
+   },
+   "status": "open",
+   "statusTimestamp": 1791480470953
+  },
+  {
+   "order": {
+    "coin": "BTC",
+    "side": "A",
+    "limitPx": "73135.0",
+    "sz": "0.00045",
+    "oid": 62188304944,
+    "timestamp": 1791480470953,
+    "origSz": "0.00045",
+    "reduceOnly": true
+   },
+   "status": "triggered",
+   "statusTimestamp": 1791480485807
+  },
+  {
+   "order": {
+    "coin": "BTC",
+    "side": "A",
+    "limitPx": "73135.0",
+    "sz": "0.0",
+    "oid": 62188304944,
+    "timestamp": 1791480485807,
+    "origSz": "0.00045",
+    "reduceOnly": true
+   },
+   "status": "filled",
+   "statusTimestamp": 1791480485807
+  }
+ ]
+}

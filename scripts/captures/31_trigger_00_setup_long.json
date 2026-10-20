@@ -1,0 +1,56 @@
+{
+  "request": {
+    "action": {
+      "type": "order",
+      "orders": [
+        {
+          "a": 3,
+          "b": true,
+          "p": "84359",
+          "s": "0.00015",
+          "r": false,
+          "t": {
+            "limit": {
+              "tif": "Ioc"
+            }
+          }
+        }
+      ],
+      "grouping": "na"
+    },
+    "nonce": 1791456477422,
+    "signature": {
+      "r": "0x95e7051612d4a13e1fc16b09867aba285103311bea9ddaf614b0f8f5522a6eee",
+      "s": "0x73301191a6f1caba684aff0f8352402ab53028d951ce5104c74e51d4ec45af4c",
+      "v": 27
+    }
+  },
+  "response": {
+    "status": "ok",
+    "response": {
+      "type": "order",
+      "data": {
+        "statuses": [
+          {
+            "filled": {
+              "totalSz": "0.00015",
+              "avgPx": "82706.0",
+              "oid": 62155939876
+            }
+          }
+        ]
+      }
+    }
+  },
+  "httpStatus": 200,
+  "meta": {
+    "nonce": 1791456477422,
+    "msgpackHex": "0x83a474797065a56f72646572a66f72646572739186a16103a162c3a170a53834333539a173a7302e3030303135a172c2a17481a56c696d697481a3746966a3496f63a867726f7570696e67a26e61",
+    "connectionId": "0xbbe190b50629fccf8e0c039ac3456c85d181d37b887a50a0683431c49a2ba11e",
+    "signature": {
+      "r": "0x95e7051612d4a13e1fc16b09867aba285103311bea9ddaf614b0f8f5522a6eee",
+      "s": "0x73301191a6f1caba684aff0f8352402ab53028d951ce5104c74e51d4ec45af4c",
+      "v": 27
+    }
+  }
+}

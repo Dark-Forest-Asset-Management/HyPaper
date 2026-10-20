@@ -118,6 +118,14 @@ export interface OrderUpdateEvent {
   status: string;
 }
 
+/** Several status updates delivered in ONE `orderUpdates` frame — HL sends a trailing
+ *  stop's `[triggered, filled]` (and a reduce-only orphan's `reduceOnlyCanceled`
+ *  alongside the closing order's own updates) together. */
+export interface OrderUpdateBatchEvent {
+  userId: string;
+  updates: Array<{ order: PaperOrder; status: string }>;
+}
+
 /** Fired by engine actions that change account state WITHOUT a fill/order
  *  hook to ride — e.g. updateIsolatedMargin, topUpIsolatedOnlyMargin,
  *  updateLeverage on an existing position. The ws server responds by

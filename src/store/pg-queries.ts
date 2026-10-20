@@ -1,6 +1,6 @@
-import { desc, asc, eq, and, gte, lte, sql, isNotNull } from 'drizzle-orm';
+import { desc, asc, eq, ne, and, gte, lte, sql, isNotNull } from 'drizzle-orm';
 import { db } from './db.js';
-import { fills, orders, funding, ledgerUpdates, liquidationEvents, liquidatorVault, twapHistory, marginTables, assetMarginTable } from './schema.js';
+import { fills, orders, orderStatusEvents, funding, ledgerUpdates, liquidationEvents, liquidatorVault, twapHistory, marginTables, assetMarginTable } from './schema.js';
 import type { PaperFill } from '../types/order.js';
 import type { LiquidationEvent } from '../types/liquidation.js';
 import type { HlMeta, HlMarginTier } from '../types/hl.js';
@@ -34,14 +34,25 @@ export interface HistoricalOrder {
 }
 
 export async function getHistoricalOrdersPg(userId: string, limit = 200): Promise<HistoricalOrder[]> {
-  const rows = await db
-    .select()
-    .from(orders)
-    .where(eq(orders.userId, userId))
-    .orderBy(desc(orders.updatedAt))
-    .limit(limit);
+  // Trailing stops are NOT read from `orders` (one overwritten row per oid): HL returns one row per
+  // status transition for them (open / triggered / filled, or open / reduceOnlyCanceled …), so
+  // they come from the append-only order_status_events table instead.
+  const [rows, events] = await Promise.all([
+    db
+      .select()
+      .from(orders)
+      .where(and(eq(orders.userId, userId), ne(orders.orderType, 'trailingStop')))
+      .orderBy(desc(orders.updatedAt))
+      .limit(limit),
+    db
+      .select()
+      .from(orderStatusEvents)
+      .where(eq(orderStatusEvents.userId, userId))
+      .orderBy(desc(orderStatusEvents.statusTimestamp), desc(orderStatusEvents.id))
+      .limit(limit),
+  ]);
 
-  return rows.map((r) => {
+  const normal = rows.map((r) => {
     const isTrigger = r.orderType === 'trigger';
     const triggerPx = r.triggerPx ?? '0.0';
     return {
@@ -83,6 +94,19 @@ export async function getHistoricalOrdersPg(userId: string, limit = 200): Promis
       statusTimestamp: r.updatedAt,
     };
   });
+
+  const trailing: HistoricalOrder[] = events.map((e) => ({
+    order: e.body as HistoricalOrder['order'],
+    status: e.status,
+    statusTimestamp: e.statusTimestamp,
+  }));
+
+  // Newest first. Array#sort is stable, and `trailing` is already (timestamp desc, id desc), so
+  // ties — a fired stop's `filled` and `triggered` share one timestamp — keep HL's order
+  // (filled before triggered before open).
+  return [...normal, ...trailing]
+    .sort((a, b) => b.statusTimestamp - a.statusTimestamp)
+    .slice(0, limit);
 }
 
 export async function getUserFillsPg(userId: string, limit = 100): Promise<PaperFill[]> {
@@ -240,14 +264,15 @@ export async function getUserFundingPg(
  *  ascending by time. */
 export async function getLedgerUpdatesPg(
   userId: string, startTime: number, endTime?: number,
-): Promise<Array<{ time: number; hash: string; delta: { type: string; usdc: string } }>> {
+): Promise<Array<{ time: number; hash: string; delta: Record<string, unknown> }>> {
   const conds = [eq(ledgerUpdates.userId, userId), gte(ledgerUpdates.time, startTime)];
   if (endTime !== undefined) conds.push(lte(ledgerUpdates.time, endTime));
   const rows = await db.select().from(ledgerUpdates).where(and(...conds)).orderBy(asc(ledgerUpdates.time));
   return rows.map((r) => ({
     time: r.time,
     hash: r.hash,
-    delta: { type: r.deltaType, usdc: r.usdc },
+    // Rows that stored HL's full delta (liquidation) return it verbatim.
+    delta: (r.delta as Record<string, unknown> | null) ?? { type: r.deltaType, usdc: r.usdc },
   }));
 }
 
@@ -256,7 +281,10 @@ export async function getNetDepositsPg(userId: string): Promise<string> {
   const rows = await db.select().from(ledgerUpdates).where(eq(ledgerUpdates.userId, userId));
   let net = D('0');
   for (const r of rows) {
-    net = r.deltaType === 'withdraw' ? net.minus(D(r.usdc)) : net.plus(D(r.usdc));
+    // Only deposits/withdrawals move net deposits; a liquidation row is a
+    // loss, already reflected in accountValue.
+    if (r.deltaType === 'withdraw') net = net.minus(D(r.usdc));
+    else if (r.deltaType === 'deposit') net = net.plus(D(r.usdc));
   }
   return net.toString();
 }
@@ -362,6 +390,9 @@ function rowToFill(row: typeof fills.$inferSelect): PaperFill {
     crossed: row.crossed,
     fee: row.fee,
     tid: row.tid,
+    // HL places `liquidation` right after `tid` (public HL userFills,
+    // 2026-10-19) and omits the key on ordinary fills.
+    ...(row.liquidation ? { liquidation: row.liquidation as NonNullable<PaperFill['liquidation']> } : {}),
     cloid: row.cloid ?? undefined,
     feeToken: row.feeToken,
     // HL always emits `twapId: null` inside the fill object on every endpoint

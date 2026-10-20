@@ -1,0 +1,203 @@
+{
+  "activationPx": "82680",
+  "ticks": [
+    {
+      "t": "2026-10-08T10:48:04.299Z",
+      "markPx": 82705,
+      "frontend": {
+        "coin": "BTC",
+        "side": "A",
+        "limitPx": "71736.0",
+        "sz": "0.00015",
+        "oid": 62155943600,
+        "timestamp": 1791456569265,
+        "triggerCondition": "Activation above 82680, retracement 3000, best 82706",
+        "isTrigger": true,
+        "triggerPx": "79706.0",
+        "children": [],
+        "isPositionTpsl": false,
+        "reduceOnly": true,
+        "orderType": "Trailing Stop Market",
+        "origSz": "0.00015",
+        "tif": null,
+        "cloid": null
+      },
+      "orderStatus": {
+        "status": "order",
+        "order": {
+          "order": {
+            "coin": "BTC",
+            "side": "A",
+            "limitPx": "71735.0",
+            "sz": "0.00015",
+            "oid": 62155943600,
+            "timestamp": 1791456569265,
+            "triggerCondition": "Activation above 82680, retracement 3000, best 82705",
+            "isTrigger": true,
+            "triggerPx": "79705.0",
+            "children": [],
+            "isPositionTpsl": false,
+            "reduceOnly": true,
+            "orderType": "Trailing Stop Market",
+            "origSz": "0.00015",
+            "tif": null,
+            "cloid": null
+          },
+          "status": "open",
+          "statusTimestamp": 1791456569265
+        }
+      },
+      "fillsSinceStart": [
+        {
+          "coin": "BTC",
+          "px": "82706.0",
+          "sz": "0.00015",
+          "side": "B",
+          "time": 1791456566099,
+          "startPosition": "0.0",
+          "dir": "Open Long",
+          "closedPnl": "0.0",
+          "hash": "0xfcf2aa45b8691b80fe6c042b3254dc010200c22b536c3a53a0bb5598776cf56b",
+          "oid": 62155939876,
+          "crossed": true,
+          "fee": "0.005582",
+          "tid": 953503941954551,
+          "feeToken": "USDC",
+          "twapId": null
+        }
+      ]
+    },
+    {
+      "t": "2026-10-08T10:48:11.658Z",
+      "markPx": 82706,
+      "frontend": {
+        "coin": "BTC",
+        "side": "A",
+        "limitPx": "71736.0",
+        "sz": "0.00015",
+        "oid": 62155943600,
+        "timestamp": 1791456569265,
+        "triggerCondition": "Activation above 82680, retracement 3000, best 82706",
+        "isTrigger": true,
+        "triggerPx": "79706.0",
+        "children": [],
+        "isPositionTpsl": false,
+        "reduceOnly": true,
+        "orderType": "Trailing Stop Market",
+        "origSz": "0.00015",
+        "tif": null,
+        "cloid": null
+      },
+      "orderStatus": {
+        "status": "order",
+        "order": {
+          "order": {
+            "coin": "BTC",
+            "side": "A",
+            "limitPx": "71735.0",
+            "sz": "0.00015",
+            "oid": 62155943600,
+            "timestamp": 1791456569265,
+            "triggerCondition": "Activation above 82680, retracement 3000, best 82705",
+            "isTrigger": true,
+            "triggerPx": "79705.0",
+            "children": [],
+            "isPositionTpsl": false,
+            "reduceOnly": true,
+            "orderType": "Trailing Stop Market",
+            "origSz": "0.00015",
+            "tif": null,
+            "cloid": null
+          },
+          "status": "open",
+          "statusTimestamp": 1791456569265
+        }
+      },
+      "fillsSinceStart": [
+        {
+          "coin": "BTC",
+          "px": "82706.0",
+          "sz": "0.00015",
+          "side": "B",
+          "time": 1791456566099,
+          "startPosition": "0.0",
+          "dir": "Open Long",
+          "closedPnl": "0.0",
+          "hash": "0xfcf2aa45b8691b80fe6c042b3254dc010200c22b536c3a53a0bb5598776cf56b",
+          "oid": 62155939876,
+          "crossed": true,
+          "fee": "0.005582",
+          "tid": 953503941954551,
+          "feeToken": "USDC",
+          "twapId": null
+        }
+      ]
+    },
+    {
+      "t": "2026-10-08T10:48:18.994Z",
+      "markPx": 82706,
+      "frontend": {
+        "coin": "BTC",
+        "side": "A",
+        "limitPx": "71766.0",
+        "sz": "0.00015",
+        "oid": 62155943600,
+        "timestamp": 1791456569265,
+        "triggerCondition": "Activation above 82680, retracement 3000, best 82739",
+        "isTrigger": true,
+        "triggerPx": "79739.0",
+        "children": [],
+        "isPositionTpsl": false,
+        "reduceOnly": true,
+        "orderType": "Trailing Stop Market",
+        "origSz": "0.00015",
+        "tif": null,
+        "cloid": null
+      },
+      "orderStatus": {
+        "status": "order",
+        "order": {
+          "order": {
+            "coin": "BTC",
+            "side": "A",
+            "limitPx": "71735.0",
+            "sz": "0.00015",
+            "oid": 62155943600,
+            "timestamp": 1791456569265,
+            "triggerCondition": "Activation above 82680, retracement 3000, best 82705",
+            "isTrigger": true,
+            "triggerPx": "79705.0",
+            "children": [],
+            "isPositionTpsl": false,
+            "reduceOnly": true,
+            "orderType": "Trailing Stop Market",
+            "origSz": "0.00015",
+            "tif": null,
+            "cloid": null
+          },
+          "status": "open",
+          "statusTimestamp": 1791456569265
+        }
+      },
+      "fillsSinceStart": [
+        {
+          "coin": "BTC",
+          "px": "82706.0",
+          "sz": "0.00015",
+          "side": "B",
+          "time": 1791456566099,
+          "startPosition": "0.0",
+          "dir": "Open Long",
+          "closedPnl": "0.0",
+          "hash": "0xfcf2aa45b8691b80fe6c042b3254dc010200c22b536c3a53a0bb5598776cf56b",
+          "oid": 62155939876,
+          "crossed": true,
+          "fee": "0.005582",
+          "tid": 953503941954551,
+          "feeToken": "USDC",
+          "twapId": null
+        }
+      ]
+    }
+  ]
+}

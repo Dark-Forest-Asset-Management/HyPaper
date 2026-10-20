@@ -1,0 +1,85 @@
+{
+  "coin": "BTC",
+  "asset": 3,
+  "szDecimals": 5,
+  "sz": "0.00015",
+  "startedAt": "2026-10-07T21:19:33.446Z",
+  "dryRun": false,
+  "variants": {
+    "v1": {
+      "label": "CLOSE long, fixed distance, no activation",
+      "oid": 62106112508,
+      "httpStatus": 200
+    },
+    "v2": {
+      "label": "CLOSE long, percentage, no activation",
+      "oid": 62106115982,
+      "httpStatus": 200
+    },
+    "v3": {
+      "label": "CLOSE long, fixed distance, activation ABOVE",
+      "oid": 62106119938,
+      "httpStatus": 200
+    },
+    "v4": {
+      "label": "OPEN long, fixed distance, no activation",
+      "oid": 62106124019,
+      "httpStatus": 200
+    },
+    "v5": {
+      "label": "OPEN long, percentage, no activation",
+      "oid": 62106126834,
+      "httpStatus": 200
+    },
+    "v6": {
+      "label": "OPEN long, fixed distance, activation BELOW",
+      "oid": 62106129977,
+      "httpStatus": 200
+    }
+  },
+  "polling": {
+    "v1": {
+      "distinctSnapshots": 7,
+      "markRange": [
+        83564,
+        83586
+      ]
+    },
+    "v2": {
+      "distinctSnapshots": 7,
+      "markRange": [
+        83564,
+        83586
+      ]
+    },
+    "v3": {
+      "distinctSnapshots": 1,
+      "markRange": [
+        83564,
+        83586
+      ]
+    },
+    "v4": {
+      "distinctSnapshots": 2,
+      "markRange": [
+        83564,
+        83586
+      ]
+    },
+    "v5": {
+      "distinctSnapshots": 2,
+      "markRange": [
+        83564,
+        83586
+      ]
+    },
+    "v6": {
+      "distinctSnapshots": 1,
+      "markRange": [
+        83564,
+        83586
+      ]
+    }
+  },
+  "finishedAt": "2026-10-07T21:24:33.281Z"
+}

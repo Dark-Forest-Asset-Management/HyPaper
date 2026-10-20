@@ -1,0 +1,72 @@
+{
+  "_doc": "Real trailingStop /exchange requests. uiCaptures: sent by the HL testnet web UI (key-SORTED JSON as shown in DevTools, includes expiresAfter, signed by the UI AGENT wallet). probeCaptures: signed directly by the main testnet key by scripts/probe-hl-testnet-trailing-stop.ts (no expiresAfter). Source=b (testnet).",
+  "agentWallet": "0xc49552efa1a56f4b84cb434b5b9b639f49e0bb4d",
+  "mainWallet": "0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b",
+  "uiCaptures": [
+    {
+      "action": {
+        "activationPx": null,
+        "asset": 3,
+        "isBuy": false,
+        "reduceOnly": true,
+        "retracement": {
+          "pct": "5.0000%"
+        },
+        "sz": "0.00014",
+        "type": "trailingStop"
+      },
+      "expiresAfter": 1791405321954,
+      "isFrontend": true,
+      "nonce": 1791405220531,
+      "signature": {
+        "r": "0xc7408fa390431b1c802b4d739913db702df1c910c5b7cd213e9ab60b3cbabfb2",
+        "s": "0x20945f901ff2b0e292461dbfd9cc0a40f4b72c13bce458760f5bfb400eba1e1a",
+        "v": 28
+      },
+      "vaultAddress": null
+    },
+    {
+      "action": {
+        "activationPx": null,
+        "asset": 3,
+        "isBuy": false,
+        "reduceOnly": true,
+        "retracement": {
+          "px": "3000"
+        },
+        "sz": "0.00014",
+        "type": "trailingStop"
+      },
+      "expiresAfter": 1791405458516,
+      "isFrontend": true,
+      "nonce": 1791405357024,
+      "signature": {
+        "r": "0x93bf11afe85b8a127c5a47cd6f681f8ec5a2b95dcba0cdb83bb907271bcda089",
+        "s": "0x32e70c7c1f8acd606c059cbb535573d9b88121a80105f03e45733bd68b74acb9",
+        "v": 28
+      },
+      "vaultAddress": null
+    }
+  ],
+  "probeCaptures": [
+    {
+      "action": {
+        "type": "trailingStop",
+        "asset": 3,
+        "isBuy": false,
+        "sz": "0.00015",
+        "reduceOnly": true,
+        "retracement": {
+          "px": "2507"
+        },
+        "activationPx": null
+      },
+      "nonce": 1791407976114,
+      "signature": {
+        "r": "0xc5223c6aa48428521a5582d677bf1a18a1178a5580b2265d6dd9806b32c08c69",
+        "s": "0x14935340d77c7362f4fd83d7ffd05390ffb70151add07931ed11ed28b2fa4c44",
+        "v": 28
+      }
+    }
+  ]
+}

@@ -54,6 +54,10 @@ export const KEYS = {
   ORDER: (oid: number) => `order:${oid}`,
   ORDERS_OPEN: 'orders:open',
   ORDERS_TRIGGERS: 'orders:triggers',
+  // Open trailing stops. Deliberately a SEPARATE set from ORDERS_OPEN /
+  // ORDERS_TRIGGERS so the limit + TP/SL matchers never touch them; evaluated
+  // by OrderMatcher.matchTrailingStops() on the MARK price.
+  ORDERS_TRAILING: 'orders:trailing',
   ORDER_BRACKET: (oid: number) => `order:${oid}:bracket`,
   ORDER_CHILDREN: (oid: number) => `order:${oid}:children`,
   ORDER_PARENT: (oid: number) => `order:${oid}:parent`,
@@ -62,6 +66,14 @@ export const KEYS = {
 
   // Active users (for funding)
   USERS_ACTIVE: 'users:active',
+  // Every (user, dex) that holds at least one perp position, as
+  // `${userId}|${scope}` (scope '' = native). Lets the liquidation worker
+  // visit only accounts with positions instead of every user × every dex.
+  // Added to on every opening fill; pruned lazily when the set is empty.
+  POSITION_HOLDERS: 'positions:holders',
+  // Partial-liquidation cooldown marker (PX TTL 30 s), keyed per
+  // `${userId}:${scope}:${'cross' | asset}`.
+  LIQ_COOLDOWN: (key: string) => `liq:cooldown:${key}`,
 
   // Sequences
   SEQ_OID: 'seq:oid',

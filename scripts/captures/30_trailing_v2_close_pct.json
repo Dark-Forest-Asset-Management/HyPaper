@@ -1,0 +1,130 @@
+{
+  "label": "CLOSE long, percentage, no activation",
+  "request": {
+    "action": {
+      "type": "trailingStop",
+      "asset": 3,
+      "isBuy": false,
+      "sz": "0.00015",
+      "reduceOnly": true,
+      "retracement": {
+        "pct": "5.0000%"
+      },
+      "activationPx": null
+    },
+    "nonce": 1791407979845,
+    "signature": {
+      "r": "0xc7f9af9bef8e74e5428a21c117db5195fb187dd22fe1511cc03cc7b6f1d7d811",
+      "s": "0x7bcc941fb57bfd822497a3ff83a9a7157c5db3ae77e4532d7b8ee211461720f2",
+      "v": 27
+    }
+  },
+  "response": {
+    "status": "ok",
+    "response": {
+      "type": "trailingStop",
+      "data": {
+        "oid": 62106115982
+      }
+    }
+  },
+  "httpStatus": 200,
+  "rawBody": "{\"status\":\"ok\",\"response\":{\"type\":\"trailingStop\",\"data\":{\"oid\":62106115982}}}",
+  "meta": {
+    "nonce": 1791407979845,
+    "msgpackHex": "0x87a474797065ac747261696c696e6753746f70a5617373657403a56973427579c2a2737aa7302e3030303135aa7265647563654f6e6c79c3ab726574726163656d656e7481a3706374a7352e3030303025ac61637469766174696f6e5078c0",
+    "connectionId": "0x7208ed30b8e1663ce5cf0b5ac183546032782c92dd8cdacd4214df25ed40179b",
+    "signature": {
+      "r": "0xc7f9af9bef8e74e5428a21c117db5195fb187dd22fe1511cc03cc7b6f1d7d811",
+      "s": "0x7bcc941fb57bfd822497a3ff83a9a7157c5db3ae77e4532d7b8ee211461720f2",
+      "v": 27
+    }
+  },
+  "followUps": {
+    "openOrders": [
+      {
+        "coin": "BTC",
+        "side": "A",
+        "limitPx": "71448.0",
+        "sz": "0.00015",
+        "oid": 62106115982,
+        "timestamp": 1791408067792,
+        "origSz": "0.00015",
+        "reduceOnly": true
+      },
+      {
+        "coin": "BTC",
+        "side": "A",
+        "limitPx": "72952.0",
+        "sz": "0.00015",
+        "oid": 62106112508,
+        "timestamp": 1791408064009,
+        "origSz": "0.00015",
+        "reduceOnly": true
+      }
+    ],
+    "frontendOpenOrders": [
+      {
+        "coin": "BTC",
+        "side": "A",
+        "limitPx": "71448.0",
+        "sz": "0.00015",
+        "oid": 62106115982,
+        "timestamp": 1791408067792,
+        "triggerCondition": "Activation immediate, retracement 5%, best 83564",
+        "isTrigger": true,
+        "triggerPx": "79385.8",
+        "children": [],
+        "isPositionTpsl": false,
+        "reduceOnly": true,
+        "orderType": "Trailing Stop Market",
+        "origSz": "0.00015",
+        "tif": null,
+        "cloid": null
+      },
+      {
+        "coin": "BTC",
+        "side": "A",
+        "limitPx": "72952.0",
+        "sz": "0.00015",
+        "oid": 62106112508,
+        "timestamp": 1791408064009,
+        "triggerCondition": "Activation immediate, retracement 2507, best 83564",
+        "isTrigger": true,
+        "triggerPx": "81057.0",
+        "children": [],
+        "isPositionTpsl": false,
+        "reduceOnly": true,
+        "orderType": "Trailing Stop Market",
+        "origSz": "0.00015",
+        "tif": null,
+        "cloid": null
+      }
+    ],
+    "orderStatus": {
+      "status": "order",
+      "order": {
+        "order": {
+          "coin": "BTC",
+          "side": "A",
+          "limitPx": "71447.0",
+          "sz": "0.00015",
+          "oid": 62106115982,
+          "timestamp": 1791408067792,
+          "triggerCondition": "Activation immediate, retracement 5%, best 83563",
+          "isTrigger": true,
+          "triggerPx": "79384.9",
+          "children": [],
+          "isPositionTpsl": false,
+          "reduceOnly": true,
+          "orderType": "Trailing Stop Market",
+          "origSz": "0.00015",
+          "tif": null,
+          "cloid": null
+        },
+        "status": "open",
+        "statusTimestamp": 1791408067792
+      }
+    }
+  }
+}

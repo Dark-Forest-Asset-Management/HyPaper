@@ -1,0 +1,43 @@
+{
+  "oid": 62187143806,
+  "results": [
+    {
+      "kind": "modify",
+      "wire": "A_nonRO_buy_limit",
+      "response": {
+        "status": "err",
+        "response": "Attempted to modify to invalid new order"
+      },
+      "stopStatusAfter": "open",
+      "stopStillTrailing": "Trailing Stop Market"
+    },
+    {
+      "kind": "modify",
+      "wire": "B_RO_sell_limit",
+      "response": {
+        "status": "err",
+        "response": "Attempted to modify to invalid new order"
+      },
+      "stopStatusAfter": "open",
+      "stopStillTrailing": "Trailing Stop Market"
+    },
+    {
+      "kind": "batchModify",
+      "wire": "A_nonRO_buy_limit",
+      "response": {
+        "status": "ok",
+        "response": {
+          "type": "order",
+          "data": {
+            "statuses": [
+              {
+                "error": "Attempted to modify to invalid new order"
+              }
+            ]
+          }
+        }
+      },
+      "stopStillTrailing": "Trailing Stop Market"
+    }
+  ]
+}

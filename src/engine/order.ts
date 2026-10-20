@@ -13,25 +13,27 @@ import type {
   HlCancelRequest,
   HlCancelByCloidRequest,
   HlOrderResponseStatus,
-  HlMeta,
 } from "../types/hl.js";
 import type { PaperOrder } from "../types/order.js";
+import { buildTrailingBody, ERR_ALREADY_FINISHED, ERR_MODIFY_INVALID } from "./trailing-math.js";
+import { emitTrailingHistory } from "./trailing-state.js";
+import {
+  SPOT_OFFSET,
+  SUB_DEX_OFFSET,
+  isSpotAsset,
+  loadUniverseEntry,
+  scopeForAsset,
+  fetchMaxLeverage,
+  cachedMaxLeverage,
+  getLeverageSetting,
+} from "./assetMeta.js";
+import { withUserLock } from "../utils/userLock.js";
 
 const matcher = new OrderMatcher(eventBus);
 
-// HL encodes sub-DEX asset ids as `100_000 + perpDexIdx*10_000 + universeIdx`.
-// Anything < 100_000 is a main-DEX universe index. perpDexIdx aligns with
-// the index in the array returned by /info perpDexs (where index 0 is null,
-// index 1 is the first sub-DEX, etc.).
-const SUB_DEX_OFFSET = 100_000;
-const SUB_DEX_STRIDE = 10_000;
-
-// HL spot assets are encoded as `10_000 + spotPairIndex`. The range
-// [10_000, 100_000) is exclusively spot — main-DEX perp universe indices are
-// in the low hundreds, and sub-DEX assets start at 100_000. Without this
-// branch a spot asset id (e.g. 10_000 for the first pair) was misread as a
-// main-DEX universe index and rejected as "Unknown asset".
-const SPOT_OFFSET = 10_000;
+// Asset-id decoding moved to assetMeta.ts; scopeForAsset is re-exported so
+// existing `import { scopeForAsset } from './order.js'` call sites keep working.
+export { scopeForAsset };
 
 interface SpotMetaCache {
   tokens: Array<{ name: string; szDecimals: number; index: number }>;
@@ -54,43 +56,6 @@ async function loadSpotEntry(asset: number): Promise<{ name: string; szDecimals:
     ? spot.tokens[baseTokenIdx]
     : spot.tokens.find((t) => t.index === baseTokenIdx);
   return { name: pair.name, szDecimals: baseTok?.szDecimals ?? 0 };
-}
-
-async function loadUniverseEntry(asset: number): Promise<{ universe: HlMeta['universe']; localIdx: number } | null> {
-  if (asset < SUB_DEX_OFFSET) {
-    const metaRaw = await redis.get(KEYS.MARKET_META);
-    if (!metaRaw) return null;
-    const meta: HlMeta = JSON.parse(metaRaw);
-    if (asset < 0 || asset >= meta.universe.length) return null;
-    return { universe: meta.universe, localIdx: asset };
-  }
-  // Sub-DEX
-  const offset = asset - SUB_DEX_OFFSET;
-  const dexIdx = Math.floor(offset / SUB_DEX_STRIDE);
-  const localIdx = offset % SUB_DEX_STRIDE;
-  const perpDexsRaw = await redis.get(KEYS.MARKET_PERPDEXS);
-  if (!perpDexsRaw) return null;
-  const perpDexs: Array<{ name: string } | null> = JSON.parse(perpDexsRaw);
-  const dex = perpDexs[dexIdx];
-  if (!dex || !dex.name) return null;
-  const subMetaRaw = await redis.get(KEYS.MARKET_META_DEX(dex.name));
-  if (!subMetaRaw) return null;
-  const subMeta: HlMeta = JSON.parse(subMetaRaw);
-  if (localIdx < 0 || localIdx >= subMeta.universe.length) return null;
-  return { universe: subMeta.universe, localIdx };
-}
-
-/** Sub-dex scope for an asset id. Returns the dex name ('xyz', 'flx', …) for
- *  asset >= 100_000, or '' for native-perp and spot. Used by the rest of the
- *  engine to key per-dex balance / positions / orders. */
-export async function scopeForAsset(asset: number): Promise<string> {
-  if (asset < SUB_DEX_OFFSET) return '';
-  const offset = asset - SUB_DEX_OFFSET;
-  const dexIdx = Math.floor(offset / SUB_DEX_STRIDE);
-  const perpDexsRaw = await redis.get(KEYS.MARKET_PERPDEXS);
-  if (!perpDexsRaw) return '';
-  const perpDexs: Array<{ name: string } | null> = JSON.parse(perpDexsRaw);
-  return perpDexs[dexIdx]?.name ?? '';
 }
 
 export async function resolveAssetCoin(asset: number): Promise<string | null> {
@@ -213,6 +178,11 @@ export async function placeSingleOrder(
   // corrupts the position (szi/entryPx/accountValue all become NaN).
   if (!Number.isFinite(parseFloat(sz)) || parseFloat(sz) <= 0) {
     return { error: `Invalid order size: ${sz}` };
+  }
+
+  if (!reduceOnly) {
+    const levErr = await leverageErrorForOpen(userId, wire.a, isBuy);
+    if (levErr) return { error: levErr };
   }
 
   const trigger = wire.t.trigger;
@@ -592,8 +562,13 @@ export async function cancelOrders(
     }
 
     if (orderData.status !== "open") {
+      // Trailing stops answer like HL does for a finished/absent order (captured).
+      // Other order types keep their existing message (aligning them is a separate change).
       results.push({
-        error: `Order ${cancel.o} is not open (status: ${orderData.status})`,
+        error:
+          orderData.orderType === "trailingStop"
+            ? ERR_ALREADY_FINISHED(cancel.a)
+            : `Order ${cancel.o} is not open (status: ${orderData.status})`,
       });
       continue;
     }
@@ -609,8 +584,17 @@ export async function cancelOrders(
     );
     pipeline.srem(KEYS.ORDERS_OPEN, cancel.o.toString());
     pipeline.srem(KEYS.ORDERS_TRIGGERS, cancel.o.toString());
+    pipeline.srem(KEYS.ORDERS_TRAILING, cancel.o.toString());
     pipeline.zrem(KEYS.ORDERS_EXPIRY, cancel.o.toString());
+    // Freeze the live trailing-stop state for orderStatus / history (HL serves a snapshot).
+    if (orderData.orderType === "trailingStop") {
+      pipeline.hset(KEYS.ORDER(cancel.o), "trSnap", JSON.stringify(buildTrailingBody(orderData, false)));
+    }
     await pipeline.exec();
+
+    if (orderData.orderType === "trailingStop") {
+      emitTrailingHistory(eventBus, orderData, "canceled", now, buildTrailingBody(orderData, false));
+    }
 
     // Bracket cascade on cancel:
     //   - If THIS oid is a PARENT (has children registered), cascade-cancel
@@ -696,12 +680,41 @@ export async function cancelByCloid(
   return results;
 }
 
+/** Rejection text for a leverage outside [1, maxLeverage]. NOT verified
+ *  against a real HL response — HL checks that the signer exists before it
+ *  validates leverage, so a throwaway-key probe (2026-10-19) only returned
+ *  "User or API Wallet … does not exist." */
+export const ERR_INVALID_LEVERAGE = "Invalid leverage value";
+
 export async function updateLeverage(
   userId: string,
   asset: number,
   isCross: boolean,
   leverage: number,
-): Promise<void> {
+): Promise<{ ok: true } | { error: string }> {
+  // "Leverage can be set by a user to any integer between 1 and the max
+  // leverage. Max leverage depends on the asset." (HL docs, Margining).
+  // The max is read live from public HL so it tracks HL's current value.
+  // Before this, any number was stored: an isolated 10x on XMR (HL max 5)
+  // opened with its margin equal to maintenance margin and was liquidated
+  // by the first $0.50 tick (paper 0x4420a11032c3e68c4442efd1bc5f33442931c75c,
+  // 2026-10-16 23:31:16 UTC).
+  const maxLeverage = await fetchMaxLeverage(asset);
+  if (maxLeverage == null) return { error: `Unknown asset ${asset}` };
+  if (!Number.isInteger(leverage) || leverage < 1 || leverage > maxLeverage) {
+    return { error: ERR_INVALID_LEVERAGE };
+  }
+  // The margin type of an open position can't change on HL ("cannot switch
+  // leverage type with open position", quoted from a third-party bot's HL
+  // error — exact casing unverified). It matters here because isolated
+  // positions carry their own margin allocation (marginAlloc) from the fill.
+  const szi = await redis.hget(KEYS.USER_POS(userId, asset), "szi");
+  if (szi && !isZero(szi)) {
+    const current = await getLeverageSetting(userId, asset);
+    if (current.isCross !== isCross) {
+      return { error: "Cannot switch leverage type with open position" };
+    }
+  }
   await redis.hset(
     KEYS.USER_LEV(userId, asset),
     "leverage",
@@ -709,6 +722,23 @@ export async function updateLeverage(
     "isCross",
     isCross.toString(),
   );
+  return { ok: true };
+}
+
+/** HL checks leverage only when a position is opened or grown ("Leverage is
+ *  only checked upon opening a position", HL docs, Margining). A setting
+ *  above the asset's current maxLeverage — stored before updateLeverage
+ *  enforced the cap, or left behind by HL lowering the asset's max — blocks
+ *  the open; reducing orders are never blocked. */
+export async function leverageErrorForOpen(userId: string, asset: number, isBuy: boolean): Promise<string | null> {
+  if (isSpotAsset(asset)) return null;
+  const szi = (await redis.hget(KEYS.USER_POS(userId, asset), "szi")) ?? "0";
+  const reducing = (gt(szi, "0") && !isBuy) || (lt(szi, "0") && isBuy);
+  if (reducing) return null;
+  const maxLeverage = await cachedMaxLeverage(asset);
+  if (maxLeverage == null) return null;
+  const { leverage } = await getLeverageSetting(userId, asset);
+  return leverage > maxLeverage ? ERR_INVALID_LEVERAGE : null;
 }
 
 export async function updateIsolatedMargin(
@@ -723,6 +753,15 @@ export async function updateIsolatedMargin(
   // and treated ntli as pre-signed — meant every "remove" call was actually
   // an add. Verified 2026-06-08 against the slushy modal which always
   // sends positive ntli and uses isBuy as the direction flag.)
+  return withUserLock(userId, () => updateIsolatedMarginLocked(userId, asset, isBuy, ntli));
+}
+
+async function updateIsolatedMarginLocked(
+  userId: string,
+  asset: number,
+  isBuy: boolean,
+  ntli: number,
+): Promise<{ ok: true } | { error: string }> {
   const magnitudeUsd = Math.abs(ntli) / 1_000_000;
   const deltaUsd = (isBuy ? magnitudeUsd : -magnitudeUsd).toFixed(6);
   const posKey = KEYS.USER_POS(userId, asset);
@@ -779,6 +818,10 @@ export async function modifyOrder(
   const orderData = await redis.hgetall(KEYS.ORDER(oid));
   if (!orderData.oid || orderData.userId !== userId) {
     return { error: `Order ${oid} not found` };
+  }
+  if (orderData.orderType === "trailingStop") {
+    // HL (round 6, T7): the modify is refused and the stop is left untouched.
+    return { error: ERR_MODIFY_INVALID };
   }
   if (orderData.status !== "open") {
     return { error: `Cannot modify canceled or filled order` };
@@ -847,6 +890,10 @@ export async function batchModifyOrders(
       const orderData = await redis.hgetall(KEYS.ORDER(m.oid));
       if (!orderData.oid || orderData.userId !== userId) {
         results.push({ error: `Order ${m.oid} not found` });
+        continue;
+      }
+      if (orderData.orderType === "trailingStop") {
+        results.push({ error: ERR_MODIFY_INVALID });
         continue;
       }
       if (orderData.status !== "open") {

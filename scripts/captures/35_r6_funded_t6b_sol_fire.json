@@ -1,0 +1,83 @@
+{
+  "oid": 62188357021,
+  "watch": {
+    "fired": true,
+    "seconds": 15.158,
+    "lastRow": {
+      "coin": "SOL",
+      "side": "A",
+      "limitPx": "95.563",
+      "sz": "0.12",
+      "oid": 62188357021,
+      "timestamp": 1791480497009,
+      "triggerCondition": "Activation immediate, retracement 0.05, best 106.23",
+      "isTrigger": true,
+      "triggerPx": "106.18",
+      "children": [],
+      "isPositionTpsl": false,
+      "reduceOnly": true,
+      "orderType": "Trailing Stop Market",
+      "origSz": "0.12",
+      "tif": null,
+      "cloid": null
+    }
+  },
+  "orderStatus": {
+    "status": "order",
+    "order": {
+      "order": {
+        "coin": "SOL",
+        "side": "A",
+        "limitPx": "95.563",
+        "sz": "0.0",
+        "oid": 62188357021,
+        "timestamp": 1791480509501,
+        "triggerCondition": "Triggered",
+        "isTrigger": false,
+        "triggerPx": "0.0",
+        "children": [],
+        "isPositionTpsl": false,
+        "reduceOnly": true,
+        "orderType": "Trailing Stop Market",
+        "origSz": "0.12",
+        "tif": "Gtc",
+        "cloid": null
+      },
+      "status": "filled",
+      "statusTimestamp": 1791480509501
+    }
+  },
+  "fills": [
+    {
+      "coin": "SOL",
+      "px": "105.98",
+      "sz": "0.12",
+      "side": "A",
+      "time": 1791480509501,
+      "startPosition": "0.12",
+      "dir": "Close Long",
+      "closedPnl": "0.0",
+      "hash": "0xa708e3dc60b76a81a882042b38b15f000043fbc1fbba89534ad18f2f1fbb446c",
+      "oid": 62188357021,
+      "crossed": true,
+      "fee": "0.005722",
+      "tid": 735097782446640,
+      "feeToken": "USDC",
+      "twapId": null
+    }
+  ],
+  "history": [
+    [
+      "filled",
+      1791480509501
+    ],
+    [
+      "triggered",
+      1791480509501
+    ],
+    [
+      "open",
+      1791480497009
+    ]
+  ]
+}

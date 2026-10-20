@@ -1,0 +1,45 @@
+{
+  "coin": "BTC",
+  "asset": 3,
+  "sz": "0.00015",
+  "startedAt": "2026-10-08T11:03:21.279Z",
+  "dryRun": false,
+  "o1": {
+    "orphanOid": 62156953329,
+    "stillInFrontendOpenOrders": {
+      "after_0s": false,
+      "after_10s": false,
+      "after_30s": false
+    },
+    "orderStatusAfter": {
+      "after_0s": "reduceOnlyCanceled",
+      "after_10s": "reduceOnlyCanceled",
+      "after_30s": "reduceOnlyCanceled"
+    },
+    "explicitCancelResponse": {
+      "status": "ok",
+      "response": {
+        "type": "cancel",
+        "data": {
+          "statuses": [
+            {
+              "error": "Order was never placed, already canceled, or filled. asset=3"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "o2_rejected": [],
+  "o2": {
+    "oid": 62157017253,
+    "retracementPct": "0.0100%",
+    "fired": true,
+    "ticks": 9,
+    "finalOrderStatus": "filled",
+    "lastTriggerConditionBeforeFire": "Activation immediate, retracement 0.01%, best 82730",
+    "maxAbsFormulaDiff": 0.028100000010454096,
+    "fillWithSameOid": true
+  },
+  "finishedAt": "2026-10-08T11:04:38.253Z"
+}

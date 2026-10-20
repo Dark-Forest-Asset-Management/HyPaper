@@ -38,6 +38,11 @@ const envSchema = z.object({
   // every 2 s ≈ 120/min, before any user-action /exchange requests).
   RATE_LIMIT_MAX: z.coerce.number().default(1200),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(60_000),
+  // D1: HL's `orderStatus` for a trailing stop is a FROZEN snapshot (it never follows the
+  // ratchet; refreshed only on status transitions) while `frontendOpenOrders` is live.
+  // false (default) = copy HL so paper behaves like live; true = serve live values.
+  // NB: parsed explicitly — z.coerce.boolean() would treat the string "false" as true.
+  TRAILING_ORDERSTATUS_LIVE: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
   FEES_ENABLED: z.coerce.boolean().default(true),
   FEE_RATE_TAKER: z.string().default('0.00035'),
   FEE_RATE_MAKER: z.string().default('0.0001'),

@@ -18,7 +18,8 @@
 
 import { EventEmitter } from 'node:events';
 import { logger } from '../utils/logger.js';
-import { checkAndLiquidateAll } from '../engine/liquidation.js';
+import { checkAndLiquidateAll, positionCoins, backfillPositionHolders } from '../engine/liquidation.js';
+import { refreshMarks } from './mark-feed.js';
 
 export class LiquidationWorker {
   private eventBus: EventEmitter;
@@ -35,11 +36,24 @@ export class LiquidationWorker {
   start(): void {
     logger.info({ pollIntervalMs: this.POLL_INTERVAL_MS }, 'LiquidationWorker started');
 
+    // Positions opened before the holder index existed.
+    void backfillPositionHolders()
+      .then((added) => logger.info({ added }, 'LiquidationWorker: position holders backfilled'))
+      .catch((err) => logger.error({ err }, 'LiquidationWorker: position holder backfill failed'));
+
     // Primary trigger: run on every price update (same tick the matcher uses).
     this.eventBus.on('mids', this.onPriceUpdate);
 
-    // Fallback: periodic poll in case WS is silent.
-    this.pollTimer = setInterval(() => void this.tick(), this.POLL_INTERVAL_MS);
+    // Fallback: periodic poll in case WS is silent. The same 5 s tick keeps a
+    // MARK for every coin with an open position — HL liquidates on the mark,
+    // and paper only has one for coins with a per-coin activeAssetCtx feed:
+    // `markSub` asks the worker to open that feed, refreshMarks HTTP-fills
+    // any mark that went stale meanwhile.
+    this.pollTimer = setInterval(() => {
+      void this.keepMarks();
+      void this.tick();
+    }, this.POLL_INTERVAL_MS);
+    void this.keepMarks();
 
     // Fire immediately so the first check doesn't wait for the first tick.
     void this.tick();
@@ -52,6 +66,16 @@ export class LiquidationWorker {
       this.pollTimer = null;
     }
     logger.info('LiquidationWorker stopped');
+  }
+
+  private async keepMarks(): Promise<void> {
+    try {
+      const coins = await positionCoins();
+      for (const coin of coins) this.eventBus.emit('markSub', { coin });
+      await refreshMarks(coins);
+    } catch (err) {
+      logger.warn({ err }, 'LiquidationWorker mark refresh failed');
+    }
   }
 
   /** Arrow function so `this` is bound correctly when used as an event listener. */

@@ -1,0 +1,157 @@
+{
+  "oid": 62158841383,
+  "after_1s": {
+    "t": "2026-10-08T11:29:33.206Z",
+    "positionSzi": 0,
+    "inFrontendOpenOrders": false,
+    "frontendEntry": null,
+    "orderStatus": {
+      "status": "order",
+      "order": {
+        "order": {
+          "coin": "BTC",
+          "side": "B",
+          "limitPx": "94206.0",
+          "sz": "0.00015",
+          "oid": 62158841383,
+          "timestamp": 1791459052573,
+          "triggerCondition": "Activation immediate, retracement 3000, best 82642",
+          "isTrigger": true,
+          "triggerPx": "85642.0",
+          "children": [],
+          "isPositionTpsl": false,
+          "reduceOnly": true,
+          "orderType": "Trailing Stop Market",
+          "origSz": "0.00015",
+          "tif": null,
+          "cloid": null
+        },
+        "status": "reduceOnlyCanceled",
+        "statusTimestamp": 1791459056634
+      }
+    },
+    "historicalOrdersForOid": [
+      {
+        "order": {
+          "coin": "BTC",
+          "side": "B",
+          "limitPx": "94206.0",
+          "sz": "0.00015",
+          "oid": 62158841383,
+          "timestamp": 1791459052573,
+          "triggerCondition": "Activation immediate, retracement 3000, best 82642",
+          "isTrigger": true,
+          "triggerPx": "85642.0",
+          "children": [],
+          "isPositionTpsl": false,
+          "reduceOnly": true,
+          "orderType": "Trailing Stop Market",
+          "origSz": "0.00015",
+          "tif": null,
+          "cloid": null
+        },
+        "status": "reduceOnlyCanceled",
+        "statusTimestamp": 1791459056634
+      },
+      {
+        "order": {
+          "coin": "BTC",
+          "side": "B",
+          "limitPx": "94206.0",
+          "sz": "0.00015",
+          "oid": 62158841383,
+          "timestamp": 1791459052573,
+          "triggerCondition": "Activation immediate, retracement 3000, best 82642",
+          "isTrigger": true,
+          "triggerPx": "85642.0",
+          "children": [],
+          "isPositionTpsl": false,
+          "reduceOnly": true,
+          "orderType": "Trailing Stop Market",
+          "origSz": "0.00015",
+          "tif": null,
+          "cloid": null
+        },
+        "status": "open",
+        "statusTimestamp": 1791459052573
+      }
+    ]
+  },
+  "after_10s": {
+    "t": "2026-10-08T11:29:44.462Z",
+    "positionSzi": 0,
+    "inFrontendOpenOrders": false,
+    "frontendEntry": null,
+    "orderStatus": {
+      "status": "order",
+      "order": {
+        "order": {
+          "coin": "BTC",
+          "side": "B",
+          "limitPx": "94206.0",
+          "sz": "0.00015",
+          "oid": 62158841383,
+          "timestamp": 1791459052573,
+          "triggerCondition": "Activation immediate, retracement 3000, best 82642",
+          "isTrigger": true,
+          "triggerPx": "85642.0",
+          "children": [],
+          "isPositionTpsl": false,
+          "reduceOnly": true,
+          "orderType": "Trailing Stop Market",
+          "origSz": "0.00015",
+          "tif": null,
+          "cloid": null
+        },
+        "status": "reduceOnlyCanceled",
+        "statusTimestamp": 1791459056634
+      }
+    },
+    "historicalOrdersForOid": [
+      {
+        "order": {
+          "coin": "BTC",
+          "side": "B",
+          "limitPx": "94206.0",
+          "sz": "0.00015",
+          "oid": 62158841383,
+          "timestamp": 1791459052573,
+          "triggerCondition": "Activation immediate, retracement 3000, best 82642",
+          "isTrigger": true,
+          "triggerPx": "85642.0",
+          "children": [],
+          "isPositionTpsl": false,
+          "reduceOnly": true,
+          "orderType": "Trailing Stop Market",
+          "origSz": "0.00015",
+          "tif": null,
+          "cloid": null
+        },
+        "status": "reduceOnlyCanceled",
+        "statusTimestamp": 1791459056634
+      },
+      {
+        "order": {
+          "coin": "BTC",
+          "side": "B",
+          "limitPx": "94206.0",
+          "sz": "0.00015",
+          "oid": 62158841383,
+          "timestamp": 1791459052573,
+          "triggerCondition": "Activation immediate, retracement 3000, best 82642",
+          "isTrigger": true,
+          "triggerPx": "85642.0",
+          "children": [],
+          "isPositionTpsl": false,
+          "reduceOnly": true,
+          "orderType": "Trailing Stop Market",
+          "origSz": "0.00015",
+          "tif": null,
+          "cloid": null
+        },
+        "status": "open",
+        "statusTimestamp": 1791459052573
+      }
+    ]
+  }
+}

@@ -2,7 +2,8 @@ import type { EventEmitter } from 'node:events';
 import { eq, and, sql } from 'drizzle-orm';
 import { id as keccakId } from 'ethers';
 import { db } from './db.js';
-import { users, orders, fills, consentRecords, funding, ledgerUpdates, twapHistory } from './schema.js';
+import { users, orders, fills, consentRecords, funding, ledgerUpdates, twapHistory, orderStatusEvents } from './schema.js';
+import type { TrailingHistoryEvent } from '../engine/trailing-state.js';
 import { logger } from '../utils/logger.js';
 import { D, mul } from '../utils/math.js';
 import type { PaperOrder, PaperFill } from '../types/order.js';
@@ -90,13 +91,13 @@ export function startPgSink(eventBus: EventEmitter): void {
           // event.fill.twapId is the string form (PaperFill type); store
           // the numeric Redis-generated id, or null for non-TWAP fills.
           twapId: event.fill.twapId ? parseInt(event.fill.twapId, 10) : null,
+          liquidation: event.fill.liquidation ?? null,
         })
         .onConflictDoNothing({ target: fills.tid });
     });
   });
 
-  eventBus.on('orderUpdate', (event: { userId: string; order: PaperOrder; status: string }) => {
-    const o = event.order;
+  const writeOrder = (o: PaperOrder): void => {
     enqueueWrite(async () => {
       await db.insert(orders)
         .values({
@@ -130,6 +131,41 @@ export function startPgSink(eventBus: EventEmitter): void {
             updatedAt: o.updatedAt,
           },
         });
+    });
+  };
+  eventBus.on('orderUpdate', (event: { userId: string; order: PaperOrder; status: string }) => {
+    writeOrder(event.order);
+  });
+  // The order row behind a liquidation fill (fills.oid references orders).
+  // A separate event from orderUpdate so the WS layer doesn't stream it as
+  // one of the user's own order updates. Emitted BEFORE the 'fill' event;
+  // the write queue is FIFO, so the order row lands first.
+  eventBus.on('liquidationOrder', (event: { order: PaperOrder }) => {
+    writeOrder(event.order);
+  });
+  // A backstop liquidation's `liquidation` ledger delta (engine/liquidation.ts
+  // emits it rather than importing this module, which needs the DB).
+  eventBus.on('liquidationLedger', (event: { userId: string; time: number; delta: LiquidationLedgerDelta }) => {
+    recordLiquidationLedger(event.userId, event.time, event.delta);
+  });
+  // Several updates delivered in one WS frame (a fired trailing stop's [triggered, filled]).
+  eventBus.on('orderUpdateBatch', (event: { updates: Array<{ order: PaperOrder }> }) => {
+    for (const u of event.updates) writeOrder(u.order);
+  });
+
+  // Append-only status history for trailing stops (→ /info historicalOrders: one row per status,
+  // each with the body frozen as of that transition). A stop reaches each status at most once.
+  eventBus.on('trailingHistory', (ev: TrailingHistoryEvent) => {
+    enqueueWrite(async () => {
+      await db.insert(orderStatusEvents)
+        .values({
+          oid: ev.oid,
+          userId: ev.userId,
+          status: ev.status,
+          statusTimestamp: ev.statusTimestamp,
+          body: ev.body,
+        })
+        .onConflictDoNothing({ target: [orderStatusEvents.oid, orderStatusEvents.status] });
     });
   });
 
@@ -166,6 +202,30 @@ export function recordLedgerUpdate(userId: string, r: {
   });
   // WS userNonFundingLedgerUpdates streams the /info-shaped element.
   bus?.emit('ledger', { userId, update: { time: r.time, hash, delta: { type: r.deltaType, usdc: r.usdc } } });
+}
+
+/** HL's `liquidation` ledger delta, as public HL returns it in
+ *  userNonFundingLedgerUpdates (captured 2026-10-19 for
+ *  0xcb02837caaee310c178501855b63bf7f4f4b1f8b, an isolated HMSTR backstop):
+ *  { type: "liquidation", liquidatedNtlPos, accountValue, leverageType:
+ *  "Isolated", liquidatedPositions: [{ coin, szi }] }. */
+export interface LiquidationLedgerDelta {
+  type: 'liquidation';
+  liquidatedNtlPos: string;
+  accountValue: string;
+  leverageType: 'Isolated' | 'Cross';
+  liquidatedPositions: Array<{ coin: string; szi: string }>;
+}
+
+function recordLiquidationLedger(userId: string, time: number, delta: LiquidationLedgerDelta): string {
+  const hash = keccakId(`${userId}:${time}:liquidation:${delta.liquidatedNtlPos}`);
+  enqueueWrite(async () => {
+    await db.insert(ledgerUpdates).values({
+      userId, time, hash, deltaType: 'liquidation', usdc: '0', delta,
+    });
+  });
+  bus?.emit('ledger', { userId, update: { time, hash, delta } });
+  return hash;
 }
 
 /** Persist the 'activated' twapHistory row (→ /info twapHistory) at TWAP

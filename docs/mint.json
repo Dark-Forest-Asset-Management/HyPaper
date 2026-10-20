@@ -66,6 +66,7 @@
         "api-reference/exchange/place-order",
         "api-reference/exchange/cancel-order",
         "api-reference/exchange/cancel-by-cloid",
+        "api-reference/exchange/trailing-stop",
         "api-reference/exchange/update-leverage"
       ]
     },

@@ -37,6 +37,8 @@ import {
   cWithdraw,
   tokenDelegate,
 } from '../../engine/staking.js';
+import { placeTrailingStop } from '../../engine/trailingStop.js';
+import { canonicalizeTrailingStop, ERR_MODIFY_INVALID, ERR_ACTION_EXPIRED } from '../../engine/trailing-math.js';
 import { ensureAccount } from '../middleware/auth.js';
 import { recoverHlSigner } from '../middleware/recoverHlSigner.js';
 import { recoverUserSignedAction, isUserSignedActionType } from '../middleware/recoverUserSignedAction.js';
@@ -81,10 +83,26 @@ function validateOrderWire(o: HlOrderWire): string | null {
 exchangeRouter.post('/', async (c) => {
   const body = await c.req.json();
 
+  // trailingStop: rebuild the action in the canonical msgpack key order BEFORE signature
+  // recovery. HyPaper hashes the action in JSON arrival order, and HL's own UI shows/sends
+  // key-SORTED JSON; recovering a signer from the wrong order yields a phantom wallet.
+  if (body?.action && typeof body.action === 'object' && body.action.type === 'trailingStop') {
+    const parsed = canonicalizeTrailingStop(body.action);
+    if (!parsed.ok) return c.json({ status: 'err', response: parsed.error }, 400);
+    body.action = parsed.action;
+  }
+
   // Derive the wallet from the EIP-712 signature when present (production path).
   // The unsigned `{ wallet }` form is accepted ONLY from an internal caller
   // presenting the shared secret (the MCP server) — never from the public
   // internet, where it let anyone act as any paper account (HP-01).
+  // `expiresAfter` is part of what HL signs (see recoverHlSigner), so it must be
+  // read BEFORE signature recovery and fed into the hash.
+  const expiresAfter: number | undefined =
+    typeof body.expiresAfter === 'number' && Number.isFinite(body.expiresAfter)
+      ? body.expiresAfter
+      : undefined;
+
   let wallet: string;
   const userSigned = !!body.action && isUserSignedActionType(body.action.type);
   if (body.signature && body.action && typeof body.nonce === 'number') {
@@ -93,7 +111,7 @@ exchangeRouter.post('/', async (c) => {
       // EIP-712 scheme than L1 actions — route by action type.
       wallet = isUserSignedActionType(body.action.type)
         ? recoverUserSignedAction(body.action, body.signature)
-        : recoverHlSigner(body.action, body.nonce, body.signature, body.vaultAddress);
+        : recoverHlSigner(body.action, body.nonce, body.signature, body.vaultAddress, expiresAfter);
     } catch (err) {
       return c.json({
         status: 'err',
@@ -152,13 +170,10 @@ exchangeRouter.post('/', async (c) => {
     await redis.set(KEYS.USER_NONCE_MAX(wallet), String(body.nonce));
   }
 
-  const expiresAfter: number | undefined =
-    typeof body.expiresAfter === 'number' && Number.isFinite(body.expiresAfter)
-      ? body.expiresAfter
-      : undefined;
-
+  // `expiresAfter` expires the REQUEST: a stale action is refused. (HL answers HTTP 200 with this exact text;
+  // it does NOT expire the resulting order — verified for trailing stops, round 6 T9.)
   if (expiresAfter !== undefined && expiresAfter <= Date.now()) {
-    return c.json({ status: 'err', response: 'expiresAfter is in the past' }, 400);
+    return c.json({ status: 'err', response: ERR_ACTION_EXPIRED });
   }
 
   const action: HlExchangeAction = body.action;
@@ -199,6 +214,17 @@ exchangeRouter.post('/', async (c) => {
         }
         const statuses = await placeOrders(effectiveWallet, action.orders, action.grouping ?? 'na', { expiresAfter, builder });
         return c.json({ status: 'ok', response: { type: 'order', data: { statuses } } });
+      }
+
+      // ── trailingStop ─────────────────────────────────────────────────────
+      // HL answers semantic errors with HTTP 200 + {status:'err', response:<string>}.
+
+      case 'trailingStop': {
+        const placed = await placeTrailingStop(effectiveWallet, action);
+        if ('error' in placed) {
+          return c.json({ status: 'err', response: placed.error });
+        }
+        return c.json({ status: 'ok', response: { type: 'trailingStop', data: { oid: placed.oid } } });
       }
 
       // ── cancel ───────────────────────────────────────────────────────────
@@ -254,7 +280,8 @@ exchangeRouter.post('/', async (c) => {
 
         const result = await modifyOrder(effectiveWallet, numericOid, action.order);
         if ('error' in result) {
-          return c.json({ status: 'err', response: result.error }, 400);
+          // HL answers a refused modify of a trailing stop with HTTP 200 + status "err".
+          return c.json({ status: 'err', response: result.error }, result.error === ERR_MODIFY_INVALID ? 200 : 400);
         }
         return c.json({ status: 'ok', response: { type: 'default' } });
       }
@@ -345,10 +372,10 @@ exchangeRouter.post('/', async (c) => {
             typeof action.isCross !== 'boolean') {
           return c.json({ status: 'err', response: 'updateLeverage requires asset, leverage, isCross' }, 400);
         }
-        if (action.leverage < 1 || action.leverage > 200) {
-          return c.json({ status: 'err', response: 'Leverage must be between 1 and 200' }, 400);
-        }
-        await updateLeverage(effectiveWallet, action.asset, action.isCross, action.leverage);
+        // Range is checked against the asset's live HL maxLeverage in the
+        // engine; HL answers a rejected leverage with HTTP 200 + status err.
+        const levResult = await updateLeverage(effectiveWallet, action.asset, action.isCross, action.leverage);
+        if ('error' in levResult) return c.json({ status: 'err', response: levResult.error });
         return c.json({ status: 'ok', response: { type: 'default' } });
       }
 

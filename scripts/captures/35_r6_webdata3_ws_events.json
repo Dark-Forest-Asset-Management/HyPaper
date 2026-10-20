@@ -1,0 +1,781 @@
+{
+  "count": 5,
+  "events": [
+    {
+      "t": "2026-10-08T17:36:11.219Z",
+      "msg": {
+        "channel": "userFills",
+        "data": {
+          "isSnapshot": true,
+          "user": "0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b",
+          "fills": [
+            {
+              "coin": "BTC",
+              "px": "83583.0",
+              "sz": "0.00002",
+              "side": "A",
+              "time": 1791406637832,
+              "startPosition": "0.00002",
+              "dir": "Close Long",
+              "closedPnl": "-0.00252",
+              "hash": "0xb618e29e46eb0c9db792042b2635fe000053fa83e1ee2b6f59e18df105eee688",
+              "oid": 62104784402,
+              "crossed": true,
+              "fee": "0.000752",
+              "tid": 65085843563501,
+              "feeToken": "USDC",
+              "twapId": null
+            },
+            {
+              "coin": "BTC",
+              "px": "83568.0",
+              "sz": "0.00006",
+              "side": "B",
+              "time": 1791408061445,
+              "startPosition": "0.0",
+              "dir": "Open Long",
+              "closedPnl": "0.0",
+              "hash": "0xab0b4105351d0f3dac84042b2686cf01060058ead0102e0f4ed3ec57f410e928",
+              "oid": 62106109687,
+              "crossed": true,
+              "fee": "0.002256",
+              "tid": 748240465960091,
+              "feeToken": "USDC",
+              "twapId": null
+            },
+            {
+              "coin": "BTC",
+              "px": "83568.0",
+              "sz": "0.00009",
+              "side": "B",
+              "time": 1791408061445,
+              "startPosition": "0.00006",
+              "dir": "Open Long",
+              "closedPnl": "0.0",
+              "hash": "0xab0b4105351d0f3dac84042b2686cf01060058ead0102e0f4ed3ec57f410e928",
+              "oid": 62106109687,
+              "crossed": true,
+              "fee": "0.003384",
+              "tid": 415577877798333,
+              "feeToken": "USDC",
+              "twapId": null
+            },
+            {
+              "coin": "BTC",
+              "px": "83550.0",
+              "sz": "0.00015",
+              "side": "A",
+              "time": 1791408359710,
+              "startPosition": "0.00015",
+              "dir": "Close Long",
+              "closedPnl": "-0.0027",
+              "hash": "0x4386ff6651d000164500042b2697cc010100174becd31ee8e74faab910d3da00",
+              "oid": 62106393260,
+              "crossed": true,
+              "fee": "0.005639",
+              "tid": 450532696552377,
+              "feeToken": "USDC",
+              "twapId": null
+            },
+            {
+              "coin": "BTC",
+              "px": "82706.0",
+              "sz": "0.00015",
+              "side": "B",
+              "time": 1791456566099,
+              "startPosition": "0.0",
+              "dir": "Open Long",
+              "closedPnl": "0.0",
+              "hash": "0xfcf2aa45b8691b80fe6c042b3254dc010200c22b536c3a53a0bb5598776cf56b",
+              "oid": 62155939876,
+              "crossed": true,
+              "fee": "0.005582",
+              "tid": 953503941954551,
+              "feeToken": "USDC",
+              "twapId": null
+            },
+            {
+              "coin": "BTC",
+              "px": "82763.0",
+              "sz": "0.00015",
+              "side": "A",
+              "time": 1791456617663,
+              "startPosition": "0.00015",
+              "dir": "Close Long",
+              "closedPnl": "0.00855",
+              "hash": "0xdfff1b08258b2fb6e178042b32582301010032edc08e4e8883c7c65ae48f09a1",
+              "oid": 62155995023,
+              "crossed": true,
+              "fee": "0.005586",
+              "tid": 71997832897642,
+              "feeToken": "USDC",
+              "twapId": null
+            },
+            {
+              "coin": "BTC",
+              "px": "82831.0",
+              "sz": "0.00015",
+              "side": "B",
+              "time": 1791457212032,
+              "startPosition": "0.0",
+              "dir": "Open Long",
+              "closedPnl": "0.0",
+              "hash": "0xf16ff2601138538cf2e9042b327de00103000a45ac3b725f95389db2d03c2d77",
+              "oid": 62156596430,
+              "crossed": true,
+              "fee": "0.005591",
+              "tid": 456119664536086,
+              "feeToken": "USDC",
+              "twapId": null
+            },
+            {
+              "coin": "BTC",
+              "px": "82830.0",
+              "sz": "0.00015",
+              "side": "A",
+              "time": 1791457221640,
+              "startPosition": "0.00015",
+              "dir": "Close Long",
+              "closedPnl": "-0.00015",
+              "hash": "0x7f4817677b6d00d880c1042b327e7e0108002f4d16601faa2310c2ba3a60dac3",
+              "oid": 62156632837,
+              "crossed": true,
+              "fee": "0.005591",
+              "tid": 352773923442694,
+              "feeToken": "USDC",
+              "twapId": null
+            },
+            {
+              "coin": "BTC",
+              "px": "82704.0",
+              "sz": "0.00015",
+              "side": "B",
+              "time": 1791457490745,
+              "startPosition": "0.0",
+              "dir": "Open Long",
+              "closedPnl": "0.0",
+              "hash": "0xd8f8dc908f65056cda72042b328fe5010500f4762a68243e7cc187e34e68df57",
+              "oid": 62156949577,
+              "crossed": true,
+              "fee": "0.005582",
+              "tid": 473167505809385,
+              "feeToken": "USDC",
+              "twapId": null
+            },
+            {
+              "coin": "BTC",
+              "px": "82705.0",
+              "sz": "0.00015",
+              "side": "A",
+              "time": 1791457498505,
+              "startPosition": "0.00015",
+              "dir": "Close Long",
+              "closedPnl": "0.00015",
+              "hash": "0xe88b3808d5795038ea04042b3290670104004fee707c6f0a8c53e35b947d2a23",
+              "oid": 62156958764,
+              "crossed": true,
+              "fee": "0.005582",
+              "tid": 941620782256036,
+              "feeToken": "USDC",
+              "twapId": null
+            },
+            {
+              "coin": "BTC",
+              "px": "82720.0",
+              "sz": "0.00015",
+              "side": "B",
+              "time": 1791457540745,
+              "startPosition": "0.0",
+              "dir": "Open Long",
+              "closedPnl": "0.0",
+              "hash": "0x35c818355ca6a4fd3741042b329349010500301af7a9c3cfd990c3881baa7ee7",
+              "oid": 62157014587,
+              "crossed": true,
+              "fee": "0.005583",
+              "tid": 936560115209539,
+              "feeToken": "USDC",
+              "twapId": null
+            },
+            {
+              "coin": "BTC",
+              "px": "82714.0",
+              "sz": "0.00015",
+              "side": "A",
+              "time": 1791457557102,
+              "startPosition": "0.00015",
+              "dir": "Close Long",
+              "closedPnl": "-0.0009",
+              "hash": "0x4935c69f247088974aaf042b32944b000070de84bf73a769ecfe71f1e3746281",
+              "oid": 62157017253,
+              "crossed": true,
+              "fee": "0.005583",
+              "tid": 905271863061930,
+              "feeToken": "USDC",
+              "twapId": null
+            },
+            {
+              "coin": "BTC",
+              "px": "82642.0",
+              "sz": "0.00015",
+              "side": "A",
+              "time": 1791459050631,
+              "startPosition": "0.0",
+              "dir": "Open Short",
+              "closedPnl": "0.0",
+              "hash": "0x4592a4547572258a470c042b32f84d010600bc3a1075445ce95b4fa73475ff74",
+              "oid": 62158839908,
+              "crossed": true,
+              "fee": "0.005578",
+              "tid": 561147774427026,
+              "feeToken": "USDC",
+              "twapId": null
+            },
+            {
+              "coin": "BTC",
+              "px": "82643.0",
+              "sz": "0.00015",
+              "side": "B",
+              "time": 1791459056634,
+              "startPosition": "-0.00015",
+              "dir": "Close Short",
+              "closedPnl": "-0.00015",
+              "hash": "0x7931f39d283ed3b27aab042b32f8b5010a000b82c331f2841cfa9eefe732ad9d",
+              "oid": 62158846092,
+              "crossed": true,
+              "fee": "0.005578",
+              "tid": 148806345541535,
+              "feeToken": "USDC",
+              "twapId": null
+            },
+            {
+              "coin": "BTC",
+              "px": "82643.0",
+              "sz": "0.0003",
+              "side": "B",
+              "time": 1791459073862,
+              "startPosition": "0.0",
+              "dir": "Open Long",
+              "closedPnl": "0.0",
+              "hash": "0x5ead992f46b575636027042b32f9ca010900b114e1b894350276448205b94f4e",
+              "oid": 62158865965,
+              "crossed": true,
+              "fee": "0.011156",
+              "tid": 27290002177813,
+              "feeToken": "USDC",
+              "twapId": null
+            },
+            {
+              "coin": "BTC",
+              "px": "82630.0",
+              "sz": "0.00015",
+              "side": "A",
+              "time": 1791459078575,
+              "startPosition": "0.0003",
+              "dir": "Close Long",
+              "closedPnl": "-0.00195",
+              "hash": "0xa8d0e0421a280178aa4a042b32fa1b010300f827b52b204a4c998b94d92bdb63",
+              "oid": 62158870934,
+              "crossed": true,
+              "fee": "0.005577",
+              "tid": 456187924652487,
+              "feeToken": "USDC",
+              "twapId": null
+            },
+            {
+              "coin": "BTC",
+              "px": "82634.0",
+              "sz": "0.00045",
+              "side": "A",
+              "time": 1791459095285,
+              "startPosition": "0.00015",
+              "dir": "Long > Short",
+              "closedPnl": "-0.00135",
+              "hash": "0x4de357b9da94fb1a4f5d042b32fb2e0103006f9f759819ecf1ac030c9998d504",
+              "oid": 62158888582,
+              "crossed": true,
+              "fee": "0.016733",
+              "tid": 896084082603263,
+              "feeToken": "USDC",
+              "twapId": null
+            },
+            {
+              "coin": "BTC",
+              "px": "82639.0",
+              "sz": "0.0003",
+              "side": "B",
+              "time": 1791459113263,
+              "startPosition": "-0.0003",
+              "dir": "Close Short",
+              "closedPnl": "-0.0015",
+              "hash": "0xccd035d9a63cca71ce49042b32fc630104004dbf413fe9437098e12c6530a45c",
+              "oid": 62158908938,
+              "crossed": true,
+              "fee": "0.011156",
+              "tid": 293090459333180,
+              "feeToken": "USDC",
+              "twapId": null
+            },
+            {
+              "coin": "BTC",
+              "px": "81307.0",
+              "sz": "0.00062",
+              "side": "B",
+              "time": 1791479879368,
+              "startPosition": "0.0",
+              "dir": "Open Long",
+              "closedPnl": "0.0",
+              "hash": "0x3b9d43e275bc2b353d17042b3884ef0000d85bc810bf4a07df65ef3534b0051f",
+              "oid": 62187255982,
+              "crossed": true,
+              "fee": "0.022684",
+              "tid": 1064377219604178,
+              "feeToken": "USDC",
+              "twapId": null
+            },
+            {
+              "coin": "BTC",
+              "px": "81311.0",
+              "sz": "0.00027",
+              "side": "B",
+              "time": 1791479879368,
+              "startPosition": "0.00062",
+              "dir": "Open Long",
+              "closedPnl": "0.0",
+              "hash": "0x3b9d43e275bc2b353d17042b3884ef0000d85bc810bf4a07df65ef3534b0051f",
+              "oid": 62187255982,
+              "crossed": true,
+              "fee": "0.009879",
+              "tid": 746968600530554,
+              "feeToken": "USDC",
+              "twapId": null
+            },
+            {
+              "coin": "BTC",
+              "px": "81180.0",
+              "sz": "0.00044",
+              "side": "A",
+              "time": 1791480077624,
+              "startPosition": "0.00089",
+              "dir": "Close Long",
+              "closedPnl": "-0.056408",
+              "hash": "0x366eea6d9f78e66a37e8042b3892d101120002533a7c053cda3795c05e7cc054",
+              "oid": 62187599644,
+              "crossed": true,
+              "fee": "0.016073",
+              "tid": 82723564280875,
+              "feeToken": "USDC",
+              "twapId": null
+            },
+            {
+              "coin": "BTC",
+              "px": "81160.0",
+              "sz": "0.00045",
+              "side": "A",
+              "time": 1791480077624,
+              "startPosition": "0.00045",
+              "dir": "Close Long",
+              "closedPnl": "-0.06669",
+              "hash": "0x366eea6d9f78e66a37e8042b3892d101120002533a7c053cda3795c05e7cc054",
+              "oid": 62187599644,
+              "crossed": true,
+              "fee": "0.016434",
+              "tid": 1057338945531947,
+              "feeToken": "USDC",
+              "twapId": null
+            },
+            {
+              "coin": "BTC",
+              "px": "81414.0",
+              "sz": "0.0008",
+              "side": "B",
+              "time": 1791480452440,
+              "startPosition": "0.0",
+              "dir": "Open Long",
+              "closedPnl": "0.0",
+              "hash": "0x8113b96843688981828d042b38ad6600004ed14dde6ba85324dc64bb026c636c",
+              "oid": 62188273841,
+              "crossed": true,
+              "fee": "0.029309",
+              "tid": 46750960053685,
+              "feeToken": "USDC",
+              "twapId": null
+            },
+            {
+              "coin": "BTC",
+              "px": "81419.0",
+              "sz": "0.0008",
+              "side": "A",
+              "time": 1791480465534,
+              "startPosition": "0.0008",
+              "dir": "Close Long",
+              "closedPnl": "0.004",
+              "hash": "0xa919f52ab338b74eaa93042b38ae4c0107000d104e3bd6204ce2a07d723c9139",
+              "oid": 62188297073,
+              "crossed": true,
+              "fee": "0.02931",
+              "tid": 516501441098721,
+              "feeToken": "USDC",
+              "twapId": null
+            },
+            {
+              "coin": "BTC",
+              "px": "81420.0",
+              "sz": "0.00015",
+              "side": "B",
+              "time": 1791480469012,
+              "startPosition": "0.0",
+              "dir": "Open Long",
+              "closedPnl": "0.0",
+              "hash": "0xc48e553884ddae9fc608042b38ae880105006d1e1fd0cd716857008b43d1888a",
+              "oid": 62188302069,
+              "crossed": true,
+              "fee": "0.005495",
+              "tid": 412413668920582,
+              "feeToken": "USDC",
+              "twapId": null
+            },
+            {
+              "coin": "BTC",
+              "px": "81439.0",
+              "sz": "0.00015",
+              "side": "A",
+              "time": 1791480485807,
+              "startPosition": "0.00015",
+              "dir": "Close Long",
+              "closedPnl": "0.00285",
+              "hash": "0xfe8f06912e6afec20008042b38afbc0102001e76c96e1d95a257b1e3ed6ed8ad",
+              "oid": 62188304944,
+              "crossed": true,
+              "fee": "0.005497",
+              "tid": 397153770680278,
+              "feeToken": "USDC",
+              "twapId": null
+            },
+            {
+              "coin": "SOL",
+              "px": "105.98",
+              "sz": "0.12",
+              "side": "B",
+              "time": 1791480495116,
+              "startPosition": "0.0",
+              "dir": "Open Long",
+              "closedPnl": "0.0",
+              "hash": "0xdda2c68c33291a06df1c042b38b069010d00de71ce2c38d8816b71def22cf3f1",
+              "oid": 62188352929,
+              "crossed": true,
+              "fee": "0.005722",
+              "tid": 336288198040683,
+              "feeToken": "USDC",
+              "twapId": null
+            },
+            {
+              "coin": "SOL",
+              "px": "105.98",
+              "sz": "0.12",
+              "side": "A",
+              "time": 1791480509501,
+              "startPosition": "0.12",
+              "dir": "Close Long",
+              "closedPnl": "0.0",
+              "hash": "0xa708e3dc60b76a81a882042b38b15f000043fbc1fbba89534ad18f2f1fbb446c",
+              "oid": 62188357021,
+              "crossed": true,
+              "fee": "0.005722",
+              "tid": 735097782446640,
+              "feeToken": "USDC",
+              "twapId": null
+            },
+            {
+              "coin": "BTC",
+              "px": "81712.0",
+              "sz": "0.00083",
+              "side": "B",
+              "time": 1791480755791,
+              "startPosition": "0.0",
+              "dir": "Open Long",
+              "closedPnl": "0.0",
+              "hash": "0x0c70b18c390e21140dea042b38c2c80000abc971d4013fe6b0395cdef801fafe",
+              "oid": 62188797076,
+              "crossed": true,
+              "fee": "0.030519",
+              "tid": 469583345059354,
+              "feeToken": "USDC",
+              "twapId": null
+            },
+            {
+              "coin": "BTC",
+              "px": "81705.0",
+              "sz": "0.00083",
+              "side": "A",
+              "time": 1791481035168,
+              "startPosition": "0.00083",
+              "dir": "Close Long",
+              "closedPnl": "-0.00581",
+              "hash": "0xb9c0501c65c7ede6bb3a042b38d643010500680200cb0cb85d88fb6f24cbc7d1",
+              "oid": 62189227983,
+              "crossed": true,
+              "fee": "0.030516",
+              "tid": 554208811806144,
+              "feeToken": "USDC",
+              "twapId": null
+            }
+          ]
+        }
+      }
+    },
+    {
+      "t": "2026-10-08T17:36:12.561Z",
+      "msg": {
+        "channel": "orderUpdates",
+        "data": [
+          {
+            "order": {
+              "coin": "ETH",
+              "side": "A",
+              "limitPx": "2133.7",
+              "sz": "0.005",
+              "oid": 62189268289,
+              "timestamp": 1791481059756,
+              "origSz": "0.005",
+              "reduceOnly": true
+            },
+            "status": "open",
+            "statusTimestamp": 1791481059756
+          }
+        ]
+      }
+    },
+    {
+      "t": "2026-10-08T17:36:14.298Z",
+      "msg": {
+        "channel": "orderUpdates",
+        "data": [
+          {
+            "order": {
+              "coin": "ETH",
+              "side": "B",
+              "limitPx": "2673.7",
+              "sz": "0.005",
+              "oid": 62189270639,
+              "timestamp": 1791481061494,
+              "origSz": "0.005",
+              "reduceOnly": true
+            },
+            "status": "open",
+            "statusTimestamp": 1791481061494
+          }
+        ]
+      }
+    },
+    {
+      "t": "2026-10-08T17:38:48.227Z",
+      "msg": {
+        "channel": "orderUpdates",
+        "data": [
+          {
+            "order": {
+              "coin": "ETH",
+              "side": "B",
+              "limitPx": "2671.6",
+              "sz": "0.005",
+              "oid": 62189270639,
+              "timestamp": 1791481061494,
+              "origSz": "0.005",
+              "reduceOnly": true
+            },
+            "status": "canceled",
+            "statusTimestamp": 1791481215409
+          }
+        ]
+      }
+    },
+    {
+      "t": "2026-10-08T17:38:49.237Z",
+      "msg": {
+        "channel": "orderUpdates",
+        "data": [
+          {
+            "order": {
+              "coin": "ETH",
+              "side": "A",
+              "limitPx": "2137.0",
+              "sz": "0.005",
+              "oid": 62189268289,
+              "timestamp": 1791481059756,
+              "origSz": "0.005",
+              "reduceOnly": true
+            },
+            "status": "canceled",
+            "statusTimestamp": 1791481216482
+          }
+        ]
+      }
+    }
+  ],
+  "channelCounts": {
+    "subscriptionResponse": 4,
+    "userFills": 1,
+    "error": 2,
+    "orderUpdates": 4,
+    "webData3": 33,
+    "pong": 5
+  },
+  "raw": [
+    {
+      "t": "2026-10-08T17:36:11.209Z",
+      "raw": "{\"channel\":\"subscriptionResponse\",\"data\":{\"method\":\"subscribe\",\"subscription\":{\"type\":\"orderUpdates\",\"user\":\"0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b\"}}}"
+    },
+    {
+      "t": "2026-10-08T17:36:11.214Z",
+      "raw": "{\"channel\":\"subscriptionResponse\",\"data\":{\"method\":\"subscribe\",\"subscription\":{\"type\":\"userFills\",\"user\":\"0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b\",\"aggregateByTime\":false}}}"
+    },
+    {
+      "t": "2026-10-08T17:36:11.219Z",
+      "raw": "{\"channel\":\"subscriptionResponse\",\"data\":{\"method\":\"subscribe\",\"subscription\":{\"type\":\"userEvents\",\"user\":\"0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b\"}}}"
+    },
+    {
+      "t": "2026-10-08T17:36:11.219Z",
+      "raw": "{\"channel\":\"error\",\"data\":\"Error parsing JSON into valid websocket request: {\\\"method\\\":\\\"subscribe\\\",\\\"subscription\\\":{\\\"type\\\":\\\"webData2\\\",\\\"user\\\":\\\"0x4A1AE5A6cFB24390a704b1cc1aB88d0F89eF596B\\\"}}\"}"
+    },
+    {
+      "t": "2026-10-08T17:36:15.318Z",
+      "raw": "{\"channel\":\"error\",\"data\":\"Error parsing JSON into valid websocket request: {\\\"method\\\":\\\"subscribe\\\",\\\"subscription\\\":{\\\"type\\\":\\\"webData2\\\",\\\"user\\\":\\\"0x4A1AE5A6cFB24390a704b1cc1aB88d0F89eF596B\\\"}}\"}"
+    },
+    {
+      "t": "2026-10-08T17:36:15.332Z",
+      "raw": "{\"channel\":\"subscriptionResponse\",\"data\":{\"method\":\"subscribe\",\"subscription\":{\"type\":\"webData3\",\"user\":\"0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b\"}}}"
+    },
+    {
+      "t": "2026-10-08T17:36:15.526Z",
+      "raw": "{\"channel\":\"webData3\",\"data\":{\"userState\":{\"agentAddress\":\"0xc49552efa1a56f4b84cb434b5b9b639f49e0bb4d\",\"agentValidUntil\":1792614443025,\"cumLedger\":\"997.8\",\"serverTime\":1791481062570,\"isVault\":false,\"user\":\"0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b\",\"dexAbstractionEnabled\":false,\"abstraction\":\"unifiedAccount\"},\"perpDexStates\":[{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{"
+    },
+    {
+      "t": "2026-10-08T17:36:17.602Z",
+      "raw": "{\"channel\":\"webData3\",\"data\":{\"userState\":{\"agentAddress\":\"0xc49552efa1a56f4b84cb434b5b9b639f49e0bb4d\",\"agentValidUntil\":1792614443025,\"cumLedger\":\"997.8\",\"serverTime\":1791481064768,\"isVault\":false,\"user\":\"0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b\",\"dexAbstractionEnabled\":false,\"abstraction\":\"unifiedAccount\"},\"perpDexStates\":[{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{"
+    },
+    {
+      "t": "2026-10-08T17:36:22.635Z",
+      "raw": "{\"channel\":\"webData3\",\"data\":{\"userState\":{\"agentAddress\":\"0xc49552efa1a56f4b84cb434b5b9b639f49e0bb4d\",\"agentValidUntil\":1792614443025,\"cumLedger\":\"997.8\",\"serverTime\":1791481069791,\"isVault\":false,\"user\":\"0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b\",\"dexAbstractionEnabled\":false,\"abstraction\":\"unifiedAccount\"},\"perpDexStates\":[{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{"
+    },
+    {
+      "t": "2026-10-08T17:36:28.283Z",
+      "raw": "{\"channel\":\"webData3\",\"data\":{\"userState\":{\"agentAddress\":\"0xc49552efa1a56f4b84cb434b5b9b639f49e0bb4d\",\"agentValidUntil\":1792614443025,\"cumLedger\":\"997.8\",\"serverTime\":1791481074810,\"isVault\":false,\"user\":\"0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b\",\"dexAbstractionEnabled\":false,\"abstraction\":\"unifiedAccount\"},\"perpDexStates\":[{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{"
+    },
+    {
+      "t": "2026-10-08T17:36:32.869Z",
+      "raw": "{\"channel\":\"webData3\",\"data\":{\"userState\":{\"agentAddress\":\"0xc49552efa1a56f4b84cb434b5b9b639f49e0bb4d\",\"agentValidUntil\":1792614443025,\"cumLedger\":\"997.8\",\"serverTime\":1791481079833,\"isVault\":false,\"user\":\"0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b\",\"dexAbstractionEnabled\":false,\"abstraction\":\"unifiedAccount\"},\"perpDexStates\":[{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{"
+    },
+    {
+      "t": "2026-10-08T17:36:37.725Z",
+      "raw": "{\"channel\":\"webData3\",\"data\":{\"userState\":{\"agentAddress\":\"0xc49552efa1a56f4b84cb434b5b9b639f49e0bb4d\",\"agentValidUntil\":1792614443025,\"cumLedger\":\"997.8\",\"serverTime\":1791481084859,\"isVault\":false,\"user\":\"0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b\",\"dexAbstractionEnabled\":false,\"abstraction\":\"unifiedAccount\"},\"perpDexStates\":[{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{"
+    },
+    {
+      "t": "2026-10-08T17:36:42.784Z",
+      "raw": "{\"channel\":\"webData3\",\"data\":{\"userState\":{\"agentAddress\":\"0xc49552efa1a56f4b84cb434b5b9b639f49e0bb4d\",\"agentValidUntil\":1792614443025,\"cumLedger\":\"997.8\",\"serverTime\":1791481089890,\"isVault\":false,\"user\":\"0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b\",\"dexAbstractionEnabled\":false,\"abstraction\":\"unifiedAccount\"},\"perpDexStates\":[{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{"
+    },
+    {
+      "t": "2026-10-08T17:36:47.762Z",
+      "raw": "{\"channel\":\"webData3\",\"data\":{\"userState\":{\"agentAddress\":\"0xc49552efa1a56f4b84cb434b5b9b639f49e0bb4d\",\"agentValidUntil\":1792614443025,\"cumLedger\":\"997.8\",\"serverTime\":1791481094907,\"isVault\":false,\"user\":\"0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b\",\"dexAbstractionEnabled\":false,\"abstraction\":\"unifiedAccount\"},\"perpDexStates\":[{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{"
+    },
+    {
+      "t": "2026-10-08T17:36:52.781Z",
+      "raw": "{\"channel\":\"webData3\",\"data\":{\"userState\":{\"agentAddress\":\"0xc49552efa1a56f4b84cb434b5b9b639f49e0bb4d\",\"agentValidUntil\":1792614443025,\"cumLedger\":\"997.8\",\"serverTime\":1791481099945,\"isVault\":false,\"user\":\"0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b\",\"dexAbstractionEnabled\":false,\"abstraction\":\"unifiedAccount\"},\"perpDexStates\":[{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{"
+    },
+    {
+      "t": "2026-10-08T17:36:58.837Z",
+      "raw": "{\"channel\":\"webData3\",\"data\":{\"userState\":{\"agentAddress\":\"0xc49552efa1a56f4b84cb434b5b9b639f49e0bb4d\",\"agentValidUntil\":1792614443025,\"cumLedger\":\"997.8\",\"serverTime\":1791481104992,\"isVault\":false,\"user\":\"0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b\",\"dexAbstractionEnabled\":false,\"abstraction\":\"unifiedAccount\"},\"perpDexStates\":[{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{"
+    },
+    {
+      "t": "2026-10-08T17:37:03.043Z",
+      "raw": "{\"channel\":\"webData3\",\"data\":{\"userState\":{\"agentAddress\":\"0xc49552efa1a56f4b84cb434b5b9b639f49e0bb4d\",\"agentValidUntil\":1792614443025,\"cumLedger\":\"997.8\",\"serverTime\":1791481110023,\"isVault\":false,\"user\":\"0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b\",\"dexAbstractionEnabled\":false,\"abstraction\":\"unifiedAccount\"},\"perpDexStates\":[{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{"
+    },
+    {
+      "t": "2026-10-08T17:37:07.898Z",
+      "raw": "{\"channel\":\"webData3\",\"data\":{\"userState\":{\"agentAddress\":\"0xc49552efa1a56f4b84cb434b5b9b639f49e0bb4d\",\"agentValidUntil\":1792614443025,\"cumLedger\":\"997.8\",\"serverTime\":1791481115052,\"isVault\":false,\"user\":\"0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b\",\"dexAbstractionEnabled\":false,\"abstraction\":\"unifiedAccount\"},\"perpDexStates\":[{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{"
+    },
+    {
+      "t": "2026-10-08T17:37:12.924Z",
+      "raw": "{\"channel\":\"webData3\",\"data\":{\"userState\":{\"agentAddress\":\"0xc49552efa1a56f4b84cb434b5b9b639f49e0bb4d\",\"agentValidUntil\":1792614443025,\"cumLedger\":\"997.8\",\"serverTime\":1791481120099,\"isVault\":false,\"user\":\"0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b\",\"dexAbstractionEnabled\":false,\"abstraction\":\"unifiedAccount\"},\"perpDexStates\":[{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{"
+    },
+    {
+      "t": "2026-10-08T17:37:18.015Z",
+      "raw": "{\"channel\":\"webData3\",\"data\":{\"userState\":{\"agentAddress\":\"0xc49552efa1a56f4b84cb434b5b9b639f49e0bb4d\",\"agentValidUntil\":1792614443025,\"cumLedger\":\"997.8\",\"serverTime\":1791481125143,\"isVault\":false,\"user\":\"0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b\",\"dexAbstractionEnabled\":false,\"abstraction\":\"unifiedAccount\"},\"perpDexStates\":[{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{"
+    },
+    {
+      "t": "2026-10-08T17:37:22.980Z",
+      "raw": "{\"channel\":\"webData3\",\"data\":{\"userState\":{\"agentAddress\":\"0xc49552efa1a56f4b84cb434b5b9b639f49e0bb4d\",\"agentValidUntil\":1792614443025,\"cumLedger\":\"997.8\",\"serverTime\":1791481130170,\"isVault\":false,\"user\":\"0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b\",\"dexAbstractionEnabled\":false,\"abstraction\":\"unifiedAccount\"},\"perpDexStates\":[{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{"
+    },
+    {
+      "t": "2026-10-08T17:37:28.098Z",
+      "raw": "{\"channel\":\"webData3\",\"data\":{\"userState\":{\"agentAddress\":\"0xc49552efa1a56f4b84cb434b5b9b639f49e0bb4d\",\"agentValidUntil\":1792614443025,\"cumLedger\":\"997.8\",\"serverTime\":1791481135208,\"isVault\":false,\"user\":\"0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b\",\"dexAbstractionEnabled\":false,\"abstraction\":\"unifiedAccount\"},\"perpDexStates\":[{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{"
+    },
+    {
+      "t": "2026-10-08T17:37:33.763Z",
+      "raw": "{\"channel\":\"webData3\",\"data\":{\"userState\":{\"agentAddress\":\"0xc49552efa1a56f4b84cb434b5b9b639f49e0bb4d\",\"agentValidUntil\":1792614443025,\"cumLedger\":\"997.8\",\"serverTime\":1791481140269,\"isVault\":false,\"user\":\"0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b\",\"dexAbstractionEnabled\":false,\"abstraction\":\"unifiedAccount\"},\"perpDexStates\":[{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{"
+    },
+    {
+      "t": "2026-10-08T17:37:39.127Z",
+      "raw": "{\"channel\":\"webData3\",\"data\":{\"userState\":{\"agentAddress\":\"0xc49552efa1a56f4b84cb434b5b9b639f49e0bb4d\",\"agentValidUntil\":1792614443025,\"cumLedger\":\"997.8\",\"serverTime\":1791481145234,\"isVault\":false,\"user\":\"0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b\",\"dexAbstractionEnabled\":false,\"abstraction\":\"unifiedAccount\"},\"perpDexStates\":[{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{"
+    },
+    {
+      "t": "2026-10-08T17:37:43.226Z",
+      "raw": "{\"channel\":\"webData3\",\"data\":{\"userState\":{\"agentAddress\":\"0xc49552efa1a56f4b84cb434b5b9b639f49e0bb4d\",\"agentValidUntil\":1792614443025,\"cumLedger\":\"997.8\",\"serverTime\":1791481150254,\"isVault\":false,\"user\":\"0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b\",\"dexAbstractionEnabled\":false,\"abstraction\":\"unifiedAccount\"},\"perpDexStates\":[{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{"
+    },
+    {
+      "t": "2026-10-08T17:37:48.715Z",
+      "raw": "{\"channel\":\"webData3\",\"data\":{\"userState\":{\"agentAddress\":\"0xc49552efa1a56f4b84cb434b5b9b639f49e0bb4d\",\"agentValidUntil\":1792614443025,\"cumLedger\":\"997.8\",\"serverTime\":1791481155271,\"isVault\":false,\"user\":\"0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b\",\"dexAbstractionEnabled\":false,\"abstraction\":\"unifiedAccount\"},\"perpDexStates\":[{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{"
+    },
+    {
+      "t": "2026-10-08T17:37:53.230Z",
+      "raw": "{\"channel\":\"webData3\",\"data\":{\"userState\":{\"agentAddress\":\"0xc49552efa1a56f4b84cb434b5b9b639f49e0bb4d\",\"agentValidUntil\":1792614443025,\"cumLedger\":\"997.8\",\"serverTime\":1791481160319,\"isVault\":false,\"user\":\"0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b\",\"dexAbstractionEnabled\":false,\"abstraction\":\"unifiedAccount\"},\"perpDexStates\":[{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{"
+    },
+    {
+      "t": "2026-10-08T17:37:58.867Z",
+      "raw": "{\"channel\":\"webData3\",\"data\":{\"userState\":{\"agentAddress\":\"0xc49552efa1a56f4b84cb434b5b9b639f49e0bb4d\",\"agentValidUntil\":1792614443025,\"cumLedger\":\"997.8\",\"serverTime\":1791481165355,\"isVault\":false,\"user\":\"0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b\",\"dexAbstractionEnabled\":false,\"abstraction\":\"unifiedAccount\"},\"perpDexStates\":[{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{"
+    },
+    {
+      "t": "2026-10-08T17:38:03.283Z",
+      "raw": "{\"channel\":\"webData3\",\"data\":{\"userState\":{\"agentAddress\":\"0xc49552efa1a56f4b84cb434b5b9b639f49e0bb4d\",\"agentValidUntil\":1792614443025,\"cumLedger\":\"997.8\",\"serverTime\":1791481170367,\"isVault\":false,\"user\":\"0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b\",\"dexAbstractionEnabled\":false,\"abstraction\":\"unifiedAccount\"},\"perpDexStates\":[{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{"
+    },
+    {
+      "t": "2026-10-08T17:38:09.038Z",
+      "raw": "{\"channel\":\"webData3\",\"data\":{\"userState\":{\"agentAddress\":\"0xc49552efa1a56f4b84cb434b5b9b639f49e0bb4d\",\"agentValidUntil\":1792614443025,\"cumLedger\":\"997.8\",\"serverTime\":1791481175437,\"isVault\":false,\"user\":\"0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b\",\"dexAbstractionEnabled\":false,\"abstraction\":\"unifiedAccount\"},\"perpDexStates\":[{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{"
+    },
+    {
+      "t": "2026-10-08T17:38:13.977Z",
+      "raw": "{\"channel\":\"webData3\",\"data\":{\"userState\":{\"agentAddress\":\"0xc49552efa1a56f4b84cb434b5b9b639f49e0bb4d\",\"agentValidUntil\":1792614443025,\"cumLedger\":\"997.8\",\"serverTime\":1791481180451,\"isVault\":false,\"user\":\"0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b\",\"dexAbstractionEnabled\":false,\"abstraction\":\"unifiedAccount\"},\"perpDexStates\":[{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{"
+    },
+    {
+      "t": "2026-10-08T17:38:18.799Z",
+      "raw": "{\"channel\":\"webData3\",\"data\":{\"userState\":{\"agentAddress\":\"0xc49552efa1a56f4b84cb434b5b9b639f49e0bb4d\",\"agentValidUntil\":1792614443025,\"cumLedger\":\"997.8\",\"serverTime\":1791481185457,\"isVault\":false,\"user\":\"0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b\",\"dexAbstractionEnabled\":false,\"abstraction\":\"unifiedAccount\"},\"perpDexStates\":[{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{"
+    },
+    {
+      "t": "2026-10-08T17:38:23.481Z",
+      "raw": "{\"channel\":\"webData3\",\"data\":{\"userState\":{\"agentAddress\":\"0xc49552efa1a56f4b84cb434b5b9b639f49e0bb4d\",\"agentValidUntil\":1792614443025,\"cumLedger\":\"997.8\",\"serverTime\":1791481190466,\"isVault\":false,\"user\":\"0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b\",\"dexAbstractionEnabled\":false,\"abstraction\":\"unifiedAccount\"},\"perpDexStates\":[{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{"
+    },
+    {
+      "t": "2026-10-08T17:38:28.554Z",
+      "raw": "{\"channel\":\"webData3\",\"data\":{\"userState\":{\"agentAddress\":\"0xc49552efa1a56f4b84cb434b5b9b639f49e0bb4d\",\"agentValidUntil\":1792614443025,\"cumLedger\":\"997.8\",\"serverTime\":1791481195494,\"isVault\":false,\"user\":\"0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b\",\"dexAbstractionEnabled\":false,\"abstraction\":\"unifiedAccount\"},\"perpDexStates\":[{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{"
+    },
+    {
+      "t": "2026-10-08T17:38:33.763Z",
+      "raw": "{\"channel\":\"webData3\",\"data\":{\"userState\":{\"agentAddress\":\"0xc49552efa1a56f4b84cb434b5b9b639f49e0bb4d\",\"agentValidUntil\":1792614443025,\"cumLedger\":\"997.8\",\"serverTime\":1791481200818,\"isVault\":false,\"user\":\"0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b\",\"dexAbstractionEnabled\":false,\"abstraction\":\"unifiedAccount\"},\"perpDexStates\":[{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{"
+    },
+    {
+      "t": "2026-10-08T17:38:38.987Z",
+      "raw": "{\"channel\":\"webData3\",\"data\":{\"userState\":{\"agentAddress\":\"0xc49552efa1a56f4b84cb434b5b9b639f49e0bb4d\",\"agentValidUntil\":1792614443025,\"cumLedger\":\"997.8\",\"serverTime\":1791481205599,\"isVault\":false,\"user\":\"0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b\",\"dexAbstractionEnabled\":false,\"abstraction\":\"unifiedAccount\"},\"perpDexStates\":[{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{"
+    },
+    {
+      "t": "2026-10-08T17:38:43.786Z",
+      "raw": "{\"channel\":\"webData3\",\"data\":{\"userState\":{\"agentAddress\":\"0xc49552efa1a56f4b84cb434b5b9b639f49e0bb4d\",\"agentValidUntil\":1792614443025,\"cumLedger\":\"997.8\",\"serverTime\":1791481210654,\"isVault\":false,\"user\":\"0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b\",\"dexAbstractionEnabled\":false,\"abstraction\":\"unifiedAccount\"},\"perpDexStates\":[{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{"
+    },
+    {
+      "t": "2026-10-08T17:38:48.227Z",
+      "raw": "{\"channel\":\"webData3\",\"data\":{\"userState\":{\"agentAddress\":\"0xc49552efa1a56f4b84cb434b5b9b639f49e0bb4d\",\"agentValidUntil\":1792614443025,\"cumLedger\":\"997.8\",\"serverTime\":1791481215409,\"isVault\":false,\"user\":\"0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b\",\"dexAbstractionEnabled\":false,\"abstraction\":\"unifiedAccount\"},\"perpDexStates\":[{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{"
+    },
+    {
+      "t": "2026-10-08T17:38:48.480Z",
+      "raw": "{\"channel\":\"webData3\",\"data\":{\"userState\":{\"agentAddress\":\"0xc49552efa1a56f4b84cb434b5b9b639f49e0bb4d\",\"agentValidUntil\":1792614443025,\"cumLedger\":\"997.8\",\"serverTime\":1791481215660,\"isVault\":false,\"user\":\"0x4a1ae5a6cfb24390a704b1cc1ab88d0f89ef596b\",\"dexAbstractionEnabled\":false,\"abstraction\":\"unifiedAccount\"},\"perpDexStates\":[{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{\"totalVaultEquity\":\"0.0\"},{"
+    }
+  ]
+}

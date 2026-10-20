@@ -1,0 +1,38 @@
+{
+  "label": "distance retracement 0",
+  "request": {
+    "action": {
+      "type": "trailingStop",
+      "asset": 3,
+      "isBuy": false,
+      "sz": "0.00015",
+      "reduceOnly": true,
+      "retracement": {
+        "px": "0"
+      },
+      "activationPx": null
+    },
+    "nonce": 1791408265127,
+    "signature": {
+      "r": "0xda682b164ae7e707100101ebf56ce14e85373086f36012ee81977846e537a15f",
+      "s": "0x49d0e7b48edfbe80d8abf62ffa4a06ee990a287da25b17cabfbde9f73d3045ef",
+      "v": 28
+    }
+  },
+  "response": {
+    "status": "err",
+    "response": "Error converting float to price"
+  },
+  "httpStatus": 200,
+  "rawBody": "{\"status\":\"err\",\"response\":\"Error converting float to price\"}",
+  "meta": {
+    "nonce": 1791408265127,
+    "msgpackHex": "0x87a474797065ac747261696c696e6753746f70a5617373657403a56973427579c2a2737aa7302e3030303135aa7265647563654f6e6c79c3ab726574726163656d656e7481a27078a130ac61637469766174696f6e5078c0",
+    "connectionId": "0x0b3e3c2059a3e1f6dbcb9faf7bca7a5def8dd18a0bba3b7230b2e3899b1cfbae",
+    "signature": {
+      "r": "0xda682b164ae7e707100101ebf56ce14e85373086f36012ee81977846e537a15f",
+      "s": "0x49d0e7b48edfbe80d8abf62ffa4a06ee990a287da25b17cabfbde9f73d3045ef",
+      "v": 28
+    }
+  }
+}

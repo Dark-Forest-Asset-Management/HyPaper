@@ -1,0 +1,114 @@
+---
+title: Trailing Stop
+description: Place a trailing stop (a stop that follows the mark price and fires a market order)
+---
+
+<Note>
+  `POST /exchange`
+</Note>
+
+A trailing stop tracks the **mark price**. Once active it keeps a watermark (`best`) — the highest mark seen for a
+sell stop, the lowest for a buy stop — and fires a taker market order when the mark retraces from that watermark by the
+configured distance. It is its **own action type**, not an order type inside `order`.
+
+Wire shape and behaviour were captured from HL testnet; see `scripts/captures/trailing-stop-summary.md`.
+
+## Request body
+
+```json
+{
+  "action": {
+    "type": "trailingStop",
+    "asset": 3,
+    "isBuy": false,
+    "sz": "0.00015",
+    "reduceOnly": true,
+    "retracement": { "px": "3000" },
+    "activationPx": null
+  },
+  "nonce": 1791457493480,
+  "signature": { "r": "0x…", "s": "0x…", "v": 28 }
+}
+```
+
+<ParamField body="action.asset" type="number" required>Perp asset index (main dex or HIP-3 sub-dex). Spot is not supported.</ParamField>
+<ParamField body="action.isBuy" type="boolean" required>`false` = sell stop (closes a long), `true` = buy stop.</ParamField>
+<ParamField body="action.sz" type="string" required>Size in base units.</ParamField>
+<ParamField body="action.reduceOnly" type="boolean" required>See *Reduce-only* below.</ParamField>
+<ParamField body="action.retracement" type="object" required>
+  Exactly one of `{ "px": "3000" }` (fixed distance) or `{ "pct": "5.0000%" }` (percent, **with** the `%` sign).
+
+  - `px` is rounded **down** to the coin's price decimals (`6 − szDecimals`; ETH `0.123` becomes `0.12`) and the rounded
+    value is what `triggerCondition` shows. A `px` that rounds to 0 (BTC `0.05`) is rejected.
+  - `pct` must be a multiple of **0.001 %** (`0.0010%` is valid, `0.0001%` and `1.2345%` are not) and below 100 %.
+    `5%`, `5.0%`, `05.0000%`, `5.00000%` are all accepted spellings.
+</ParamField>
+<ParamField body="action.activationPx" type="string | null" required>
+  `null` = start tracking immediately. Otherwise tracking starts once the mark reaches this price (sell: mark ≥ it; buy:
+  mark ≤ it). An activation that is already satisfied at placement activates immediately — it is **not** rejected.
+</ParamField>
+
+### Signing: field order matters
+
+The action is msgpack-encoded for the signature in this exact key order:
+
+`type, asset, isBuy, sz, reduceOnly, retracement, activationPx`
+
+HyPaper rebuilds the action in that order before recovering the signer, so key-sorted JSON (what HL's own web UI
+shows) is accepted too. Unknown, missing or wrongly-typed fields are rejected. `expiresAfter`, when sent, is part of the
+signed hash (as on HL).
+
+## Response
+
+```json
+{ "status": "ok", "response": { "type": "trailingStop", "data": { "oid": 62106112508 } } }
+```
+
+Errors are `HTTP 200` with `{"status":"err","response":"<message>"}`:
+
+| Condition | Message |
+|---|---|
+| `pct` of 0, or 100 % and above | `Trailing stop retracement is invalid.` |
+| `pct` malformed (no `%`, spaces) or not a multiple of 0.001 % | `Percentage is invalid.` |
+| `px` of 0 or rounding to 0 at the coin's price decimals | `Error converting float to price` |
+| sell `px` at or above the current price (or the activation price) | `Trailing stop retracement is invalid.` |
+| `expiresAfter` already in the past | `Action already expired` |
+| wrong shape (missing / extra / wrongly typed fields) | `Failed to deserialize the JSON body into the target type` (HTTP 400) |
+
+## Behaviour
+
+- **Mark, not mid.** Activation, the watermark and the trigger are all evaluated on the mark price.
+- **Trigger.** `triggerPx = best − px` / `best × (1 − pct/100)` for sells, `best + px` / `best × (1 + pct/100)` for buys,
+  rounded half-up to `6 − szDecimals` decimals. It only ever moves in the stop's favour.
+- **Firing.** A taker market order **with the same oid**, capped at `limitPx` (trigger × 0.9 for sells, × 1.1 for buys).
+  Status goes `open → triggered → filled`.
+- **Margin** is checked when the stop fires, not when it is placed. If the margin is short HyPaper fills **as much as it
+  allows** and drops the rest: the stop still ends `filled`, and the unfilled remainder stays in the final body's `sz`
+  (a 0.00516 BTC stop with room for 0.0008 ends with `sz: "0.00436"`). Only when **nothing** is affordable does it end
+  `marginCanceled` (after a `triggered` row, with `[triggered, marginCanceled]` in one websocket frame). Reduce-only
+  stops are never margin-checked; a stop larger than the position fills exactly the position and ends with `sz: "0.0"`.
+- **`expiresAfter`** expires the **request**, not the order: a stale request is refused, but a stop placed with a
+  future `expiresAfter` keeps resting after that time passes.
+- **Reduce-only.** Accepted on a flat account and with a size larger than the position. When the position goes flat
+  (or flips) the stop is auto-canceled with status `reduceOnlyCanceled`; a partial reduction leaves it open, unchanged.
+- **Cancel** with the normal `cancel` action. Canceling an already finished stop returns
+  `Order was never placed, already canceled, or filled. asset=<n>`.
+- `modify` / `batchModify` on a trailing stop are refused with `Attempted to modify to invalid new order` (`modify` answers
+  HTTP 200 with `status: "err"`; `batchModify` answers `ok` with `statuses: [{ "error": … }]`); the stop is left untouched.
+
+## In the info endpoints
+
+- `openOrders` — a plain resting order.
+- `frontendOpenOrders` — `orderType: "Trailing Stop Market"`, live `triggerPx` (`"0.0"` until activated) and a
+  `triggerCondition` such as `Activation immediate, retracement 5, best 82760.2` /
+  `Activation above 86066, retracement 3000, best waiting`.
+- `orderStatus` — like HL, a **frozen snapshot** that does not follow the watermark (set
+  `TRAILING_ORDERSTATUS_LIVE=true` to serve live values instead). After firing: `triggerCondition: "Triggered"`,
+  `isTrigger: false`, `sz: "0.0"`, `tif: "Gtc"`.
+- `historicalOrders` — one row per status (`open`, `triggered`, `filled`, or `open`, `reduceOnlyCanceled` …), each with the
+  body as it was at that transition.
+
+## WebSocket `orderUpdates`
+
+`open` (plain order body) at placement; `[triggered, filled]` together in **one** frame when it fires; `canceled` /
+`reduceOnlyCanceled` otherwise. There are no events for activation or for watermark updates.

@@ -1,0 +1,106 @@
+{
+  "oid": 62187255982,
+  "watch": {
+    "fired": true,
+    "seconds": 19.813,
+    "lastRow": {
+      "coin": "BTC",
+      "side": "B",
+      "limitPx": "89428.0",
+      "sz": "0.00542",
+      "oid": 62187255982,
+      "timestamp": 1791479860584,
+      "triggerCondition": "Activation immediate, retracement 5, best 81294",
+      "isTrigger": true,
+      "triggerPx": "81299.0",
+      "children": [],
+      "isPositionTpsl": false,
+      "reduceOnly": false,
+      "orderType": "Trailing Stop Market",
+      "origSz": "0.00542",
+      "tif": null,
+      "cloid": null
+    }
+  },
+  "orderStatus": {
+    "status": "order",
+    "order": {
+      "order": {
+        "coin": "BTC",
+        "side": "B",
+        "limitPx": "89428.0",
+        "sz": "0.00453",
+        "oid": 62187255982,
+        "timestamp": 1791479879368,
+        "triggerCondition": "Triggered",
+        "isTrigger": false,
+        "triggerPx": "0.0",
+        "children": [],
+        "isPositionTpsl": false,
+        "reduceOnly": false,
+        "orderType": "Trailing Stop Market",
+        "origSz": "0.00542",
+        "tif": "Gtc",
+        "cloid": null
+      },
+      "status": "filled",
+      "statusTimestamp": 1791479879368
+    }
+  },
+  "history": [
+    [
+      "filled",
+      1791479879368
+    ],
+    [
+      "triggered",
+      1791479879368
+    ],
+    [
+      "open",
+      1791479860584
+    ]
+  ],
+  "fills": [
+    {
+      "coin": "BTC",
+      "px": "81311.0",
+      "sz": "0.00027",
+      "side": "B",
+      "time": 1791479879368,
+      "startPosition": "0.00062",
+      "dir": "Open Long",
+      "closedPnl": "0.0",
+      "hash": "0x3b9d43e275bc2b353d17042b3884ef0000d85bc810bf4a07df65ef3534b0051f",
+      "oid": 62187255982,
+      "crossed": true,
+      "fee": "0.009879",
+      "tid": 746968600530554,
+      "feeToken": "USDC",
+      "twapId": null
+    },
+    {
+      "coin": "BTC",
+      "px": "81307.0",
+      "sz": "0.00062",
+      "side": "B",
+      "time": 1791479879368,
+      "startPosition": "0.0",
+      "dir": "Open Long",
+      "closedPnl": "0.0",
+      "hash": "0x3b9d43e275bc2b353d17042b3884ef0000d85bc810bf4a07df65ef3534b0051f",
+      "oid": 62187255982,
+      "crossed": true,
+      "fee": "0.022684",
+      "tid": 1064377219604178,
+      "feeToken": "USDC",
+      "twapId": null
+    }
+  ],
+  "positions": [
+    {
+      "coin": "BTC",
+      "szi": 0.00089
+    }
+  ]
+}

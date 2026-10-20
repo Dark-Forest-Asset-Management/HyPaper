@@ -18,7 +18,7 @@
  * Requires: HyPaper running + Redis up.
  */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { shapeOf, diffShape, compareToGolden, type Mismatch } from './shape.js';
@@ -107,6 +107,59 @@ function report(label: string, mm: Mismatch[]): void {
   report('activeAssetData', compareToGolden(golden('16_activeAssetData.json'), await info({ type: 'activeAssetData', user: W, coin: 'BTC' })));
   // userFunding requires the funding worker to fire (8h cadence) — covered by
   // test-scripts/tmp-epic-1.1-account-state.ts which drives it directly.
+
+  // ── Trailing stops (HL testnet captures 30_* / 33_*) ──────────────────────
+  // Place a close-long trailing stop, then orphan it by closing the position, and diff HyPaper's responses against the
+  // real HL ones. Uses HyPaper's OWN universe for the BTC asset id (the mainnet index above can differ on testnet).
+  if (existsSync(resolve(CAPTURES, '30_trailing_v1_close_px.json')) && existsSync(resolve(CAPTURES, '33_orphan_o1_after_close_snapshots.json'))) {
+    const raw = (f: string) => JSON.parse(readFileSync(resolve(CAPTURES, f), 'utf8'));
+    const hpMeta = await info({ type: 'meta' });
+    const tAsset = hpMeta.universe.findIndex((u: any) => u.name === 'BTC');
+    const tMids = await info({ type: 'allMids' });
+    const tMid = Number(tMids.BTC ?? mid);
+    if (tAsset < 0) {
+      console.log('\n── trailing stops ──  SKIPPED (BTC not in HyPaper universe)');
+    } else {
+      await hypaper({ type: 'resetAccount', user: W });
+      await hypaper({ type: 'setBalance', user: W, balance: 1_000_000 });
+      const sz = '0.01';
+      const filled = await exchange({ wallet: W, action: { type: 'order', grouping: 'na',
+        orders: [{ a: tAsset, b: true, p: (tMid * 1.05).toFixed(0), s: sz, r: false, t: { limit: { tif: 'Ioc' } } }] } });
+      const placed = await exchange({ wallet: W, action: { type: 'trailingStop', asset: tAsset, isBuy: false, sz, reduceOnly: true,
+        retracement: { px: '3000' }, activationPx: null } });
+      const oid = placed?.response?.data?.oid;
+      if (!filled?.response?.data?.statuses?.[0]?.filled || !Number.isInteger(oid)) {
+        console.log('\n── trailing stops ──  FAIL could not set up: ' + JSON.stringify({ filled, placed }));
+        hardFails++;
+      } else {
+        const g1 = raw('30_trailing_v1_close_px.json');
+        const gOid = g1.response.response.data.oid;
+        report('trailingStop /exchange response', compareToGolden(g1.response, placed));
+        report('trailingStop frontendOpenOrders row', compareToGolden(g1.followUps.frontendOpenOrders.find((o: any) => o.oid === gOid),
+          (await info({ type: 'frontendOpenOrders', user: W })).find((o: any) => o.oid === oid) ?? {}));
+        report('trailingStop openOrders row', compareToGolden(g1.followUps.openOrders.find((o: any) => o.oid === gOid),
+          (await info({ type: 'openOrders', user: W })).find((o: any) => o.oid === oid) ?? {}));
+        report('trailingStop orderStatus (open)', compareToGolden(g1.followUps.orderStatus, await info({ type: 'orderStatus', user: W, oid })));
+
+        // Orphan: close the position under the stop with a normal reduce-only IOC.
+        await exchange({ wallet: W, action: { type: 'order', grouping: 'na',
+          orders: [{ a: tAsset, b: false, p: (tMid * 0.95).toFixed(0), s: sz, r: true, t: { limit: { tif: 'Ioc' } } }] } });
+        await new Promise((r) => setTimeout(r, 1200));   // pg-sink persists the history rows asynchronously
+        const go = raw('33_orphan_o1_after_close_snapshots.json').after_0s;
+        report('trailingStop orderStatus (reduceOnlyCanceled)', compareToGolden(go.orderStatus, await info({ type: 'orderStatus', user: W, oid })));
+        const hist = (await info({ type: 'historicalOrders', user: W })).filter((h: any) => h.order.oid === oid);
+        const names = hist.map((h: any) => h.status).join(',');
+        if (names !== 'reduceOnlyCanceled,open') {
+          console.log(`\n── trailingStop historicalOrders ──  FAIL expected [reduceOnlyCanceled,open], got [${names}]`);
+          hardFails++;
+        } else {
+          for (const h of go.historicalOrdersForOid) {
+            report(`trailingStop historicalOrders row (${h.status})`, compareToGolden(h, hist.find((x: any) => x.status === h.status) ?? {}));
+          }
+        }
+      }
+    }
+  }
 
   await hypaper({ type: 'resetAccount', user: W });
 

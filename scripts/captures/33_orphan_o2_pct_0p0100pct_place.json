@@ -1,0 +1,88 @@
+{
+  "label": "O2: CLOSE long, TIGHT pct 0.0100%, no activation",
+  "request": {
+    "action": {
+      "type": "trailingStop",
+      "asset": 3,
+      "isBuy": false,
+      "sz": "0.00015",
+      "reduceOnly": true,
+      "retracement": {
+        "pct": "0.0100%"
+      },
+      "activationPx": null
+    },
+    "nonce": 1791457453926,
+    "signature": {
+      "r": "0x1f6e7e7885b01978456eaa864585e64e694b06bfef1d68d5861e8f5196456721",
+      "s": "0x48ce328366bda930d8152adf4d892b9199c537cc16b1de760cdab85b40880a6b",
+      "v": 28
+    }
+  },
+  "response": {
+    "status": "ok",
+    "response": {
+      "type": "trailingStop",
+      "data": {
+        "oid": 62157017253
+      }
+    }
+  },
+  "httpStatus": 200,
+  "rawBody": "{\"status\":\"ok\",\"response\":{\"type\":\"trailingStop\",\"data\":{\"oid\":62157017253}}}",
+  "meta": {
+    "nonce": 1791457453926,
+    "msgpackHex": "0x87a474797065ac747261696c696e6753746f70a5617373657403a56973427579c2a2737aa7302e3030303135aa7265647563654f6e6c79c3ab726574726163656d656e7481a3706374a7302e3031303025ac61637469766174696f6e5078c0",
+    "connectionId": "0x3d24fbdbbf8d3006b21feb10f8bd309b14ff67fea955ea9a628bf58d77e5a0f6",
+    "signature": {
+      "r": "0x1f6e7e7885b01978456eaa864585e64e694b06bfef1d68d5861e8f5196456721",
+      "s": "0x48ce328366bda930d8152adf4d892b9199c537cc16b1de760cdab85b40880a6b",
+      "v": 28
+    }
+  },
+  "immediateFrontendOpenOrders": [
+    {
+      "coin": "BTC",
+      "side": "A",
+      "limitPx": "74440.0",
+      "sz": "0.00015",
+      "oid": 62157017253,
+      "timestamp": 1791457542639,
+      "triggerCondition": "Activation immediate, retracement 0.01%, best 82719",
+      "isTrigger": true,
+      "triggerPx": "82710.7",
+      "children": [],
+      "isPositionTpsl": false,
+      "reduceOnly": true,
+      "orderType": "Trailing Stop Market",
+      "origSz": "0.00015",
+      "tif": null,
+      "cloid": null
+    }
+  ],
+  "immediateOrderStatus": {
+    "status": "order",
+    "order": {
+      "order": {
+        "coin": "BTC",
+        "side": "A",
+        "limitPx": "74440.0",
+        "sz": "0.00015",
+        "oid": 62157017253,
+        "timestamp": 1791457542639,
+        "triggerCondition": "Activation immediate, retracement 0.01%, best 82719",
+        "isTrigger": true,
+        "triggerPx": "82710.7",
+        "children": [],
+        "isPositionTpsl": false,
+        "reduceOnly": true,
+        "orderType": "Trailing Stop Market",
+        "origSz": "0.00015",
+        "tif": null,
+        "cloid": null
+      },
+      "status": "open",
+      "statusTimestamp": 1791457542639
+    }
+  }
+}

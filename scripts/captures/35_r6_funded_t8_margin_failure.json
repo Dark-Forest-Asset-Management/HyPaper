@@ -1,0 +1,89 @@
+{
+  "oid": 62188273841,
+  "watch": {
+    "fired": true,
+    "seconds": 0.695,
+    "lastRow": {
+      "coin": "BTC",
+      "side": "B",
+      "limitPx": "89223.0",
+      "sz": "0.00516",
+      "oid": 62188273841,
+      "timestamp": 1791480451263,
+      "triggerCondition": "Activation immediate, retracement 5, best 81107",
+      "isTrigger": true,
+      "triggerPx": "81112.0",
+      "children": [],
+      "isPositionTpsl": false,
+      "reduceOnly": false,
+      "orderType": "Trailing Stop Market",
+      "origSz": "0.00516",
+      "tif": null,
+      "cloid": null
+    }
+  },
+  "orderStatus": {
+    "status": "order",
+    "order": {
+      "order": {
+        "coin": "BTC",
+        "side": "B",
+        "limitPx": "89223.0",
+        "sz": "0.00436",
+        "oid": 62188273841,
+        "timestamp": 1791480452440,
+        "triggerCondition": "Triggered",
+        "isTrigger": false,
+        "triggerPx": "0.0",
+        "children": [],
+        "isPositionTpsl": false,
+        "reduceOnly": false,
+        "orderType": "Trailing Stop Market",
+        "origSz": "0.00516",
+        "tif": "Gtc",
+        "cloid": null
+      },
+      "status": "filled",
+      "statusTimestamp": 1791480452440
+    }
+  },
+  "history": [
+    [
+      "filled",
+      1791480452440
+    ],
+    [
+      "triggered",
+      1791480452440
+    ],
+    [
+      "open",
+      1791480451263
+    ]
+  ],
+  "fills": [
+    {
+      "coin": "BTC",
+      "px": "81414.0",
+      "sz": "0.0008",
+      "side": "B",
+      "time": 1791480452440,
+      "startPosition": "0.0",
+      "dir": "Open Long",
+      "closedPnl": "0.0",
+      "hash": "0x8113b96843688981828d042b38ad6600004ed14dde6ba85324dc64bb026c636c",
+      "oid": 62188273841,
+      "crossed": true,
+      "fee": "0.029309",
+      "tid": 46750960053685,
+      "feeToken": "USDC",
+      "twapId": null
+    }
+  ],
+  "positions": [
+    {
+      "coin": "BTC",
+      "szi": 0.0008
+    }
+  ]
+}

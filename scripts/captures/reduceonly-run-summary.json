@@ -1,0 +1,45 @@
+{
+  "coin": "BTC",
+  "asset": 3,
+  "sz1": "0.00015",
+  "sz2": "0.0003",
+  "sz3": "0.00045",
+  "startedAt": "2026-10-08T11:29:10.601Z",
+  "dryRun": false,
+  "r1_flat_sell": {
+    "oid": 62158826437,
+    "accepted": true
+  },
+  "r2_flat_buy": {
+    "oid": 62158831480,
+    "accepted": true
+  },
+  "r3": {
+    "oid": 62158841383,
+    "accepted": true,
+    "afterClose": {
+      "status1s": "reduceOnlyCanceled",
+      "open1s": false,
+      "status10s": "reduceOnlyCanceled"
+    }
+  },
+  "r4": {
+    "oid": 62158869164,
+    "accepted": true,
+    "stopSz": "0.00045",
+    "positionSz": "0.0003"
+  },
+  "r5": {
+    "status1s": "open",
+    "open1s": true,
+    "szAfter": "0.00045",
+    "status10s": "open"
+  },
+  "r6": {
+    "status1s": "reduceOnlyCanceled",
+    "open1s": false,
+    "positionAfter": -0.0003,
+    "status10s": "reduceOnlyCanceled"
+  },
+  "finishedAt": "2026-10-08T11:30:27.501Z"
+}

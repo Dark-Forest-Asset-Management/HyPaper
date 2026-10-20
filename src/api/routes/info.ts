@@ -223,33 +223,30 @@ infoRouter.post('/', async (c) => {
 
       case 'historicalOrders': {
         if (!user) return c.json({ error: 'Missing user' }, 400);
-        // body.dex filters to the dex's coin-prefix ("xyz:") rows. Native
-        // (no dex) returns rows whose coin does NOT contain ':'.
-        const dex = typeof body.dex === 'string' ? body.dex : '';
-        const rows = await getHistoricalOrdersPg(user, body.limit ?? 200);
-        const filtered = !dex
-          ? rows.filter((r) => !r.order.coin.includes(':'))
-          : rows.filter((r) => r.order.coin.startsWith(`${dex}:`));
-        return c.json(filtered);
+        // Every dex's orders, like public HL — which ignores a `dex` param
+        // here (probed 2026-10-20: no dex / "xyz" / "flx" / "" returned the
+        // same 2000 rows). Filtering to native when no dex was passed hid
+        // every HIP-3 order from slushy's Order History. Default cap 2000,
+        // HL's (same probe).
+        const rows = await getHistoricalOrdersPg(user, body.limit ?? 2000);
+        return c.json(rows);
       }
 
       // ── Fills ────────────────────────────────────────────────────────────
 
       case 'userFills': {
         if (!user) return c.json({ error: 'Missing user' }, 400);
-        const dex = typeof body.dex === 'string' ? body.dex : '';
-        const fills = await getUserFills(user, 100, dex);
+        // All dexes, HL's 2000 cap — see engine/fill.ts.
+        const fills = await getUserFills(user);
         return c.json(fills);
       }
 
       case 'userFillsByTime': {
         if (!user) return c.json({ error: 'Missing user' }, 400);
-        const dex = typeof body.dex === 'string' ? body.dex : '';
         const fills = await getUserFillsByTime(
           user,
           body.startTime ?? 0,
           body.endTime,
-          dex,
         );
         return c.json(fills);
       }

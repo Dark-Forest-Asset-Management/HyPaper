@@ -1,0 +1,738 @@
+{
+  "rows": [
+    {
+      "coin": "SOL",
+      "name": "sell px 0.05",
+      "szDecimals": 2,
+      "mark": 107.28,
+      "row": {
+        "coin": "SOL",
+        "side": "A",
+        "limitPx": "96.508",
+        "sz": "0.12",
+        "oid": 62187161001,
+        "timestamp": 1791479804309,
+        "triggerCondition": "Activation immediate, retracement 0.05, best 107.28",
+        "isTrigger": true,
+        "triggerPx": "107.23",
+        "children": [],
+        "isPositionTpsl": false,
+        "reduceOnly": true,
+        "orderType": "Trailing Stop Market",
+        "origSz": "0.12",
+        "tif": null,
+        "cloid": null
+      },
+      "ruleCheck": {
+        "ok": true,
+        "triggerPx": {
+          "hl": "107.23",
+          "hyPaper": "107.23"
+        },
+        "limitPx": {
+          "hl": "96.508",
+          "hyPaper": "96.508"
+        },
+        "text": {
+          "hl": "Activation immediate, retracement 0.05, best 107.28",
+          "hyPaper": "Activation immediate, retracement 0.05, best 107.28"
+        }
+      }
+    },
+    {
+      "coin": "SOL",
+      "name": "sell px 0.123",
+      "szDecimals": 2,
+      "mark": 107.28,
+      "row": {
+        "coin": "SOL",
+        "side": "A",
+        "limitPx": "96.442",
+        "sz": "0.12",
+        "oid": 62187166498,
+        "timestamp": 1791479807017,
+        "triggerCondition": "Activation immediate, retracement 0.123, best 107.28",
+        "isTrigger": true,
+        "triggerPx": "107.157",
+        "children": [],
+        "isPositionTpsl": false,
+        "reduceOnly": true,
+        "orderType": "Trailing Stop Market",
+        "origSz": "0.12",
+        "tif": null,
+        "cloid": null
+      },
+      "ruleCheck": {
+        "ok": true,
+        "triggerPx": {
+          "hl": "107.157",
+          "hyPaper": "107.157"
+        },
+        "limitPx": {
+          "hl": "96.442",
+          "hyPaper": "96.442"
+        },
+        "text": {
+          "hl": "Activation immediate, retracement 0.123, best 107.28",
+          "hyPaper": "Activation immediate, retracement 0.123, best 107.28"
+        }
+      }
+    },
+    {
+      "coin": "SOL",
+      "name": "sell px 1.5",
+      "szDecimals": 2,
+      "mark": 107.28,
+      "row": {
+        "coin": "SOL",
+        "side": "A",
+        "limitPx": "95.203",
+        "sz": "0.12",
+        "oid": 62187170717,
+        "timestamp": 1791479810038,
+        "triggerCondition": "Activation immediate, retracement 1.5, best 107.28",
+        "isTrigger": true,
+        "triggerPx": "105.78",
+        "children": [],
+        "isPositionTpsl": false,
+        "reduceOnly": true,
+        "orderType": "Trailing Stop Market",
+        "origSz": "0.12",
+        "tif": null,
+        "cloid": null
+      },
+      "ruleCheck": {
+        "ok": true,
+        "triggerPx": {
+          "hl": "105.78",
+          "hyPaper": "105.78"
+        },
+        "limitPx": {
+          "hl": "95.203",
+          "hyPaper": "95.203"
+        },
+        "text": {
+          "hl": "Activation immediate, retracement 1.5, best 107.28",
+          "hyPaper": "Activation immediate, retracement 1.5, best 107.28"
+        }
+      }
+    },
+    {
+      "coin": "SOL",
+      "name": "sell pct 0.5%",
+      "szDecimals": 2,
+      "mark": 107.28,
+      "row": {
+        "coin": "SOL",
+        "side": "A",
+        "limitPx": "96.07",
+        "sz": "0.12",
+        "oid": 62187174596,
+        "timestamp": 1791479812751,
+        "triggerCondition": "Activation immediate, retracement 0.5%, best 107.28",
+        "isTrigger": true,
+        "triggerPx": "106.7436",
+        "children": [],
+        "isPositionTpsl": false,
+        "reduceOnly": true,
+        "orderType": "Trailing Stop Market",
+        "origSz": "0.12",
+        "tif": null,
+        "cloid": null
+      },
+      "ruleCheck": {
+        "ok": true,
+        "triggerPx": {
+          "hl": "106.7436",
+          "hyPaper": "106.7436"
+        },
+        "limitPx": {
+          "hl": "96.07",
+          "hyPaper": "96.07"
+        },
+        "text": {
+          "hl": "Activation immediate, retracement 0.5%, best 107.28",
+          "hyPaper": "Activation immediate, retracement 0.5%, best 107.28"
+        }
+      }
+    },
+    {
+      "coin": "SOL",
+      "name": "sell pct 1.2345%",
+      "error": {
+        "status": "err",
+        "response": "Percentage is invalid."
+      }
+    },
+    {
+      "coin": "SOL",
+      "name": "sell px 0.5 act above",
+      "szDecimals": 2,
+      "mark": 107.28,
+      "row": {
+        "coin": "SOL",
+        "side": "A",
+        "limitPx": "96.292",
+        "sz": "0.12",
+        "oid": 62187180530,
+        "timestamp": 1791479816637,
+        "triggerCondition": "Activation above 107.49, retracement 0.5, best waiting",
+        "isTrigger": true,
+        "triggerPx": "0.0",
+        "children": [],
+        "isPositionTpsl": false,
+        "reduceOnly": true,
+        "orderType": "Trailing Stop Market",
+        "origSz": "0.12",
+        "tif": null,
+        "cloid": null
+      },
+      "ruleCheck": {
+        "ok": true,
+        "triggerPx": {
+          "hl": "0.0",
+          "hyPaper": "0.0"
+        },
+        "limitPx": {
+          "hl": "96.292",
+          "hyPaper": "96.292"
+        },
+        "text": {
+          "hl": "Activation above 107.49, retracement 0.5, best waiting",
+          "hyPaper": "Activation above 107.49, retracement 0.5, best waiting"
+        }
+      }
+    },
+    {
+      "coin": "SOL",
+      "name": "buy px 0.05",
+      "szDecimals": 2,
+      "mark": 107.28,
+      "row": {
+        "coin": "SOL",
+        "side": "B",
+        "limitPx": "118.06",
+        "sz": "0.12",
+        "oid": 62187184576,
+        "timestamp": 1791479819404,
+        "triggerCondition": "Activation immediate, retracement 0.05, best 107.28",
+        "isTrigger": true,
+        "triggerPx": "107.33",
+        "children": [],
+        "isPositionTpsl": false,
+        "reduceOnly": true,
+        "orderType": "Trailing Stop Market",
+        "origSz": "0.12",
+        "tif": null,
+        "cloid": null
+      },
+      "ruleCheck": {
+        "ok": true,
+        "triggerPx": {
+          "hl": "107.33",
+          "hyPaper": "107.33"
+        },
+        "limitPx": {
+          "hl": "118.06",
+          "hyPaper": "118.06"
+        },
+        "text": {
+          "hl": "Activation immediate, retracement 0.05, best 107.28",
+          "hyPaper": "Activation immediate, retracement 0.05, best 107.28"
+        }
+      }
+    },
+    {
+      "coin": "SOL",
+      "name": "buy px 0.123",
+      "szDecimals": 2,
+      "mark": 107.28,
+      "row": {
+        "coin": "SOL",
+        "side": "B",
+        "limitPx": "118.14",
+        "sz": "0.12",
+        "oid": 62187189951,
+        "timestamp": 1791479822225,
+        "triggerCondition": "Activation immediate, retracement 0.123, best 107.28",
+        "isTrigger": true,
+        "triggerPx": "107.403",
+        "children": [],
+        "isPositionTpsl": false,
+        "reduceOnly": true,
+        "orderType": "Trailing Stop Market",
+        "origSz": "0.12",
+        "tif": null,
+        "cloid": null
+      },
+      "ruleCheck": {
+        "ok": true,
+        "triggerPx": {
+          "hl": "107.403",
+          "hyPaper": "107.403"
+        },
+        "limitPx": {
+          "hl": "118.14",
+          "hyPaper": "118.14"
+        },
+        "text": {
+          "hl": "Activation immediate, retracement 0.123, best 107.28",
+          "hyPaper": "Activation immediate, retracement 0.123, best 107.28"
+        }
+      }
+    },
+    {
+      "coin": "SOL",
+      "name": "buy pct 0.5%",
+      "szDecimals": 2,
+      "mark": 107.28,
+      "row": {
+        "coin": "SOL",
+        "side": "B",
+        "limitPx": "118.59",
+        "sz": "0.12",
+        "oid": 62187196031,
+        "timestamp": 1791479825140,
+        "triggerCondition": "Activation immediate, retracement 0.5%, best 107.28",
+        "isTrigger": true,
+        "triggerPx": "107.8164",
+        "children": [],
+        "isPositionTpsl": false,
+        "reduceOnly": true,
+        "orderType": "Trailing Stop Market",
+        "origSz": "0.12",
+        "tif": null,
+        "cloid": null
+      },
+      "ruleCheck": {
+        "ok": true,
+        "triggerPx": {
+          "hl": "107.8164",
+          "hyPaper": "107.8164"
+        },
+        "limitPx": {
+          "hl": "118.59",
+          "hyPaper": "118.59"
+        },
+        "text": {
+          "hl": "Activation immediate, retracement 0.5%, best 107.28",
+          "hyPaper": "Activation immediate, retracement 0.5%, best 107.28"
+        }
+      }
+    },
+    {
+      "coin": "SOL",
+      "name": "buy pct 1.2345%",
+      "error": {
+        "status": "err",
+        "response": "Percentage is invalid."
+      }
+    },
+    {
+      "coin": "SOL",
+      "name": "buy px 0.5 act below",
+      "szDecimals": 2,
+      "mark": 107.28,
+      "row": {
+        "coin": "SOL",
+        "side": "B",
+        "limitPx": "118.32",
+        "sz": "0.12",
+        "oid": 62187203634,
+        "timestamp": 1791479828885,
+        "triggerCondition": "Activation below 107.07, retracement 0.5, best waiting",
+        "isTrigger": true,
+        "triggerPx": "0.0",
+        "children": [],
+        "isPositionTpsl": false,
+        "reduceOnly": true,
+        "orderType": "Trailing Stop Market",
+        "origSz": "0.12",
+        "tif": null,
+        "cloid": null
+      },
+      "ruleCheck": {
+        "ok": true,
+        "triggerPx": {
+          "hl": "0.0",
+          "hyPaper": "0.0"
+        },
+        "limitPx": {
+          "hl": "118.32",
+          "hyPaper": "118.32"
+        },
+        "text": {
+          "hl": "Activation below 107.07, retracement 0.5, best waiting",
+          "hyPaper": "Activation below 107.07, retracement 0.5, best waiting"
+        }
+      }
+    },
+    {
+      "coin": "ETH",
+      "name": "sell px 0.05",
+      "szDecimals": 4,
+      "mark": 2398.3,
+      "row": {
+        "coin": "ETH",
+        "side": "A",
+        "limitPx": "2159.5",
+        "sz": "0.0051",
+        "oid": 62187208063,
+        "timestamp": 1791479831590,
+        "triggerCondition": "Activation immediate, retracement 0.05, best 2399.4",
+        "isTrigger": true,
+        "triggerPx": "2399.35",
+        "children": [],
+        "isPositionTpsl": false,
+        "reduceOnly": true,
+        "orderType": "Trailing Stop Market",
+        "origSz": "0.0051",
+        "tif": null,
+        "cloid": null
+      },
+      "ruleCheck": {
+        "ok": true,
+        "triggerPx": {
+          "hl": "2399.35",
+          "hyPaper": "2399.35"
+        },
+        "limitPx": {
+          "hl": "2159.5",
+          "hyPaper": "2159.5"
+        },
+        "text": {
+          "hl": "Activation immediate, retracement 0.05, best 2399.4",
+          "hyPaper": "Activation immediate, retracement 0.05, best 2399.4"
+        }
+      }
+    },
+    {
+      "coin": "ETH",
+      "name": "sell px 0.123",
+      "szDecimals": 4,
+      "mark": 2398.3,
+      "row": {
+        "coin": "ETH",
+        "side": "A",
+        "limitPx": "2159.4",
+        "sz": "0.0051",
+        "oid": 62187212449,
+        "timestamp": 1791479834532,
+        "triggerCondition": "Activation immediate, retracement 0.12, best 2399.4",
+        "isTrigger": true,
+        "triggerPx": "2399.28",
+        "children": [],
+        "isPositionTpsl": false,
+        "reduceOnly": true,
+        "orderType": "Trailing Stop Market",
+        "origSz": "0.0051",
+        "tif": null,
+        "cloid": null
+      },
+      "ruleCheck": {
+        "ok": true,
+        "triggerPx": {
+          "hl": "2399.28",
+          "hyPaper": "2399.28"
+        },
+        "limitPx": {
+          "hl": "2159.4",
+          "hyPaper": "2159.4"
+        },
+        "text": {
+          "hl": "Activation immediate, retracement 0.12, best 2399.4",
+          "hyPaper": "Activation immediate, retracement 0.12, best 2399.4"
+        }
+      }
+    },
+    {
+      "coin": "ETH",
+      "name": "sell px 1.5",
+      "szDecimals": 4,
+      "mark": 2398.3,
+      "row": {
+        "coin": "ETH",
+        "side": "A",
+        "limitPx": "2158.2",
+        "sz": "0.0051",
+        "oid": 62187217065,
+        "timestamp": 1791479837278,
+        "triggerCondition": "Activation immediate, retracement 1.5, best 2399.4",
+        "isTrigger": true,
+        "triggerPx": "2397.9",
+        "children": [],
+        "isPositionTpsl": false,
+        "reduceOnly": true,
+        "orderType": "Trailing Stop Market",
+        "origSz": "0.0051",
+        "tif": null,
+        "cloid": null
+      },
+      "ruleCheck": {
+        "ok": true,
+        "triggerPx": {
+          "hl": "2397.9",
+          "hyPaper": "2397.9"
+        },
+        "limitPx": {
+          "hl": "2158.2",
+          "hyPaper": "2158.2"
+        },
+        "text": {
+          "hl": "Activation immediate, retracement 1.5, best 2399.4",
+          "hyPaper": "Activation immediate, retracement 1.5, best 2399.4"
+        }
+      }
+    },
+    {
+      "coin": "ETH",
+      "name": "sell pct 0.5%",
+      "szDecimals": 4,
+      "mark": 2398.3,
+      "row": {
+        "coin": "ETH",
+        "side": "A",
+        "limitPx": "2148.3",
+        "sz": "0.0051",
+        "oid": 62187221436,
+        "timestamp": 1791479839993,
+        "triggerCondition": "Activation immediate, retracement 0.5%, best 2398.9",
+        "isTrigger": true,
+        "triggerPx": "2386.91",
+        "children": [],
+        "isPositionTpsl": false,
+        "reduceOnly": true,
+        "orderType": "Trailing Stop Market",
+        "origSz": "0.0051",
+        "tif": null,
+        "cloid": null
+      },
+      "ruleCheck": {
+        "ok": true,
+        "triggerPx": {
+          "hl": "2386.91",
+          "hyPaper": "2386.91"
+        },
+        "limitPx": {
+          "hl": "2148.3",
+          "hyPaper": "2148.3"
+        },
+        "text": {
+          "hl": "Activation immediate, retracement 0.5%, best 2398.9",
+          "hyPaper": "Activation immediate, retracement 0.5%, best 2398.9"
+        }
+      }
+    },
+    {
+      "coin": "ETH",
+      "name": "sell pct 1.2345%",
+      "error": {
+        "status": "err",
+        "response": "Percentage is invalid."
+      }
+    },
+    {
+      "coin": "ETH",
+      "name": "sell px 0.5 act above",
+      "szDecimals": 4,
+      "mark": 2398.3,
+      "row": {
+        "coin": "ETH",
+        "side": "A",
+        "limitPx": "2162.4",
+        "sz": "0.0051",
+        "oid": 62187228695,
+        "timestamp": 1791479843835,
+        "triggerCondition": "Activation above 2403.1, retracement 0.5, best waiting",
+        "isTrigger": true,
+        "triggerPx": "0.0",
+        "children": [],
+        "isPositionTpsl": false,
+        "reduceOnly": true,
+        "orderType": "Trailing Stop Market",
+        "origSz": "0.0051",
+        "tif": null,
+        "cloid": null
+      },
+      "ruleCheck": {
+        "ok": true,
+        "triggerPx": {
+          "hl": "0.0",
+          "hyPaper": "0.0"
+        },
+        "limitPx": {
+          "hl": "2162.4",
+          "hyPaper": "2162.4"
+        },
+        "text": {
+          "hl": "Activation above 2403.1, retracement 0.5, best waiting",
+          "hyPaper": "Activation above 2403.1, retracement 0.5, best waiting"
+        }
+      }
+    },
+    {
+      "coin": "ETH",
+      "name": "buy px 0.05",
+      "szDecimals": 4,
+      "mark": 2398.3,
+      "row": {
+        "coin": "ETH",
+        "side": "B",
+        "limitPx": "2638.5",
+        "sz": "0.0051",
+        "oid": 62187232870,
+        "timestamp": 1791479846805,
+        "triggerCondition": "Activation immediate, retracement 0.05, best 2398.6",
+        "isTrigger": true,
+        "triggerPx": "2398.65",
+        "children": [],
+        "isPositionTpsl": false,
+        "reduceOnly": true,
+        "orderType": "Trailing Stop Market",
+        "origSz": "0.0051",
+        "tif": null,
+        "cloid": null
+      },
+      "ruleCheck": {
+        "ok": true,
+        "triggerPx": {
+          "hl": "2398.65",
+          "hyPaper": "2398.65"
+        },
+        "limitPx": {
+          "hl": "2638.5",
+          "hyPaper": "2638.5"
+        },
+        "text": {
+          "hl": "Activation immediate, retracement 0.05, best 2398.6",
+          "hyPaper": "Activation immediate, retracement 0.05, best 2398.6"
+        }
+      }
+    },
+    {
+      "coin": "ETH",
+      "name": "buy px 0.123",
+      "szDecimals": 4,
+      "mark": 2398.3,
+      "row": {
+        "coin": "ETH",
+        "side": "B",
+        "limitPx": "2638.7",
+        "sz": "0.0051",
+        "oid": 62187236662,
+        "timestamp": 1791479849510,
+        "triggerCondition": "Activation immediate, retracement 0.12, best 2398.7",
+        "isTrigger": true,
+        "triggerPx": "2398.82",
+        "children": [],
+        "isPositionTpsl": false,
+        "reduceOnly": true,
+        "orderType": "Trailing Stop Market",
+        "origSz": "0.0051",
+        "tif": null,
+        "cloid": null
+      },
+      "ruleCheck": {
+        "ok": true,
+        "triggerPx": {
+          "hl": "2398.82",
+          "hyPaper": "2398.82"
+        },
+        "limitPx": {
+          "hl": "2638.7",
+          "hyPaper": "2638.7"
+        },
+        "text": {
+          "hl": "Activation immediate, retracement 0.12, best 2398.7",
+          "hyPaper": "Activation immediate, retracement 0.12, best 2398.7"
+        }
+      }
+    },
+    {
+      "coin": "ETH",
+      "name": "buy pct 0.5%",
+      "szDecimals": 4,
+      "mark": 2398.3,
+      "row": {
+        "coin": "ETH",
+        "side": "B",
+        "limitPx": "2651.7",
+        "sz": "0.0051",
+        "oid": 62187240733,
+        "timestamp": 1791479852173,
+        "triggerCondition": "Activation immediate, retracement 0.5%, best 2398.7",
+        "isTrigger": true,
+        "triggerPx": "2410.69",
+        "children": [],
+        "isPositionTpsl": false,
+        "reduceOnly": true,
+        "orderType": "Trailing Stop Market",
+        "origSz": "0.0051",
+        "tif": null,
+        "cloid": null
+      },
+      "ruleCheck": {
+        "ok": true,
+        "triggerPx": {
+          "hl": "2410.69",
+          "hyPaper": "2410.69"
+        },
+        "limitPx": {
+          "hl": "2651.7",
+          "hyPaper": "2651.7"
+        },
+        "text": {
+          "hl": "Activation immediate, retracement 0.5%, best 2398.7",
+          "hyPaper": "Activation immediate, retracement 0.5%, best 2398.7"
+        }
+      }
+    },
+    {
+      "coin": "ETH",
+      "name": "buy pct 1.2345%",
+      "error": {
+        "status": "err",
+        "response": "Percentage is invalid."
+      }
+    },
+    {
+      "coin": "ETH",
+      "name": "buy px 0.5 act below",
+      "szDecimals": 4,
+      "mark": 2398.3,
+      "row": {
+        "coin": "ETH",
+        "side": "B",
+        "limitPx": "2633.4",
+        "sz": "0.0051",
+        "oid": 62187246116,
+        "timestamp": 1791479856162,
+        "triggerCondition": "Activation below 2393.5, retracement 0.5, best waiting",
+        "isTrigger": true,
+        "triggerPx": "0.0",
+        "children": [],
+        "isPositionTpsl": false,
+        "reduceOnly": true,
+        "orderType": "Trailing Stop Market",
+        "origSz": "0.0051",
+        "tif": null,
+        "cloid": null
+      },
+      "ruleCheck": {
+        "ok": true,
+        "triggerPx": {
+          "hl": "0.0",
+          "hyPaper": "0.0"
+        },
+        "limitPx": {
+          "hl": "2633.4",
+          "hyPaper": "2633.4"
+        },
+        "text": {
+          "hl": "Activation below 2393.5, retracement 0.5, best waiting",
+          "hyPaper": "Activation below 2393.5, retracement 0.5, best waiting"
+        }
+      }
+    }
+  ]
+}
