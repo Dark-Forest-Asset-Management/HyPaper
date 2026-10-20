@@ -19,7 +19,7 @@
 import { redis } from '../store/redis.js';
 import { KEYS } from '../store/keys.js';
 import { nextOid } from '../utils/id.js';
-import { resolveAssetCoin, scopeForAsset, getAssetDecimals } from './order.js';
+import { resolveAssetCoin, scopeForAsset, getAssetDecimals, leverageErrorForOpen } from './order.js';
 import { getFreshMark, refreshMarks } from '../worker/mark-feed.js';
 import {
   validateTrailingStop, validatePxAgainstReference, paramsFromWire, evaluateTrailing, fieldsFrom, buildTrailingBody,
@@ -45,6 +45,14 @@ export async function placeTrailingStop(
   // Validation needs the coin's price decimals (px is normalised to them).
   const semanticError = validateTrailingStop(action, szDecimals);
   if (semanticError) return { error: semanticError };
+
+  // A stop that can open / grow a position is held to the asset's maxLeverage, exactly like an order
+  // (engine/order.ts leverageErrorForOpen). Without this, a leverage stored above the max — set before
+  // updateLeverage enforced the cap — still went live through the trailing-stop path.
+  if (!action.reduceOnly) {
+    const levErr = await leverageErrorForOpen(userId, action.asset, action.isBuy);
+    if (levErr) return { error: levErr };
+  }
 
   // Ask the worker for a per-coin activeAssetCtx (mark) subscription. Lazy import: the
   // worker module pulls in the whole engine and must not be a static dependency of this one.

@@ -1,29 +1,25 @@
 import { getUserFillsPg, getUserFillsByTimePg } from '../store/pg-queries.js';
 import type { PaperFill } from '../types/order.js';
 
-/** Filter fills by dex scope. scope==='' → native rows (coin has no colon).
- *  scope==='xyz' → coin starts with 'xyz:'. Same convention as historicalOrders
- *  filtering in info.ts. Engine-layer post-filter is fine for paper-account
- *  volumes; production SQL would push this into the WHERE clause. */
-function scopeFilterFills(rows: PaperFill[], scope: string): PaperFill[] {
-  if (!scope) return rows.filter((r) => !r.coin.includes(':'));
-  const prefix = `${scope}:`;
-  return rows.filter((r) => r.coin.startsWith(prefix));
-}
+// Fills are NOT filtered by dex. Public HL's userFills / userFillsByTime
+// return every dex's fills for the user and ignore a `dex` param entirely —
+// probed 2026-10-20 for 0x0aafd0eddbffd00ccea26e90436d50a4f8c22839: no dex,
+// dex "xyz", dex "flx" and dex "" all returned the same 2000 rows, every one
+// an `xyz:` coin. HyPaper used to return native rows only when no dex was
+// passed — which is what slushy sends — so HIP-3 fills never reached Trade
+// History.
 
-export async function getUserFills(userId: string, limit = 100, scope = ''): Promise<PaperFill[]> {
-  // Over-fetch when filtering so we still return up to `limit` matching rows
-  // after the post-filter drops the other-scope rows.
-  const rows = await getUserFillsPg(userId, scope ? Math.max(limit * 4, 200) : limit);
-  return scopeFilterFills(rows, scope).slice(0, limit);
+/** HL returns at most the 2000 most recent fills (same probe: 2000 rows). */
+export const HL_USER_FILLS_LIMIT = 2000;
+
+export async function getUserFills(userId: string, limit = HL_USER_FILLS_LIMIT): Promise<PaperFill[]> {
+  return getUserFillsPg(userId, limit);
 }
 
 export async function getUserFillsByTime(
   userId: string,
   startTime: number,
   endTime?: number,
-  scope = '',
 ): Promise<PaperFill[]> {
-  const rows = await getUserFillsByTimePg(userId, startTime, endTime);
-  return scopeFilterFills(rows, scope);
+  return getUserFillsByTimePg(userId, startTime, endTime);
 }

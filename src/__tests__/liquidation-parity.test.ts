@@ -415,3 +415,14 @@ describe('position holder index', () => {
     expect(await r.smembers(KEYS.POSITION_HOLDERS)).toEqual([]);
   });
 });
+
+describe('trailing stops are held to the same leverage cap as orders', () => {
+  it('an opening trailing stop is refused at a stored leverage above max; a reduce-only one is not', async () => {
+    const { placeTrailingStop } = await import('../engine/trailingStop.js');
+    await r.hset(KEYS.USER_LEV(USER, 0), 'leverage', '10', 'isCross', 'false');
+    const wire = { type: 'trailingStop', asset: 0, isBuy: false, sz: '1', reduceOnly: false, retracement: { pct: '5%' }, activationPx: null } as any;
+    expect(await placeTrailingStop(USER, wire)).toEqual({ error: ERR_INVALID_LEVERAGE });
+    // reduce-only skips the leverage check (it then fails later only for lack of a mark here — not for leverage)
+    expect(await placeTrailingStop(USER, { ...wire, reduceOnly: true })).not.toEqual({ error: ERR_INVALID_LEVERAGE });
+  });
+});

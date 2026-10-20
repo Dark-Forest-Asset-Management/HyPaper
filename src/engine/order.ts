@@ -730,7 +730,7 @@ export async function updateLeverage(
  *  above the asset's current maxLeverage — stored before updateLeverage
  *  enforced the cap, or left behind by HL lowering the asset's max — blocks
  *  the open; reducing orders are never blocked. */
-async function leverageErrorForOpen(userId: string, asset: number, isBuy: boolean): Promise<string | null> {
+export async function leverageErrorForOpen(userId: string, asset: number, isBuy: boolean): Promise<string | null> {
   if (isSpotAsset(asset)) return null;
   const szi = (await redis.hget(KEYS.USER_POS(userId, asset), "szi")) ?? "0";
   const reducing = (gt(szi, "0") && !isBuy) || (lt(szi, "0") && isBuy);
