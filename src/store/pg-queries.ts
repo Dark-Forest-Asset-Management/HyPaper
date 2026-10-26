@@ -285,6 +285,9 @@ export async function getNetDepositsPg(userId: string): Promise<string> {
     // loss, already reflected in accountValue.
     if (r.deltaType === 'withdraw') net = net.minus(D(r.usdc));
     else if (r.deltaType === 'deposit') net = net.plus(D(r.usdc));
+    // A master ⇄ sub-account move is a flow, not PnL: `usdc` is stored signed
+    // for this user (see pg-sink recordLedgerUpdate).
+    else if (r.deltaType === 'subAccountTransfer') net = net.plus(D(r.usdc));
   }
   return net.toString();
 }

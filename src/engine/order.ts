@@ -803,6 +803,77 @@ export async function scheduleCancel(
   return { ok: true };
 }
 
+
+// ─── bracket links across a modify ───────────────────────────────────────────
+// A modify is a cancel + replace with a NEW oid, and the bracket links
+// (order:<oid>:parent / :bracket / :children) are keyed by oid. Until this
+// existed the replacement carried none of them: a modified TP child lost its
+// parent pointer (so it was no longer dormant while the entry rested and could
+// fire against an unrelated position) and its OCO siblings (so an SL fill no
+// longer cancelled it). Found 2026-10-23 while chaining an Average In add to
+// the position's bracket.
+//
+//   CHILD modified  → the replacement inherits the parent pointer and the
+//                     sibling set; the parent's children set and each
+//                     sibling's bracket set swap old → new.
+//   PARENT modified → its open children are cascade-cancelled, as HL does for
+//                     a `modify` on a normalTpsl entry (slushy App.tsx
+//                     handleModifyTriggerOrder works around exactly that).
+//   Replacement rejected / filled at once → the old links are dropped; a
+//                     filled parent leaves its children live, as a fill does.
+async function carryBracketLinks(
+  userId: string,
+  oldOid: number,
+  replacement: HlOrderResponseStatus,
+): Promise<void> {
+  const newOid =
+    typeof replacement === "object" && replacement !== null && "resting" in replacement
+      ? replacement.resting?.oid
+      : undefined;
+  const oldStr = oldOid.toString();
+  const parentStr = await redis.get(KEYS.ORDER_PARENT(oldOid));
+  const siblings = await redis.smembers(KEYS.ORDER_BRACKET(oldOid));
+  const children = await redis.smembers(KEYS.ORDER_CHILDREN(oldOid));
+
+  if (children.length > 0) {
+    await redis.del(KEYS.ORDER_CHILDREN(oldOid));
+    const childCancels: HlCancelRequest[] = [];
+    for (const childStr of children) {
+      const childOid = parseInt(childStr, 10);
+      if (!Number.isFinite(childOid)) continue;
+      const childData = await redis.hgetall(KEYS.ORDER(childOid));
+      if (childData.oid && childData.status === "open" && childData.userId === userId) {
+        childCancels.push({ a: parseInt(childData.asset, 10), o: childOid });
+      }
+      await redis.del(KEYS.ORDER_PARENT(childOid));
+      await redis.del(KEYS.ORDER_BRACKET(childOid));
+    }
+    if (childCancels.length > 0) await cancelOrders(userId, childCancels);
+  }
+
+  const pipeline = redis.pipeline();
+  pipeline.del(KEYS.ORDER_BRACKET(oldOid));
+  pipeline.del(KEYS.ORDER_PARENT(oldOid));
+  if (parentStr) {
+    const parentOid = parseInt(parentStr, 10);
+    if (Number.isFinite(parentOid)) {
+      pipeline.srem(KEYS.ORDER_CHILDREN(parentOid), oldStr);
+      if (newOid) {
+        pipeline.sadd(KEYS.ORDER_CHILDREN(parentOid), newOid.toString());
+        pipeline.set(KEYS.ORDER_PARENT(newOid), parentStr);
+      }
+    }
+  }
+  for (const sibStr of siblings) {
+    const sibOid = parseInt(sibStr, 10);
+    if (!Number.isFinite(sibOid)) continue;
+    pipeline.srem(KEYS.ORDER_BRACKET(sibOid), oldStr);
+    if (newOid) pipeline.sadd(KEYS.ORDER_BRACKET(sibOid), newOid.toString());
+  }
+  if (newOid && siblings.length > 0) pipeline.sadd(KEYS.ORDER_BRACKET(newOid), ...siblings);
+  await pipeline.exec();
+}
+
 // ─── modify ──────────────────────────────────────────────────────────────────
 // HL modify = atomic cancel-and-replace.
 // We cancel the old order and place a new one. The new OID is returned
@@ -869,7 +940,8 @@ export async function modifyOrder(
 
   // Place the replacement order (same grouping as original)
   const grouping = orderData.grouping ?? "na";
-  await placeSingleOrder(userId, newWire, grouping);
+  const replacement = await placeSingleOrder(userId, newWire, grouping);
+  await carryBracketLinks(userId, oid, replacement);
 
   return { ok: true };
 }
@@ -944,6 +1016,7 @@ export async function batchModifyOrders(
       // Place replacement and get its status
       const grouping = orderData.grouping ?? "na";
       const status = await placeSingleOrder(userId, m.order, grouping);
+      await carryBracketLinks(userId, m.oid, status);
       results.push(status);
     } catch (err) {
       logger.error({ err, oid: m.oid }, "batchModify error");

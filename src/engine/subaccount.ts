@@ -31,6 +31,7 @@ import { redis } from '../store/redis.js';
 import { KEYS } from '../store/keys.js';
 import { logger } from '../utils/logger.js';
 import { ensureAccount } from '../api/middleware/auth.js';
+import { recordLedgerUpdate } from '../store/pg-sink.js';
 
 // ─── Sub-account helpers ──────────────────────────────────────────────────────
 
@@ -196,6 +197,17 @@ export async function subAccountTransfer(
   pipeline.hset(senderKey,   'balance', newSenderBalance);
   pipeline.hset(receiverKey, 'balance', newReceiverBalance);
   await pipeline.exec();
+
+  // Ledger rows for both sides, so the portfolio's net deposits move with
+  // the balance and PnL does not (HL treats a sub-account transfer as a
+  // flow, not a gain or loss). The ledger endpoint shows the transfer too.
+  const senderId   = isDeposit ? masterUserId : subAddr;
+  const receiverId = isDeposit ? subAddr : masterUserId;
+  const time = Date.now();
+  const usdc = amountUsd.toFixed(6);
+  const delta = { type: 'subAccountTransfer', usdc, user: senderId, destination: receiverId };
+  recordLedgerUpdate(senderId,   { time, deltaType: 'subAccountTransfer', usdc: `-${usdc}`, delta });
+  recordLedgerUpdate(receiverId, { time, deltaType: 'subAccountTransfer', usdc, delta });
 
   logger.info(
     { masterUserId, subAddr, isDeposit, amountUsd },

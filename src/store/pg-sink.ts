@@ -190,18 +190,28 @@ export function recordFunding(userId: string, r: {
 
 /** Record a non-funding balance change (→ /info userNonFundingLedgerUpdates).
  *  Paper emits 'deposit' on account creation + balance top-ups, 'withdraw'
- *  on decreases. Hash is synthesized deterministically (paper has no chain). */
+ *  on decreases, and 'subAccountTransfer' for each side of a master ⇄ sub
+ *  move. Hash is synthesized deterministically (paper has no chain).
+ *
+ *  For 'subAccountTransfer' the `usdc` column is SIGNED from this user's
+ *  point of view (negative for the sender, positive for the receiver) so
+ *  getNetDepositsPg can treat it as a flow; `delta` carries HL's unsigned
+ *  element for the ledger endpoint. Without these rows a transfer showed up
+ *  as PnL (account value moved, net deposits did not), which HL's own
+ *  portfolio never does (checked live 2026-10-26: four sends moved the
+ *  account value and left pnlHistory unchanged). */
 export function recordLedgerUpdate(userId: string, r: {
-  time: number; deltaType: 'deposit' | 'withdraw'; usdc: string;
+  time: number; deltaType: 'deposit' | 'withdraw' | 'subAccountTransfer'; usdc: string;
+  delta?: Record<string, unknown>;
 }): void {
   const hash = keccakId(`${userId}:${r.time}:${r.deltaType}:${r.usdc}`);
   enqueueWrite(async () => {
     await db.insert(ledgerUpdates).values({
-      userId, time: r.time, hash, deltaType: r.deltaType, usdc: r.usdc,
+      userId, time: r.time, hash, deltaType: r.deltaType, usdc: r.usdc, delta: r.delta ?? null,
     });
   });
   // WS userNonFundingLedgerUpdates streams the /info-shaped element.
-  bus?.emit('ledger', { userId, update: { time: r.time, hash, delta: { type: r.deltaType, usdc: r.usdc } } });
+  bus?.emit('ledger', { userId, update: { time: r.time, hash, delta: r.delta ?? { type: r.deltaType, usdc: r.usdc } } });
 }
 
 /** HL's `liquidation` ledger delta, as public HL returns it in
